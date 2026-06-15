@@ -16,6 +16,7 @@ class StarCitizenWikiSource:
         self._settings = settings
         self._cache = cache
         self._session = session
+        self._ship_names: list[str] | None = None
 
     async def lookup(self, query: str) -> LookupResult | None:
         normalized_query = " ".join(query.strip().split())
@@ -57,6 +58,67 @@ class StarCitizenWikiSource:
         result = self._parse_ship_result(data, pledge_data)
         await self._cache.set(cache_key, self._ship_to_cache(result), self._settings.cache_ttl_seconds)
         return result
+
+    async def autocomplete_ships(self, query: str, limit: int = 25) -> list[str]:
+        ship_names = await self._get_ship_names()
+        normalized_query = self._normalize_name(query)
+
+        if not normalized_query:
+            return ship_names[:limit]
+
+        whole_name_starts = []
+        word_starts = []
+        contains = []
+
+        for name in ship_names:
+            normalized_name = self._normalize_name(name)
+            words = normalized_name.split()
+            if normalized_name.startswith(normalized_query):
+                whole_name_starts.append(name)
+            elif any(word.startswith(normalized_query) for word in words):
+                word_starts.append(name)
+            elif normalized_query in normalized_name:
+                contains.append(name)
+
+        return (whole_name_starts + word_starts + contains)[:limit]
+
+    async def _get_ship_names(self) -> list[str]:
+        if self._ship_names is not None:
+            return self._ship_names
+
+        cached = await self._cache.get("star-citizen-wiki:ship-names:v1")
+        if isinstance(cached, list) and all(isinstance(name, str) for name in cached):
+            self._ship_names = cached
+            return self._ship_names
+
+        names = await self._fetch_ship_names()
+        self._ship_names = names
+        await self._cache.set("star-citizen-wiki:ship-names:v1", names, 86400)
+        return names
+
+    async def _fetch_ship_names(self) -> list[str]:
+        names: set[str] = set()
+        page = 1
+        last_page = 1
+
+        while page <= last_page:
+            payload = await self._fetch_json(f"{self.base_url}/api/v2/vehicles?page[number]={page}")
+            if not payload:
+                break
+
+            meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
+            last_page = int(meta.get("last_page") or last_page)
+
+            for vehicle in payload.get("data", []):
+                if not isinstance(vehicle, dict):
+                    continue
+                name = vehicle.get("game_name") or vehicle.get("name")
+                if isinstance(name, str) and name.strip():
+                    names.add(name.strip())
+
+            page += 1
+
+        return sorted(names, key=lambda name: name.lower())
 
     async def _fetch_text(self, url: str) -> str | None:
         try:

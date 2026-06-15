@@ -25,6 +25,21 @@ class SourceRegistry:
                 return result
         return None
 
+    async def autocomplete_ships(self, query: str, limit: int = 25) -> list[str]:
+        seen: set[str] = set()
+        matches: list[str] = []
+
+        for source in self._sources:
+            for name in await source.autocomplete_ships(query, limit):
+                if name in seen:
+                    continue
+                seen.add(name)
+                matches.append(name)
+                if len(matches) >= limit:
+                    return matches
+
+        return matches
+
     async def close(self) -> None:
         for source in self._sources:
             await source.close()

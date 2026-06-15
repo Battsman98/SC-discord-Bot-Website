@@ -73,6 +73,22 @@ async def ship_command(interaction: discord.Interaction, name: str) -> None:
     await interaction.followup.send(embed=build_ship_embed(result))
 
 
+@ship_command.autocomplete("name")
+async def ship_name_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    names = await bot.sources.autocomplete_ships(current)
+    return [
+        app_commands.Choice(name=name[:100], value=name[:100])
+        for name in names[:25]
+    ]
+
+
 async def send_lookup(interaction: discord.Interaction, query: str) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):

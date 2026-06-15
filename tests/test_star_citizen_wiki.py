@@ -1,3 +1,5 @@
+import asyncio
+
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 
 
@@ -79,3 +81,18 @@ def test_parse_ship_result_includes_pledge_and_purchase_data() -> None:
     assert ship.pledge.warbond_price == 100
     assert ship.purchases[0].price == 2010960
     assert ship.purchases[0].location == "Lorville / Hurston / Stanton"
+
+
+def test_autocomplete_ships_prefers_starts_with_matches() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._ship_names = [
+        "Aegis Avenger Titan",
+        "Anvil Carrack",
+        "Drake Cutlass Black",
+        "Origin 600i Executive Edition",
+        "MISC Freelancer",
+    ]
+
+    matches = asyncio.run(source.autocomplete_ships("cut", limit=2))
+
+    assert matches == ["Drake Cutlass Black", "Origin 600i Executive Edition"]
