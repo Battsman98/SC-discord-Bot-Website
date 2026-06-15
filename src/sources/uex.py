@@ -31,7 +31,7 @@ class UEXSource:
         if commodity is None:
             return None
 
-        cache_key = f"uex:commodity:v3:{commodity['name'].lower()}"
+        cache_key = f"uex:commodity:v4:{commodity['name'].lower()}"
         cached = await self._cache.get(cache_key)
         if cached:
             return self._commodity_from_cache(cached)
@@ -131,8 +131,8 @@ class UEXSource:
             is_refined=bool(commodity.get("is_refined")),
             is_harvestable=bool(commodity.get("is_harvestable")),
             wiki_url=self._string_or_none(commodity.get("wiki")),
-            buy_from=sorted(buy_from, key=lambda market: float(market.price))[:5],
-            sell_to=sorted(sell_to, key=lambda market: float(market.price), reverse=True)[:5],
+            buy_from=sorted(buy_from, key=lambda market: float(market.price))[:3],
+            sell_to=sorted(sell_to, key=lambda market: float(market.price), reverse=True)[:3],
             source_name=self.name,
         )
 
