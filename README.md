@@ -16,6 +16,9 @@ Python Discord bot for collecting information from approved websites/APIs and se
 - `/status` checks whether the bot is online.
 - `/lookup` searches Star Citizen game information.
 - `/ship` looks up a Star Citizen ship or vehicle.
+- `/commodity` looks up commodity pricing and locations.
+
+See `docs/commands.md` for the full command reference.
 
 ## Local Setup
 
