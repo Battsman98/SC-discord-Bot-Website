@@ -63,14 +63,14 @@ async def ship_command(interaction: discord.Interaction, name: str) -> None:
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
 
-    await interaction.response.defer(thinking=True)
+    await interaction.response.defer(thinking=True, ephemeral=True)
     result = await bot.sources.lookup_ship(name)
 
     if result is None:
-        await interaction.followup.send(f"No ship or vehicle found for `{name}`.")
+        await interaction.followup.send(f"No ship or vehicle found for `{name}`.", ephemeral=True)
         return
 
-    await interaction.followup.send(embed=build_ship_embed(result))
+    await interaction.followup.send(embed=build_ship_embed(result), ephemeral=True)
 
 
 @ship_command.autocomplete("name")
@@ -95,11 +95,11 @@ async def send_lookup(interaction: discord.Interaction, query: str) -> None:
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
 
-    await interaction.response.defer(thinking=True)
+    await interaction.response.defer(thinking=True, ephemeral=True)
     result = await bot.sources.lookup(query)
 
     if result is None:
-        await interaction.followup.send(f"No result found for `{query}`.")
+        await interaction.followup.send(f"No result found for `{query}`.", ephemeral=True)
         return
 
     embed = discord.Embed(
@@ -109,7 +109,7 @@ async def send_lookup(interaction: discord.Interaction, query: str) -> None:
         color=discord.Color.blurple(),
     )
     embed.set_footer(text=f"Source: {result.source_name}")
-    await interaction.followup.send(embed=embed)
+    await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 def build_ship_embed(result: ShipResult) -> discord.Embed:
