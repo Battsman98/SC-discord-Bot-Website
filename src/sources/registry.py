@@ -41,12 +41,18 @@ class SourceRegistry:
 
         return matches
 
-    async def lookup_commodity(self, query: str, system: str | None = None) -> CommodityResult | None:
+    async def lookup_commodity(
+        self,
+        query: str,
+        system: str | None = None,
+        purchase_system: str | None = None,
+        sell_system: str | None = None,
+    ) -> CommodityResult | None:
         for source in self._sources:
             lookup = getattr(source, "lookup_commodity", None)
             if lookup is None:
                 continue
-            result = await lookup(query, system)
+            result = await lookup(query, system, purchase_system, sell_system)
             if result is not None:
                 return result
         return None

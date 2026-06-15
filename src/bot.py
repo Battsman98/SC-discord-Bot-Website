@@ -93,13 +93,17 @@ async def ship_name_autocomplete(
 @app_commands.command(name="commodity", description="Look up Star Citizen commodity prices and locations.")
 @app_commands.describe(
     name="The commodity name to search for.",
-    system="Optional star system filter, such as Stanton, Pyro, or Nyx.",
+    system="Optional star system filter for both purchase and sell locations.",
+    purchase_system="Optional system filter for purchase locations only.",
+    sell_system="Optional system filter for sell locations only.",
     quantity_scu="Optional SCU amount for estimated buy cost and sell payout.",
 )
 async def commodity_command(
     interaction: discord.Interaction,
     name: str,
     system: str | None = None,
+    purchase_system: str | None = None,
+    sell_system: str | None = None,
     quantity_scu: float | None = None,
 ) -> None:
     bot = interaction.client
@@ -112,13 +116,16 @@ async def commodity_command(
         return
 
     await interaction.response.defer(thinking=True, ephemeral=True)
-    result = await bot.sources.lookup_commodity(name, system)
+    result = await bot.sources.lookup_commodity(name, system, purchase_system, sell_system)
 
     if result is None:
         await interaction.followup.send(f"No commodity found for `{name}`.", ephemeral=True)
         return
 
-    await interaction.followup.send(embed=build_commodity_embed(result, quantity_scu, system), ephemeral=True)
+    await interaction.followup.send(
+        embed=build_commodity_embed(result, quantity_scu, system, purchase_system, sell_system),
+        ephemeral=True,
+    )
 
 
 @commodity_command.autocomplete("name")
@@ -135,6 +142,22 @@ async def commodity_name_autocomplete(
         app_commands.Choice(name=name[:100], value=name[:100])
         for name in names[:25]
     ]
+
+
+@commodity_command.autocomplete("system")
+@commodity_command.autocomplete("purchase_system")
+@commodity_command.autocomplete("sell_system")
+async def commodity_system_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    del interaction
+    systems = ["Stanton", "Pyro", "Nyx"]
+    normalized = current.lower().strip()
+    matches = [system for system in systems if system.lower().startswith(normalized)]
+    if not matches and normalized:
+        matches = [system for system in systems if normalized in system.lower()]
+    return [app_commands.Choice(name=system, value=system) for system in matches[:25]]
 
 
 async def send_lookup(interaction: discord.Interaction, query: str) -> None:
@@ -193,10 +216,15 @@ def build_commodity_embed(
     result: CommodityResult,
     quantity_scu: float | None = None,
     system: str | None = None,
+    purchase_system: str | None = None,
+    sell_system: str | None = None,
 ) -> discord.Embed:
+    purchase_filter = purchase_system or system
+    sell_filter = sell_system or system
     description = [
         _line("Code", result.code),
-        _line("System Filter", system),
+        _line("Purchase System", purchase_filter),
+        _line("Sell System", sell_filter),
     ]
 
     embed = discord.Embed(

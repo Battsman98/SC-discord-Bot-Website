@@ -70,15 +70,38 @@ def test_parse_commodity_orders_buy_and_sell_markets() -> None:
 def test_autocomplete_commodities_prefers_starts_with_matches() -> None:
     source = UEXSource.__new__(UEXSource)
     source._commodities = [
-        {"name": "Agricium"},
-        {"name": "Gold"},
-        {"name": "Golden Medmon"},
-        {"name": "Diamond"},
+        {"name": "Agricium", "code": "AGRI"},
+        {"name": "Gold", "code": "GOLD"},
+        {"name": "Golden Medmon", "code": "GMED"},
+        {"name": "Diamond", "code": "DIAM"},
     ]
 
     matches = asyncio.run(source.autocomplete_commodities("go", limit=2))
 
-    assert matches == ["Gold", "Golden Medmon"]
+    assert matches == ["Gold (GOLD)", "Golden Medmon (GMED)"]
+
+
+def test_autocomplete_commodities_matches_codes() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._commodities = [
+        {"name": "Agricium", "code": "AGRI"},
+        {"name": "Gold", "code": "GOLD"},
+    ]
+
+    matches = asyncio.run(source.autocomplete_commodities("agri", limit=2))
+
+    assert matches == ["Agricium (AGRI)"]
+
+
+def test_find_commodity_accepts_display_name_with_code() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._commodities = [
+        {"name": "Gold", "code": "GOLD"},
+    ]
+
+    match = asyncio.run(source._find_commodity("Gold (GOLD)"))
+
+    assert match == {"name": "Gold", "code": "GOLD"}
 
 
 def test_parse_commodity_filters_by_system_before_limiting() -> None:
@@ -134,3 +157,53 @@ def test_parse_commodity_filters_by_system_before_limiting() -> None:
     assert [market.system for market in result.sell_to] == ["Stanton"]
     assert result.buy_from[0].terminal_name == "Stanton Sale"
     assert result.sell_to[0].terminal_name == "Stanton Sale"
+
+
+def test_parse_commodity_can_filter_purchase_and_sell_systems_separately() -> None:
+    source = UEXSource.__new__(UEXSource)
+    result = source._parse_commodity(
+        {
+            "name": "Gold",
+            "code": "GOLD",
+            "kind": "Metal",
+            "price_buy": 31000,
+            "price_sell": 32000,
+            "is_illegal": 0,
+            "is_mineral": 1,
+            "is_raw": 0,
+            "is_refined": 1,
+            "is_harvestable": 0,
+            "wiki": "https://starcitizen.tools/Gold",
+        },
+        [
+            {
+                "terminal_name": "Pyro Buyer",
+                "price_buy": 60000,
+                "price_buy_avg": 60000,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "price_sell": 0,
+                "status_sell": 0,
+                "outpost_name": "Pyro Outpost",
+                "planet_name": "Bloom",
+                "star_system_name": "Pyro",
+            },
+            {
+                "terminal_name": "Stanton Seller",
+                "price_buy": 0,
+                "status_buy": 0,
+                "price_sell": 20000,
+                "price_sell_avg": 20000,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 40,
+                "city_name": "Area 18",
+                "planet_name": "ArcCorp",
+                "star_system_name": "Stanton",
+            },
+        ],
+        purchase_system="Stanton",
+        sell_system="Pyro",
+    )
+
+    assert [market.terminal_name for market in result.buy_from] == ["Stanton Seller"]
+    assert [market.terminal_name for market in result.sell_to] == ["Pyro Buyer"]

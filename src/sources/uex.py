@@ -26,40 +26,61 @@ class UEXSource:
     async def autocomplete_ships(self, query: str, limit: int = 25) -> list[str]:
         return []
 
-    async def lookup_commodity(self, query: str, system: str | None = None) -> CommodityResult | None:
+    async def lookup_commodity(
+        self,
+        query: str,
+        system: str | None = None,
+        purchase_system: str | None = None,
+        sell_system: str | None = None,
+    ) -> CommodityResult | None:
         commodity = await self._find_commodity(query)
         if commodity is None:
             return None
 
         normalized_system = self._normalize(system)
-        cache_key = f"uex:commodity:v5:{commodity['name'].lower()}:{normalized_system or 'all'}"
+        normalized_purchase_system = self._normalize(purchase_system) or normalized_system
+        normalized_sell_system = self._normalize(sell_system) or normalized_system
+        cache_key = (
+            f"uex:commodity:v6:{commodity['name'].lower()}:"
+            f"buy-{normalized_purchase_system or 'all'}:"
+            f"sell-{normalized_sell_system or 'all'}"
+        )
         cached = await self._cache.get(cache_key)
         if cached:
             return self._commodity_from_cache(cached)
 
         prices = await self._fetch_prices(str(commodity["name"]))
-        result = self._parse_commodity(commodity, prices, system)
+        result = self._parse_commodity(commodity, prices, system, purchase_system, sell_system)
         await self._cache.set(cache_key, self._commodity_to_cache(result), self._settings.cache_ttl_seconds)
         return result
 
     async def autocomplete_commodities(self, query: str, limit: int = 25) -> list[str]:
         commodities = await self._get_commodities()
         normalized_query = self._normalize(query)
-        names = [str(row["name"]) for row in commodities if row.get("name")]
+        names = [self._display_name(row) for row in commodities if row.get("name")]
 
         if not normalized_query:
             return names[:limit]
 
-        starts = [name for name in names if self._normalize(name).startswith(normalized_query)]
+        starts = [
+            self._display_name(row)
+            for row in commodities
+            if self._normalize(row.get("name")).startswith(normalized_query)
+            or self._normalize(row.get("code")).startswith(normalized_query)
+        ]
         contains = [
-            name
-            for name in names
-            if normalized_query in self._normalize(name) and name not in starts
+            self._display_name(row)
+            for row in commodities
+            if (
+                normalized_query in self._normalize(row.get("name"))
+                or normalized_query in self._normalize(row.get("code"))
+            )
+            and self._display_name(row) not in starts
         ]
         return (starts + contains)[:limit]
 
     async def _find_commodity(self, query: str) -> dict | None:
-        normalized_query = self._normalize(query)
+        normalized_query = self._normalize(self._strip_code_suffix(query))
         if not normalized_query:
             return None
 
@@ -72,6 +93,9 @@ class UEXSource:
                 return commodity
         for commodity in commodities:
             if normalized_query in self._normalize(commodity.get("name")):
+                return commodity
+        for commodity in commodities:
+            if normalized_query in self._normalize(commodity.get("code")):
                 return commodity
         return None
 
@@ -111,24 +135,24 @@ class UEXSource:
         commodity: dict,
         prices: list[dict],
         system: str | None = None,
+        purchase_system: str | None = None,
+        sell_system: str | None = None,
     ) -> CommodityResult:
         normalized_system = self._normalize(system)
-        if normalized_system:
-            prices = [
-                row
-                for row in prices
-                if self._normalize(row.get("star_system_name")) == normalized_system
-            ]
+        normalized_purchase_system = self._normalize(purchase_system) or normalized_system
+        normalized_sell_system = self._normalize(sell_system) or normalized_system
+        purchase_prices = self._filter_prices_by_system(prices, normalized_purchase_system)
+        sell_prices = self._filter_prices_by_system(prices, normalized_sell_system)
 
         buy_from = [
             self._market(row, "price_sell_avg", "scu_sell_stock_avg")
-            for row in prices
+            for row in purchase_prices
             if self._positive(row.get("price_sell_avg") or row.get("price_sell"))
             and self._positive(row.get("status_sell"))
         ]
         sell_to = [
             self._market(row, "price_buy_avg", "scu_buy_avg")
-            for row in prices
+            for row in sell_prices
             if self._positive(row.get("price_buy_avg") or row.get("price_buy"))
             and self._positive(row.get("status_buy"))
         ]
@@ -161,6 +185,20 @@ class UEXSource:
             game_version=self._string_or_none(row.get("game_version")),
         )
 
+    def _filter_prices_by_system(self, prices: list[dict], normalized_system: str) -> list[dict]:
+        if not normalized_system:
+            return prices
+        return [
+            row
+            for row in prices
+            if self._normalize(row.get("star_system_name")) == normalized_system
+        ]
+
+    def _display_name(self, commodity: dict) -> str:
+        name = str(commodity.get("name") or "")
+        code = self._string_or_none(commodity.get("code"))
+        return f"{name} ({code})" if code else name
+
     def _location(self, row: dict) -> str | None:
         return self._string_or_none(
             row.get("outpost_name")
@@ -178,6 +216,10 @@ class UEXSource:
 
     def _normalize(self, value: object) -> str:
         return " ".join(str(value or "").lower().replace("-", " ").split())
+
+    def _strip_code_suffix(self, value: object) -> str:
+        text = str(value or "").strip()
+        return text.split("(", 1)[0].strip() if "(" in text and text.endswith(")") else text
 
     def _string_or_none(self, value: object) -> str | None:
         return str(value) if value not in (None, "") else None
