@@ -1,9 +1,5 @@
 # Discord Bot Commands
 
-This file is the running command reference for the Star Citizen Discord bot. Update it whenever commands, options, or behavior change.
-
-If `COMMANDS_CHANNEL_ID` is set in `.env`, the bot posts or updates this command reference in that Discord channel when the bot starts.
-
 ## `/status`
 
 Checks whether the bot is online.

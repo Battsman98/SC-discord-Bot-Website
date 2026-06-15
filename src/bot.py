@@ -296,6 +296,8 @@ def build_commodity_embed(
 def build_commands_reference_embeds() -> list[discord.Embed]:
     reference_path = Path("docs/commands.md")
     markdown = reference_path.read_text(encoding="utf-8").strip()
+    if markdown.startswith("# Discord Bot Commands"):
+        markdown = markdown.removeprefix("# Discord Bot Commands").strip()
     chunks = _chunk_text(markdown, 3500)
     embeds = []
 
