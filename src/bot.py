@@ -93,11 +93,13 @@ async def ship_name_autocomplete(
 @app_commands.command(name="commodity", description="Look up Star Citizen commodity prices and locations.")
 @app_commands.describe(
     name="The commodity name to search for.",
+    system="Optional star system filter, such as Stanton, Pyro, or Nyx.",
     quantity_scu="Optional SCU amount for estimated buy cost and sell payout.",
 )
 async def commodity_command(
     interaction: discord.Interaction,
     name: str,
+    system: str | None = None,
     quantity_scu: float | None = None,
 ) -> None:
     bot = interaction.client
@@ -110,13 +112,13 @@ async def commodity_command(
         return
 
     await interaction.response.defer(thinking=True, ephemeral=True)
-    result = await bot.sources.lookup_commodity(name)
+    result = await bot.sources.lookup_commodity(name, system)
 
     if result is None:
         await interaction.followup.send(f"No commodity found for `{name}`.", ephemeral=True)
         return
 
-    await interaction.followup.send(embed=build_commodity_embed(result, quantity_scu), ephemeral=True)
+    await interaction.followup.send(embed=build_commodity_embed(result, quantity_scu, system), ephemeral=True)
 
 
 @commodity_command.autocomplete("name")
@@ -187,9 +189,14 @@ def build_ship_embed(result: ShipResult) -> discord.Embed:
     return embed
 
 
-def build_commodity_embed(result: CommodityResult, quantity_scu: float | None = None) -> discord.Embed:
+def build_commodity_embed(
+    result: CommodityResult,
+    quantity_scu: float | None = None,
+    system: str | None = None,
+) -> discord.Embed:
     description = [
         _line("Code", result.code),
+        _line("System Filter", system),
     ]
 
     embed = discord.Embed(

@@ -26,18 +26,19 @@ class UEXSource:
     async def autocomplete_ships(self, query: str, limit: int = 25) -> list[str]:
         return []
 
-    async def lookup_commodity(self, query: str) -> CommodityResult | None:
+    async def lookup_commodity(self, query: str, system: str | None = None) -> CommodityResult | None:
         commodity = await self._find_commodity(query)
         if commodity is None:
             return None
 
-        cache_key = f"uex:commodity:v4:{commodity['name'].lower()}"
+        normalized_system = self._normalize(system)
+        cache_key = f"uex:commodity:v5:{commodity['name'].lower()}:{normalized_system or 'all'}"
         cached = await self._cache.get(cache_key)
         if cached:
             return self._commodity_from_cache(cached)
 
         prices = await self._fetch_prices(str(commodity["name"]))
-        result = self._parse_commodity(commodity, prices)
+        result = self._parse_commodity(commodity, prices, system)
         await self._cache.set(cache_key, self._commodity_to_cache(result), self._settings.cache_ttl_seconds)
         return result
 
@@ -105,7 +106,20 @@ class UEXSource:
         except (aiohttp.ClientError, ValueError):
             return None
 
-    def _parse_commodity(self, commodity: dict, prices: list[dict]) -> CommodityResult:
+    def _parse_commodity(
+        self,
+        commodity: dict,
+        prices: list[dict],
+        system: str | None = None,
+    ) -> CommodityResult:
+        normalized_system = self._normalize(system)
+        if normalized_system:
+            prices = [
+                row
+                for row in prices
+                if self._normalize(row.get("star_system_name")) == normalized_system
+            ]
+
         buy_from = [
             self._market(row, "price_sell_avg", "scu_sell_stock_avg")
             for row in prices

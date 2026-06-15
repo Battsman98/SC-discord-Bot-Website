@@ -90,7 +90,7 @@ class GameInfoSource(Protocol):
     async def autocomplete_ships(self, query: str, limit: int = 25) -> list[str]:
         ...
 
-    async def lookup_commodity(self, query: str) -> CommodityResult | None:
+    async def lookup_commodity(self, query: str, system: str | None = None) -> CommodityResult | None:
         ...
 
     async def autocomplete_commodities(self, query: str, limit: int = 25) -> list[str]:
