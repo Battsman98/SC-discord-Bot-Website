@@ -101,3 +101,47 @@ Examples:
 /commodity Gold purchase_system:Stanton sell_system:Pyro
 /commodity Gold purchase_system:Stanton sell_system:Pyro quantity_scu:100
 ```
+
+## `/exec`
+
+Shows the current Executive Hangar clock.
+
+Response visibility: private to the user.
+
+Options: none.
+
+Current output:
+
+- Current Executive Hangar status
+- Current phase
+- Light state
+- Relative countdown to the next phase change
+- Exact local time of the next phase change
+
+## `/cztimer`
+
+Starts a local contested-zone countdown helper.
+
+Response visibility: private to the user.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `timer` | Yes | Timer type to track. |
+| `started_minutes_ago` | No | Minutes already elapsed when starting the helper. |
+
+Timer choices:
+
+- Blue keycard terminal - 15 min
+- Compboard/tablet - 30 min
+- Red supervisor keycard - 30 min
+- Ruin timer door cycle - 20 min
+
+Examples:
+
+```text
+/exec
+/cztimer timer:Blue keycard terminal - 15 min
+/cztimer timer:Compboard/tablet - 30 min started_minutes_ago:5
+```

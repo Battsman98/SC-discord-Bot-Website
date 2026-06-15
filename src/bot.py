@@ -9,6 +9,11 @@ from src.cache import SQLiteCache
 from src.config import Settings
 from src.sources.base import CommodityMarket, CommodityResult, ShipResult
 from src.sources.registry import SourceRegistry, build_default_registry
+from src.timers import (
+    calculate_countdown_end_unix,
+    calculate_exec_hangar_status,
+    fetch_exec_cycle_start_unix,
+)
 
 
 class GameAssistBot(commands.Bot):
@@ -31,6 +36,8 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(lookup_command)
         self.tree.add_command(ship_command)
         self.tree.add_command(commodity_command)
+        self.tree.add_command(exec_command)
+        self.tree.add_command(cztimer_command)
 
         if self.settings.discord_guild_id:
             guild = discord.Object(id=self.settings.discord_guild_id)
@@ -198,6 +205,74 @@ async def commodity_system_autocomplete(
     if not matches and normalized:
         matches = [system for system in systems if normalized in system.lower()]
     return [app_commands.Choice(name=system, value=system) for system in matches[:25]]
+
+
+@app_commands.command(name="exec", description="Show the current Executive Hangar clock.")
+async def exec_command(interaction: discord.Interaction) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    try:
+        cycle_start = await fetch_exec_cycle_start_unix(bot.settings.http_timeout_seconds)
+    except Exception:
+        await interaction.followup.send("Could not fetch the Executive Hangar timer right now.", ephemeral=True)
+        return
+
+    status = calculate_exec_hangar_status(cycle_start)
+    embed = discord.Embed(
+        title="Executive Hangar Clock",
+        description=f"Status: {status.status}\nPhase: {status.status_detail}",
+        url=status.source_url,
+        color=discord.Color.green() if status.status == "Open" else discord.Color.red(),
+    )
+    embed.add_field(name="Lights", value=status.lights, inline=False)
+    embed.add_field(name="Next Change", value=f"<t:{status.next_change_unix}:R>", inline=True)
+    embed.add_field(name="At", value=f"<t:{status.next_change_unix}:T>", inline=True)
+    embed.set_footer(text="Source: contestedzonetimers.com")
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@app_commands.command(name="cztimer", description="Start a local contested-zone countdown.")
+@app_commands.describe(
+    timer="The contested-zone timer to track.",
+    started_minutes_ago="Optional minutes already elapsed.",
+)
+@app_commands.choices(
+    timer=[
+        app_commands.Choice(name="Blue keycard terminal - 15 min", value="blue_keycard"),
+        app_commands.Choice(name="Compboard/tablet - 30 min", value="compboard"),
+        app_commands.Choice(name="Red supervisor keycard - 30 min", value="red_keycard"),
+        app_commands.Choice(name="Ruin timer door cycle - 20 min", value="ruin_timer_door"),
+    ]
+)
+async def cztimer_command(
+    interaction: discord.Interaction,
+    timer: app_commands.Choice[str],
+    started_minutes_ago: int = 0,
+) -> None:
+    if started_minutes_ago < 0:
+        await interaction.response.send_message("Elapsed minutes cannot be negative.", ephemeral=True)
+        return
+
+    durations = {
+        "blue_keycard": ("Blue Keycard Terminal", 15 * 60),
+        "compboard": ("Compboard / Tablet", 30 * 60),
+        "red_keycard": ("Red Supervisor Keycard", 30 * 60),
+        "ruin_timer_door": ("Ruin Timer Door Cycle", 20 * 60),
+    }
+    label, duration = durations[timer.value]
+    ends_at = calculate_countdown_end_unix(duration, started_minutes_ago)
+
+    embed = discord.Embed(
+        title=label,
+        description=f"Ready <t:{ends_at}:R>\nReady at <t:{ends_at}:T>",
+        color=discord.Color.orange(),
+    )
+    embed.set_footer(text="Local helper timer based on known contested-zone durations")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def send_lookup(interaction: discord.Interaction, query: str) -> None:

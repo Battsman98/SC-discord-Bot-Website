@@ -17,6 +17,8 @@ Python Discord bot for collecting information from approved websites/APIs and se
 - `/lookup` searches Star Citizen game information.
 - `/ship` looks up a Star Citizen ship or vehicle.
 - `/commodity` looks up commodity pricing and locations.
+- `/exec` shows the Executive Hangar clock.
+- `/cztimer` starts a contested-zone helper countdown.
 
 See `docs/commands.md` for the full command reference.
 
