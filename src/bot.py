@@ -26,6 +26,7 @@ class GameAssistBot(commands.Bot):
     async def setup_hook(self) -> None:
         self.tree.add_command(status_command)
         self.tree.add_command(lookup_command)
+        self.tree.add_command(ship_command)
 
         if self.settings.discord_guild_id:
             guild = discord.Object(id=self.settings.discord_guild_id)
@@ -47,9 +48,19 @@ async def status_command(interaction: discord.Interaction) -> None:
     await interaction.response.send_message("Online and ready.", ephemeral=True)
 
 
-@app_commands.command(name="lookup", description="Search configured game information sources.")
-@app_commands.describe(query="The item, quest, enemy, location, or topic to search for.")
+@app_commands.command(name="lookup", description="Search Star Citizen game information.")
+@app_commands.describe(query="The ship, item, location, mission, company, or topic to search for.")
 async def lookup_command(interaction: discord.Interaction, query: str) -> None:
+    await send_lookup(interaction, query)
+
+
+@app_commands.command(name="ship", description="Look up a Star Citizen ship or vehicle.")
+@app_commands.describe(name="The ship or vehicle name to search for.")
+async def ship_command(interaction: discord.Interaction, name: str) -> None:
+    await send_lookup(interaction, name)
+
+
+async def send_lookup(interaction: discord.Interaction, query: str) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)

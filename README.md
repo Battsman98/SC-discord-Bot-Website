@@ -6,9 +6,16 @@ Python Discord bot for collecting information from approved websites/APIs and se
 
 - Slash command-ready Discord bot using `discord.py`
 - Environment-based secrets through `.env`
-- Website/API source abstraction for adding game data providers
+- Star Citizen lookup support through Star Citizen Wiki data
+- Website/API source abstraction for adding more game data providers
 - SQLite cache to avoid repeated website requests
 - VPS-friendly `systemd` service example
+
+## Discord Commands
+
+- `/status` checks whether the bot is online.
+- `/lookup` searches Star Citizen game information.
+- `/ship` looks up a Star Citizen ship or vehicle.
 
 ## Local Setup
 

@@ -14,8 +14,9 @@ class Settings:
     cache_ttl_seconds: int
 
     @classmethod
-    def from_env(cls) -> "Settings":
-        load_dotenv()
+    def from_env(cls, load_env_file: bool = True) -> "Settings":
+        if load_env_file:
+            load_dotenv()
 
         discord_token = os.getenv("DISCORD_TOKEN", "").strip()
         if not discord_token or discord_token == "replace-with-your-discord-bot-token":

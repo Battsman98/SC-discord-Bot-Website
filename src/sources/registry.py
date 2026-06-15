@@ -3,7 +3,7 @@ import aiohttp
 from src.cache import SQLiteCache
 from src.config import Settings
 from src.sources.base import GameInfoSource, LookupResult
-from src.sources.example import ExampleWebsiteSource
+from src.sources.star_citizen_wiki import StarCitizenWikiSource
 
 
 class SourceRegistry:
@@ -28,6 +28,6 @@ async def build_default_registry(settings: Settings, cache: SQLiteCache) -> Sour
     timeout = aiohttp.ClientTimeout(total=settings.http_timeout_seconds)
     session = aiohttp.ClientSession(timeout=timeout)
     sources: list[GameInfoSource] = [
-        ExampleWebsiteSource(settings, cache, session),
+        StarCitizenWikiSource(settings, cache, session),
     ]
     return SourceRegistry(sources, session)
