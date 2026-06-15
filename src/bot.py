@@ -6,6 +6,7 @@ from discord.ext import commands
 
 from src.cache import SQLiteCache
 from src.config import Settings
+from src.sources.base import ShipResult
 from src.sources.registry import SourceRegistry, build_default_registry
 
 
@@ -57,7 +58,19 @@ async def lookup_command(interaction: discord.Interaction, query: str) -> None:
 @app_commands.command(name="ship", description="Look up a Star Citizen ship or vehicle.")
 @app_commands.describe(name="The ship or vehicle name to search for.")
 async def ship_command(interaction: discord.Interaction, name: str) -> None:
-    await send_lookup(interaction, name)
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True)
+    result = await bot.sources.lookup_ship(name)
+
+    if result is None:
+        await interaction.followup.send(f"No ship or vehicle found for `{name}`.")
+        return
+
+    await interaction.followup.send(embed=build_ship_embed(result))
 
 
 async def send_lookup(interaction: discord.Interaction, query: str) -> None:
@@ -81,6 +94,101 @@ async def send_lookup(interaction: discord.Interaction, query: str) -> None:
     )
     embed.set_footer(text=f"Source: {result.source_name}")
     await interaction.followup.send(embed=embed)
+
+
+def build_ship_embed(result: ShipResult) -> discord.Embed:
+    embed = discord.Embed(
+        title=result.name,
+        description=result.description or "No basic description available.",
+        url=result.source_url,
+        color=discord.Color.dark_teal(),
+    )
+
+    overview = [
+        _line("Manufacturer", result.manufacturer),
+        _line("Type", result.vehicle_type),
+        _line("Career", result.career),
+        _line("Role", result.role),
+        _line("Size", result.size),
+        _line("Status", result.status),
+    ]
+    embed.add_field(name="Overview", value="\n".join(line for line in overview if line) or "Unknown", inline=False)
+
+    specs = [
+        _line("Cargo", f"{_format_number(result.cargo_capacity)} SCU" if result.cargo_capacity is not None else None),
+        _line("Crew", str(result.crew) if result.crew is not None else None),
+        _line("Length", f"{_format_number(result.length)} m" if result.length is not None else None),
+        _line("Beam", f"{_format_number(result.beam)} m" if result.beam is not None else None),
+        _line("Height", f"{_format_number(result.height)} m" if result.height is not None else None),
+    ]
+    embed.add_field(name="Specs", value="\n".join(line for line in specs if line) or "Unknown", inline=False)
+
+    embed.add_field(name="Pledge Store", value=_format_pledge(result), inline=False)
+    embed.add_field(name="In-Game Purchase", value=_format_purchases(result), inline=False)
+    embed.set_footer(text=f"Source: {result.source_name} + UEX pledge/pricing data")
+    return embed
+
+
+def _format_pledge(result: ShipResult) -> str:
+    pledge = result.pledge
+    if pledge is None:
+        return "No pledge store data found."
+
+    lines = []
+    if pledge.is_on_sale is True:
+        lines.append("Availability: Available")
+    elif pledge.is_on_sale is False:
+        lines.append("Availability: Not currently listed as on sale")
+    else:
+        lines.append("Availability: Unknown")
+
+    if pledge.price is not None:
+        lines.append(f"Pledge price: {_format_currency(pledge.price, pledge.currency)}")
+    if pledge.warbond_price is not None:
+        lines.append(f"Warbond: {_format_currency(pledge.warbond_price, pledge.currency)}")
+    if pledge.package_price is not None:
+        lines.append(f"Package: {_format_currency(pledge.package_price, pledge.currency)}")
+    if pledge.pledge_url:
+        lines.append(f"[Open pledge page]({pledge.pledge_url})")
+    else:
+        lines.append("[Open RSI pledge store](https://robertsspaceindustries.com/en/pledge)")
+
+    return "\n".join(lines)
+
+
+def _format_purchases(result: ShipResult) -> str:
+    if not result.purchases:
+        return "No in-game purchase locations found."
+
+    lines = []
+    for purchase in result.purchases:
+        terminal = purchase.terminal_name
+        if purchase.uex_link:
+            terminal = f"[{terminal}]({purchase.uex_link})"
+        location = f" - {purchase.location}" if purchase.location else ""
+        lines.append(f"{_format_currency(purchase.price, 'aUEC')} at {terminal}{location}")
+    return "\n".join(lines)
+
+
+def _line(label: str, value: str | None) -> str | None:
+    return f"{label}: {value}" if value else None
+
+
+def _format_currency(value: int | float, currency: str) -> str:
+    amount = _format_number(value)
+    if currency == "aUEC":
+        return f"{amount} aUEC"
+    if currency == "USD":
+        return f"${amount} USD"
+    return f"{amount} {currency}"
+
+
+def _format_number(value: int | float | None) -> str:
+    if value is None:
+        return "Unknown"
+    if isinstance(value, float) and not value.is_integer():
+        return f"{value:,.2f}"
+    return f"{int(value):,}"
 
 
 def configure_logging() -> None:
