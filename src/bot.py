@@ -188,22 +188,8 @@ def build_ship_embed(result: ShipResult) -> discord.Embed:
 
 
 def build_commodity_embed(result: CommodityResult, quantity_scu: float | None = None) -> discord.Embed:
-    flags = []
-    if result.is_illegal:
-        flags.append("Illegal")
-    if result.is_mineral:
-        flags.append("Mineral")
-    if result.is_raw:
-        flags.append("Raw")
-    if result.is_refined:
-        flags.append("Refined")
-    if result.is_harvestable:
-        flags.append("Harvestable")
-
     description = [
         _line("Code", result.code),
-        _line("Kind", result.kind),
-        _line("Flags", ", ".join(flags) if flags else "None"),
     ]
 
     embed = discord.Embed(
