@@ -11,6 +11,7 @@ from src.config import Settings
 from src.sources.base import CommodityMarket, CommodityResult, ShipResult
 from src.sources.registry import SourceRegistry, build_default_registry
 from src.timers import (
+    ExecHangarStatus,
     calculate_countdown_end_unix,
     calculate_cycle_start_from_phase,
     calculate_exec_hangar_status,
@@ -118,13 +119,12 @@ class GameAssistBot(commands.Bot):
             return
 
         try:
-            cycle_start, source_label = await self.resolve_exec_cycle_start()
-            status = calculate_exec_hangar_status(cycle_start)
+            status_context = await self.resolve_exec_status_context()
         except Exception:
             logging.warning("Could not fetch Executive Hangar timer for status message")
             return
 
-        embed = build_exec_status_embed(status, source_label)
+        embed = build_exec_status_embed(status_context)
         cache_key = f"discord:exec-status-message:{self.settings.exec_status_channel_id}"
         message_id = await self.cache.get(cache_key)
 
@@ -148,6 +148,25 @@ class GameAssistBot(commands.Bot):
 
         cycle_start = await fetch_exec_cycle_start_unix(self.settings.http_timeout_seconds)
         return cycle_start, "contestedzonetimers.com community timer"
+
+    async def resolve_exec_status_context(self) -> dict:
+        source_cycle_start = await fetch_exec_cycle_start_unix(self.settings.http_timeout_seconds)
+        source_status = calculate_exec_hangar_status(source_cycle_start)
+        override = await self.cache.get(EXEC_OVERRIDE_CACHE_KEY)
+
+        if isinstance(override, dict) and isinstance(override.get("cycle_start_unix"), int):
+            corrected_status = calculate_exec_hangar_status(override["cycle_start_unix"])
+            return {
+                "source_status": source_status,
+                "corrected_status": corrected_status,
+                "override": override,
+            }
+
+        return {
+            "source_status": source_status,
+            "corrected_status": None,
+            "override": None,
+        }
 
     async def close(self) -> None:
         if self._exec_status_task:
@@ -281,13 +300,12 @@ async def exec_command(interaction: discord.Interaction) -> None:
 
     await interaction.response.defer(thinking=True)
     try:
-        cycle_start, source_label = await bot.resolve_exec_cycle_start()
+        status_context = await bot.resolve_exec_status_context()
     except Exception:
         await interaction.followup.send("Could not fetch the Executive Hangar timer right now.")
         return
 
-    status = calculate_exec_hangar_status(cycle_start)
-    await interaction.followup.send(embed=build_exec_status_embed(status, source_label))
+    await interaction.followup.send(embed=build_exec_status_embed(status_context))
 
 
 @app_commands.command(name="execset", description="Correct the Executive Hangar timer.")
@@ -327,6 +345,8 @@ async def execset_command(
         {
             "cycle_start_unix": cycle_start,
             "updated_by": interaction.user.id,
+            "updated_by_name": str(interaction.user),
+            "updated_at_unix": discord.utils.utcnow().timestamp(),
             "phase": phase.value,
             "remaining_minutes": remaining_minutes,
         },
@@ -352,18 +372,50 @@ async def execclear_command(interaction: discord.Interaction) -> None:
     await interaction.response.send_message("Executive Hangar timer override cleared. Using community timer source again.", ephemeral=True)
 
 
-def build_exec_status_embed(status, source_label: str) -> discord.Embed:
+def build_exec_status_embed(status_context: dict) -> discord.Embed:
+    source_status = status_context["source_status"]
+    corrected_status = status_context.get("corrected_status")
+    override = status_context.get("override")
+    display_status = corrected_status or source_status
+
     embed = discord.Embed(
         title="Executive Hangar Clock",
-        description=f"Status: {status.status}\nPhase: {status.status_detail}",
-        url=status.source_url,
-        color=discord.Color.green() if status.status == "Open" else discord.Color.red(),
+        description=f"Status: {display_status.status}\nPhase: {display_status.status_detail}",
+        url=display_status.source_url,
+        color=discord.Color.green() if display_status.status == "Open" else discord.Color.red(),
     )
-    embed.add_field(name="Lights", value=status.lights, inline=False)
-    embed.add_field(name="Next Change", value=f"<t:{status.next_change_unix}:R>", inline=True)
-    embed.add_field(name="At", value=f"<t:{status.next_change_unix}:T>", inline=True)
-    embed.set_footer(text=f"Source: {source_label}, auto-updated every 60s when pinned")
+    embed.add_field(name="Active Timer", value=_format_exec_status(display_status), inline=False)
+
+    if corrected_status is not None and isinstance(override, dict):
+        embed.add_field(name="Website Source Timer", value=_format_exec_status(source_status), inline=False)
+        updated_by = override.get("updated_by")
+        updated_by_name = override.get("updated_by_name")
+        if isinstance(updated_by, int):
+            user = f"<@{updated_by}>"
+        else:
+            user = str(updated_by_name or "Unknown user")
+        updated_at = override.get("updated_at_unix")
+        updated_line = f"\nUpdated: <t:{int(updated_at)}:R>" if isinstance(updated_at, (int, float)) else ""
+        embed.add_field(
+            name="Manual Correction",
+            value=f"Corrected by: {user}{updated_line}",
+            inline=False,
+        )
+
+    embed.set_footer(
+        text="Source timer: contestedzonetimers.com community timer. Corrected timer shown when manually adjusted."
+    )
     return embed
+
+
+def _format_exec_status(status: ExecHangarStatus) -> str:
+    return (
+        f"Status: {status.status}\n"
+        f"Phase: {status.status_detail}\n"
+        f"Lights: {status.lights}\n"
+        f"Next Change: <t:{status.next_change_unix}:R>\n"
+        f"At: <t:{status.next_change_unix}:T>"
+    )
 
 
 def _can_manage_exec_timer(interaction: discord.Interaction, settings: Settings) -> bool:

@@ -119,6 +119,8 @@ Current output:
 - Light state
 - Relative countdown to the next phase change
 - Exact local time of the next phase change
+- If manually corrected, the embed shows both the website source timer and the corrected active timer
+- If manually corrected, the embed shows which user made the correction
 
 Data source:
 
@@ -145,6 +147,7 @@ Options:
 | `remaining_minutes` | Yes | Minutes remaining in the selected phase. |
 
 When used, the bot stores a manual override and updates the public Executive Hangar status message.
+While active, `/exec` and the public status message show both the community source timer and the corrected timer.
 
 Examples:
 
