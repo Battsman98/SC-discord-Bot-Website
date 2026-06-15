@@ -107,7 +107,6 @@ def build_ship_embed(result: ShipResult) -> discord.Embed:
     overview = [
         _line("Manufacturer", result.manufacturer),
         _line("Type", result.vehicle_type),
-        _line("Career", result.career),
         _line("Role", result.role),
         _line("Size", result.size),
         _line("Status", result.status),
@@ -117,9 +116,6 @@ def build_ship_embed(result: ShipResult) -> discord.Embed:
     specs = [
         _line("Cargo", f"{_format_number(result.cargo_capacity)} SCU" if result.cargo_capacity is not None else None),
         _line("Crew", str(result.crew) if result.crew is not None else None),
-        _line("Length", f"{_format_number(result.length)} m" if result.length is not None else None),
-        _line("Beam", f"{_format_number(result.beam)} m" if result.beam is not None else None),
-        _line("Height", f"{_format_number(result.height)} m" if result.height is not None else None),
     ]
     embed.add_field(name="Specs", value="\n".join(line for line in specs if line) or "Unknown", inline=False)
 
