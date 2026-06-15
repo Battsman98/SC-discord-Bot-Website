@@ -10,6 +10,7 @@ class Settings:
     discord_guild_id: int | None
     commands_channel_id: int | None
     exec_status_channel_id: int | None
+    exec_admin_role_ids: tuple[int, ...]
     command_prefix: str
     database_path: str
     http_timeout_seconds: int
@@ -27,12 +28,18 @@ class Settings:
         guild_id = os.getenv("DISCORD_GUILD_ID", "").strip()
         commands_channel_id = os.getenv("COMMANDS_CHANNEL_ID", "").strip()
         exec_status_channel_id = os.getenv("EXEC_STATUS_CHANNEL_ID", "").strip()
+        exec_admin_role_ids = tuple(
+            int(role_id.strip())
+            for role_id in os.getenv("EXEC_ADMIN_ROLE_IDS", "").split(",")
+            if role_id.strip()
+        )
 
         return cls(
             discord_token=discord_token,
             discord_guild_id=int(guild_id) if guild_id else None,
             commands_channel_id=int(commands_channel_id) if commands_channel_id else None,
             exec_status_channel_id=int(exec_status_channel_id) if exec_status_channel_id else None,
+            exec_admin_role_ids=exec_admin_role_ids,
             command_prefix=os.getenv("BOT_COMMAND_PREFIX", "!"),
             database_path=os.getenv("DATABASE_PATH", "data/bot.sqlite3"),
             http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "15")),

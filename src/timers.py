@@ -10,6 +10,16 @@ EXEC_RED_PHASE_SECONDS = 2 * 60 * 60
 EXEC_GREEN_PHASE_SECONDS = 1 * 60 * 60
 EXEC_BLACK_PHASE_SECONDS = 5 * 60
 EXEC_TOTAL_CYCLE_SECONDS = EXEC_RED_PHASE_SECONDS + EXEC_GREEN_PHASE_SECONDS + EXEC_BLACK_PHASE_SECONDS
+EXEC_PHASE_DURATIONS = {
+    "closed": EXEC_RED_PHASE_SECONDS,
+    "open": EXEC_GREEN_PHASE_SECONDS,
+    "resetting": EXEC_BLACK_PHASE_SECONDS,
+}
+EXEC_PHASE_OFFSETS = {
+    "closed": 0,
+    "open": EXEC_RED_PHASE_SECONDS,
+    "resetting": EXEC_RED_PHASE_SECONDS + EXEC_GREEN_PHASE_SECONDS,
+}
 
 
 @dataclass(frozen=True)
@@ -82,6 +92,26 @@ def calculate_exec_hangar_status(cycle_start_unix: int, now_unix: int | None = N
 def calculate_countdown_end_unix(duration_seconds: int, started_minutes_ago: int = 0) -> int:
     remaining = max(0, duration_seconds - started_minutes_ago * 60)
     return int(time.time()) + remaining
+
+
+def calculate_cycle_start_from_phase(
+    phase: str,
+    remaining_minutes: int,
+    now_unix: int | None = None,
+) -> int:
+    normalized_phase = phase.lower().strip()
+    if normalized_phase not in EXEC_PHASE_DURATIONS:
+        raise ValueError(f"Unknown Executive Hangar phase: {phase}")
+
+    duration = EXEC_PHASE_DURATIONS[normalized_phase]
+    remaining_seconds = remaining_minutes * 60
+    if remaining_seconds < 0 or remaining_seconds > duration:
+        raise ValueError("Remaining minutes are outside the selected phase duration")
+
+    now = now_unix if now_unix is not None else int(time.time())
+    phase_elapsed = duration - remaining_seconds
+    cycle_elapsed = EXEC_PHASE_OFFSETS[normalized_phase] + phase_elapsed
+    return now - cycle_elapsed
 
 
 def _exec_red_phase_lights(phase_elapsed: int) -> str:

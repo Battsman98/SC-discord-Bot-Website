@@ -3,6 +3,7 @@ from src.timers import (
     EXEC_GREEN_PHASE_SECONDS,
     EXEC_RED_PHASE_SECONDS,
     calculate_countdown_end_unix,
+    calculate_cycle_start_from_phase,
     calculate_exec_hangar_status,
 )
 
@@ -39,3 +40,12 @@ def test_countdown_end_accounts_for_elapsed_minutes(monkeypatch) -> None:
     monkeypatch.setattr("src.timers.time.time", lambda: 1_000)
 
     assert calculate_countdown_end_unix(15 * 60, started_minutes_ago=5) == 1_600
+
+
+def test_calculate_cycle_start_from_open_phase() -> None:
+    cycle_start = calculate_cycle_start_from_phase("open", remaining_minutes=30, now_unix=10_000)
+
+    status = calculate_exec_hangar_status(cycle_start, 10_000)
+
+    assert status.status == "Open"
+    assert status.phase_remaining_seconds == 30 * 60

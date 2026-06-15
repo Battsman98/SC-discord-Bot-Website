@@ -12,9 +12,13 @@ from src.sources.base import CommodityMarket, CommodityResult, ShipResult
 from src.sources.registry import SourceRegistry, build_default_registry
 from src.timers import (
     calculate_countdown_end_unix,
+    calculate_cycle_start_from_phase,
     calculate_exec_hangar_status,
     fetch_exec_cycle_start_unix,
 )
+
+
+EXEC_OVERRIDE_CACHE_KEY = "exec:cycle-start-override"
 
 
 class GameAssistBot(commands.Bot):
@@ -39,6 +43,8 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(ship_command)
         self.tree.add_command(commodity_command)
         self.tree.add_command(exec_command)
+        self.tree.add_command(execset_command)
+        self.tree.add_command(execclear_command)
         self.tree.add_command(cztimer_command)
 
         if self.settings.discord_guild_id:
@@ -112,13 +118,13 @@ class GameAssistBot(commands.Bot):
             return
 
         try:
-            cycle_start = await fetch_exec_cycle_start_unix(self.settings.http_timeout_seconds)
+            cycle_start, source_label = await self.resolve_exec_cycle_start()
             status = calculate_exec_hangar_status(cycle_start)
         except Exception:
             logging.warning("Could not fetch Executive Hangar timer for status message")
             return
 
-        embed = build_exec_status_embed(status)
+        embed = build_exec_status_embed(status, source_label)
         cache_key = f"discord:exec-status-message:{self.settings.exec_status_channel_id}"
         message_id = await self.cache.get(cache_key)
 
@@ -134,6 +140,14 @@ class GameAssistBot(commands.Bot):
         message = await channel.send(embed=embed)
         await self.cache.set(cache_key, message.id, 315360000)
         logging.info("Created Executive Hangar status message %s", message.id)
+
+    async def resolve_exec_cycle_start(self) -> tuple[int, str]:
+        override = await self.cache.get(EXEC_OVERRIDE_CACHE_KEY)
+        if isinstance(override, dict) and isinstance(override.get("cycle_start_unix"), int):
+            return override["cycle_start_unix"], "Manual override"
+
+        cycle_start = await fetch_exec_cycle_start_unix(self.settings.http_timeout_seconds)
+        return cycle_start, "contestedzonetimers.com community timer"
 
     async def close(self) -> None:
         if self._exec_status_task:
@@ -267,16 +281,78 @@ async def exec_command(interaction: discord.Interaction) -> None:
 
     await interaction.response.defer(thinking=True)
     try:
-        cycle_start = await fetch_exec_cycle_start_unix(bot.settings.http_timeout_seconds)
+        cycle_start, source_label = await bot.resolve_exec_cycle_start()
     except Exception:
         await interaction.followup.send("Could not fetch the Executive Hangar timer right now.")
         return
 
     status = calculate_exec_hangar_status(cycle_start)
-    await interaction.followup.send(embed=build_exec_status_embed(status))
+    await interaction.followup.send(embed=build_exec_status_embed(status, source_label))
 
 
-def build_exec_status_embed(status) -> discord.Embed:
+@app_commands.command(name="execset", description="Correct the Executive Hangar timer.")
+@app_commands.describe(
+    phase="Current Executive Hangar phase.",
+    remaining_minutes="Minutes remaining in the selected phase.",
+)
+@app_commands.choices(
+    phase=[
+        app_commands.Choice(name="Closed", value="closed"),
+        app_commands.Choice(name="Open", value="open"),
+        app_commands.Choice(name="Resetting", value="resetting"),
+    ]
+)
+async def execset_command(
+    interaction: discord.Interaction,
+    phase: app_commands.Choice[str],
+    remaining_minutes: int,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    if not _can_manage_exec_timer(interaction, bot.settings):
+        await interaction.response.send_message("You do not have permission to update the Executive Hangar timer.", ephemeral=True)
+        return
+
+    try:
+        cycle_start = calculate_cycle_start_from_phase(phase.value, remaining_minutes)
+    except ValueError as error:
+        await interaction.response.send_message(str(error), ephemeral=True)
+        return
+
+    await bot.cache.set(
+        EXEC_OVERRIDE_CACHE_KEY,
+        {
+            "cycle_start_unix": cycle_start,
+            "updated_by": interaction.user.id,
+            "phase": phase.value,
+            "remaining_minutes": remaining_minutes,
+        },
+        315360000,
+    )
+    await bot.sync_exec_status_message()
+    await interaction.response.send_message("Executive Hangar timer override saved and status message updated.", ephemeral=True)
+
+
+@app_commands.command(name="execclear", description="Clear the manual Executive Hangar timer override.")
+async def execclear_command(interaction: discord.Interaction) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    if not _can_manage_exec_timer(interaction, bot.settings):
+        await interaction.response.send_message("You do not have permission to clear the Executive Hangar timer.", ephemeral=True)
+        return
+
+    await bot.cache.delete(EXEC_OVERRIDE_CACHE_KEY)
+    await bot.sync_exec_status_message()
+    await interaction.response.send_message("Executive Hangar timer override cleared. Using community timer source again.", ephemeral=True)
+
+
+def build_exec_status_embed(status, source_label: str) -> discord.Embed:
     embed = discord.Embed(
         title="Executive Hangar Clock",
         description=f"Status: {status.status}\nPhase: {status.status_detail}",
@@ -286,8 +362,20 @@ def build_exec_status_embed(status) -> discord.Embed:
     embed.add_field(name="Lights", value=status.lights, inline=False)
     embed.add_field(name="Next Change", value=f"<t:{status.next_change_unix}:R>", inline=True)
     embed.add_field(name="At", value=f"<t:{status.next_change_unix}:T>", inline=True)
-    embed.set_footer(text="Source: contestedzonetimers.com community timer, auto-updated every 60s when pinned")
+    embed.set_footer(text=f"Source: {source_label}, auto-updated every 60s when pinned")
     return embed
+
+
+def _can_manage_exec_timer(interaction: discord.Interaction, settings: Settings) -> bool:
+    user = interaction.user
+    if not isinstance(user, discord.Member):
+        return False
+
+    if settings.exec_admin_role_ids:
+        user_role_ids = {role.id for role in user.roles}
+        return bool(user_role_ids.intersection(settings.exec_admin_role_ids))
+
+    return user.guild_permissions.manage_guild
 
 
 @app_commands.command(name="cztimer", description="Start a local contested-zone countdown.")

@@ -18,6 +18,8 @@ Python Discord bot for collecting information from approved websites/APIs and se
 - `/ship` looks up a Star Citizen ship or vehicle.
 - `/commodity` looks up commodity pricing and locations.
 - `/exec` shows the Executive Hangar clock.
+- `/execset` corrects the Executive Hangar clock for approved users.
+- `/execclear` clears an Executive Hangar manual override.
 - `/cztimer` starts a contested-zone helper countdown.
 
 See `docs/commands.md` for the full command reference.
@@ -25,6 +27,8 @@ See `docs/commands.md` for the full command reference.
 Set `COMMANDS_CHANNEL_ID` in `.env` to have the bot auto-post/update the command reference in a Discord channel on startup.
 
 Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive Hangar status message updated every 60 seconds.
+
+Set comma-separated `EXEC_ADMIN_ROLE_IDS` in `.env` to restrict `/execset` and `/execclear` to specific Discord roles. If no role IDs are configured, users with Manage Server can use those commands.
 
 ## Local Setup
 

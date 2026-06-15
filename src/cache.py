@@ -58,5 +58,9 @@ class SQLiteCache:
         )
         self._connection.commit()
 
+    async def delete(self, cache_key: str) -> None:
+        self._connection.execute("DELETE FROM cache_entries WHERE cache_key = ?", (cache_key,))
+        self._connection.commit()
+
     async def close(self) -> None:
         self._connection.close()

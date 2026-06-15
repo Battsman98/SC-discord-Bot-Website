@@ -126,6 +126,45 @@ Data source:
 - The bot calculates status locally from the community timer model used by `contestedzonetimers.com`.
 - This is a community timer, not official CIG server telemetry.
 
+## `/execset`
+
+Manually corrects the Executive Hangar clock when the timer is wrong.
+
+Response visibility: private to the user.
+
+Permissions:
+
+- If `EXEC_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
+- If no role IDs are configured yet, users must have Discord's Manage Server permission.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `phase` | Yes | Current phase: Closed, Open, or Resetting. |
+| `remaining_minutes` | Yes | Minutes remaining in the selected phase. |
+
+When used, the bot stores a manual override and updates the public Executive Hangar status message.
+
+Examples:
+
+```text
+/execset phase:Open remaining_minutes:42
+/execset phase:Closed remaining_minutes:110
+```
+
+## `/execclear`
+
+Clears the manual Executive Hangar timer override and returns to the community timer source.
+
+Response visibility: private to the user.
+
+Permissions:
+
+- Same permission rules as `/execset`.
+
+Options: none.
+
 ## `/cztimer`
 
 Starts a local contested-zone countdown helper.
