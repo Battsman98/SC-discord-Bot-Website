@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 class Settings:
     discord_token: str
     discord_guild_id: int | None
+    commands_channel_id: int | None
     command_prefix: str
     database_path: str
     http_timeout_seconds: int
@@ -23,10 +24,12 @@ class Settings:
             raise RuntimeError("DISCORD_TOKEN is required. Add it to your .env file.")
 
         guild_id = os.getenv("DISCORD_GUILD_ID", "").strip()
+        commands_channel_id = os.getenv("COMMANDS_CHANNEL_ID", "").strip()
 
         return cls(
             discord_token=discord_token,
             discord_guild_id=int(guild_id) if guild_id else None,
+            commands_channel_id=int(commands_channel_id) if commands_channel_id else None,
             command_prefix=os.getenv("BOT_COMMAND_PREFIX", "!"),
             database_path=os.getenv("DATABASE_PATH", "data/bot.sqlite3"),
             http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "15")),

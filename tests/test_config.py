@@ -13,10 +13,12 @@ def test_settings_require_discord_token(monkeypatch: pytest.MonkeyPatch) -> None
 def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DISCORD_TOKEN", "token")
     monkeypatch.setenv("DISCORD_GUILD_ID", "123")
+    monkeypatch.setenv("COMMANDS_CHANNEL_ID", "456")
     monkeypatch.setenv("CACHE_TTL_SECONDS", "60")
 
     settings = Settings.from_env(load_env_file=False)
 
     assert settings.discord_token == "token"
     assert settings.discord_guild_id == 123
+    assert settings.commands_channel_id == 456
     assert settings.cache_ttl_seconds == 60

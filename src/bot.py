@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import discord
 from discord import app_commands
@@ -23,6 +24,7 @@ class GameAssistBot(commands.Bot):
         self.settings = settings
         self.cache = cache
         self.sources = sources
+        self._commands_reference_synced = False
 
     async def setup_hook(self) -> None:
         self.tree.add_command(status_command)
@@ -38,6 +40,44 @@ class GameAssistBot(commands.Bot):
         else:
             await self.tree.sync()
             logging.info("Synced global slash commands")
+
+    async def on_ready(self) -> None:
+        if self._commands_reference_synced:
+            return
+
+        self._commands_reference_synced = True
+        await self.sync_commands_reference_message()
+
+    async def sync_commands_reference_message(self) -> None:
+        if not self.settings.commands_channel_id:
+            return
+
+        try:
+            channel = await self.fetch_channel(self.settings.commands_channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.warning("Could not access COMMANDS_CHANNEL_ID %s", self.settings.commands_channel_id)
+            return
+
+        if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
+            logging.warning("COMMANDS_CHANNEL_ID does not point to a messageable channel")
+            return
+
+        embeds = build_commands_reference_embeds()
+        cache_key = f"discord:commands-reference-message:{self.settings.commands_channel_id}"
+        message_id = await self.cache.get(cache_key)
+
+        if isinstance(message_id, int):
+            try:
+                message = await channel.fetch_message(message_id)
+                await message.edit(content=None, embeds=embeds)
+                logging.info("Updated commands reference message %s", message_id)
+                return
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logging.info("Could not update previous commands reference message; creating a new one")
+
+        message = await channel.send(embeds=embeds)
+        await self.cache.set(cache_key, message.id, 315360000)
+        logging.info("Created commands reference message %s", message.id)
 
     async def close(self) -> None:
         await self.sources.close()
@@ -251,6 +291,45 @@ def build_commodity_embed(
         )
     embed.set_footer(text=f"Source: {result.source_name}")
     return embed
+
+
+def build_commands_reference_embeds() -> list[discord.Embed]:
+    reference_path = Path("docs/commands.md")
+    markdown = reference_path.read_text(encoding="utf-8").strip()
+    chunks = _chunk_text(markdown, 3500)
+    embeds = []
+
+    for index, chunk in enumerate(chunks):
+        embed = discord.Embed(
+            title="Discord Bot Commands" if index == 0 else f"Discord Bot Commands Continued {index + 1}",
+            description=chunk,
+            color=discord.Color.blurple(),
+        )
+        embed.set_footer(text="Auto-updated from docs/commands.md when the bot starts")
+        embeds.append(embed)
+
+    return embeds
+
+
+def _chunk_text(text: str, max_length: int) -> list[str]:
+    paragraphs = text.split("\n\n")
+    chunks: list[str] = []
+    current = ""
+
+    for paragraph in paragraphs:
+        candidate = f"{current}\n\n{paragraph}".strip() if current else paragraph
+        if len(candidate) <= max_length:
+            current = candidate
+            continue
+
+        if current:
+            chunks.append(current)
+        current = paragraph
+
+    if current:
+        chunks.append(current)
+
+    return chunks
 
 
 def _format_markets(markets: list[CommodityMarket]) -> str:

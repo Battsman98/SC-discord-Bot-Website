@@ -20,6 +20,8 @@ Python Discord bot for collecting information from approved websites/APIs and se
 
 See `docs/commands.md` for the full command reference.
 
+Set `COMMANDS_CHANNEL_ID` in `.env` to have the bot auto-post/update the command reference in a Discord channel on startup.
+
 ## Local Setup
 
 Install Python 3.12+ first. On Windows, make sure Python is added to PATH.
