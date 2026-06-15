@@ -6,7 +6,7 @@ from discord.ext import commands
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import ShipResult
+from src.sources.base import CommodityMarket, CommodityResult, ShipResult
 from src.sources.registry import SourceRegistry, build_default_registry
 
 
@@ -28,6 +28,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(status_command)
         self.tree.add_command(lookup_command)
         self.tree.add_command(ship_command)
+        self.tree.add_command(commodity_command)
 
         if self.settings.discord_guild_id:
             guild = discord.Object(id=self.settings.discord_guild_id)
@@ -89,6 +90,40 @@ async def ship_name_autocomplete(
     ]
 
 
+@app_commands.command(name="commodity", description="Look up Star Citizen commodity prices and locations.")
+@app_commands.describe(name="The commodity name to search for.")
+async def commodity_command(interaction: discord.Interaction, name: str) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    result = await bot.sources.lookup_commodity(name)
+
+    if result is None:
+        await interaction.followup.send(f"No commodity found for `{name}`.", ephemeral=True)
+        return
+
+    await interaction.followup.send(embed=build_commodity_embed(result), ephemeral=True)
+
+
+@commodity_command.autocomplete("name")
+async def commodity_name_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    names = await bot.sources.autocomplete_commodities(current)
+    return [
+        app_commands.Choice(name=name[:100], value=name[:100])
+        for name in names[:25]
+    ]
+
+
 async def send_lookup(interaction: discord.Interaction, query: str) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
@@ -139,6 +174,63 @@ def build_ship_embed(result: ShipResult) -> discord.Embed:
     embed.add_field(name="In-Game Purchase", value=_format_purchases(result), inline=False)
     embed.set_footer(text=f"Source: {result.source_name} + UEX pledge/pricing data")
     return embed
+
+
+def build_commodity_embed(result: CommodityResult) -> discord.Embed:
+    flags = []
+    if result.is_illegal:
+        flags.append("Illegal")
+    if result.is_mineral:
+        flags.append("Mineral")
+    if result.is_raw:
+        flags.append("Raw")
+    if result.is_refined:
+        flags.append("Refined")
+    if result.is_harvestable:
+        flags.append("Harvestable")
+
+    description = [
+        _line("Code", result.code),
+        _line("Kind", result.kind),
+        _line("Flags", ", ".join(flags) if flags else "None"),
+    ]
+
+    embed = discord.Embed(
+        title=result.name,
+        description="\n".join(line for line in description if line),
+        url=result.wiki_url,
+        color=discord.Color.gold(),
+    )
+    embed.add_field(
+        name="Buy From",
+        value=_format_markets(result.buy_from, "stock"),
+        inline=False,
+    )
+    embed.add_field(
+        name="Sell To",
+        value=_format_markets(result.sell_to, "demand"),
+        inline=False,
+    )
+    embed.set_footer(text=f"Source: {result.source_name}")
+    return embed
+
+
+def _format_markets(markets: list[CommodityMarket], scu_label: str) -> str:
+    if not markets:
+        return "No current locations found."
+
+    lines = []
+    for market in markets:
+        location = f" - {market.location}" if market.location else ""
+        scu = f", {scu_label}: {_format_number(market.scu)} SCU" if market.scu is not None else ""
+        version = f" ({market.game_version})" if market.game_version else ""
+        line = f"{_format_currency(market.price, 'aUEC')}/SCU at {market.terminal_name}{location}{scu}{version}"
+        candidate = "\n".join([*lines, line])
+        if len(candidate) > 1000:
+            lines.append("More locations available in UEX.")
+            break
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _format_pledge(result: ShipResult) -> str:

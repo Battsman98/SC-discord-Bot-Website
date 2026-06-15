@@ -49,6 +49,33 @@ class ShipResult:
     source_name: str
 
 
+@dataclass(frozen=True)
+class CommodityMarket:
+    terminal_name: str
+    location: str | None
+    price: int | float
+    scu: int | float | None
+    game_version: str | None
+
+
+@dataclass(frozen=True)
+class CommodityResult:
+    name: str
+    code: str | None
+    kind: str | None
+    average_buy_price: int | float | None
+    average_sell_price: int | float | None
+    is_illegal: bool
+    is_mineral: bool
+    is_raw: bool
+    is_refined: bool
+    is_harvestable: bool
+    wiki_url: str | None
+    buy_from: list[CommodityMarket]
+    sell_to: list[CommodityMarket]
+    source_name: str
+
+
 class GameInfoSource(Protocol):
     name: str
 
@@ -59,6 +86,12 @@ class GameInfoSource(Protocol):
         ...
 
     async def autocomplete_ships(self, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def lookup_commodity(self, query: str) -> CommodityResult | None:
+        ...
+
+    async def autocomplete_commodities(self, query: str, limit: int = 25) -> list[str]:
         ...
 
     async def close(self) -> None:
