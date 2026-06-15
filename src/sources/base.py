@@ -52,9 +52,11 @@ class ShipResult:
 @dataclass(frozen=True)
 class CommodityMarket:
     terminal_name: str
+    system: str | None
+    planet: str | None
     location: str | None
     price: int | float
-    scu: int | float | None
+    demand: int | float | None
     game_version: str | None
 
 

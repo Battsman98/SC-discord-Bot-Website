@@ -31,7 +31,7 @@ class UEXSource:
         if commodity is None:
             return None
 
-        cache_key = f"uex:commodity:v1:{commodity['name'].lower()}"
+        cache_key = f"uex:commodity:v3:{commodity['name'].lower()}"
         cached = await self._cache.get(cache_key)
         if cached:
             return self._commodity_from_cache(cached)
@@ -107,14 +107,16 @@ class UEXSource:
 
     def _parse_commodity(self, commodity: dict, prices: list[dict]) -> CommodityResult:
         buy_from = [
-            self._market(row, "price_sell", "scu_sell_stock")
+            self._market(row, "price_sell_avg", "scu_sell_stock_avg")
             for row in prices
-            if self._positive(row.get("price_sell")) and self._positive(row.get("status_sell"))
+            if self._positive(row.get("price_sell_avg") or row.get("price_sell"))
+            and self._positive(row.get("status_sell"))
         ]
         sell_to = [
-            self._market(row, "price_buy", "scu_buy")
+            self._market(row, "price_buy_avg", "scu_buy_avg")
             for row in prices
-            if self._positive(row.get("price_buy")) and self._positive(row.get("status_buy"))
+            if self._positive(row.get("price_buy_avg") or row.get("price_buy"))
+            and self._positive(row.get("status_buy"))
         ]
 
         return CommodityResult(
@@ -134,23 +136,25 @@ class UEXSource:
             source_name=self.name,
         )
 
-    def _market(self, row: dict, price_key: str, scu_key: str) -> CommodityMarket:
+    def _market(self, row: dict, price_key: str, demand_key: str) -> CommodityMarket:
         return CommodityMarket(
             terminal_name=str(row.get("terminal_name") or "Unknown terminal"),
+            system=self._string_or_none(row.get("star_system_name")),
+            planet=self._string_or_none(row.get("planet_name") or row.get("orbit_name")),
             location=self._location(row),
-            price=row[price_key],
-            scu=row.get(scu_key) or None,
+            price=row.get(price_key) or row.get(price_key.replace("_avg", "")),
+            demand=row.get(demand_key) or row.get(demand_key.replace("_avg", "")) or None,
             game_version=self._string_or_none(row.get("game_version")),
         )
 
     def _location(self, row: dict) -> str | None:
-        parts = [
-            row.get("outpost_name") or row.get("city_name") or row.get("space_station_name") or row.get("poi_name"),
-            row.get("moon_name"),
-            row.get("planet_name") or row.get("orbit_name"),
-            row.get("star_system_name"),
-        ]
-        return " / ".join(str(part) for part in parts if part) or None
+        return self._string_or_none(
+            row.get("outpost_name")
+            or row.get("city_name")
+            or row.get("space_station_name")
+            or row.get("poi_name")
+            or row.get("terminal_name")
+        )
 
     def _positive(self, value: object) -> bool:
         try:

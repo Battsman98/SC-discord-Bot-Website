@@ -91,11 +91,22 @@ async def ship_name_autocomplete(
 
 
 @app_commands.command(name="commodity", description="Look up Star Citizen commodity prices and locations.")
-@app_commands.describe(name="The commodity name to search for.")
-async def commodity_command(interaction: discord.Interaction, name: str) -> None:
+@app_commands.describe(
+    name="The commodity name to search for.",
+    quantity_scu="Optional SCU amount for estimated buy cost and sell payout.",
+)
+async def commodity_command(
+    interaction: discord.Interaction,
+    name: str,
+    quantity_scu: float | None = None,
+) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    if quantity_scu is not None and quantity_scu <= 0:
+        await interaction.response.send_message("Quantity must be greater than 0 SCU.", ephemeral=True)
         return
 
     await interaction.response.defer(thinking=True, ephemeral=True)
@@ -105,7 +116,7 @@ async def commodity_command(interaction: discord.Interaction, name: str) -> None
         await interaction.followup.send(f"No commodity found for `{name}`.", ephemeral=True)
         return
 
-    await interaction.followup.send(embed=build_commodity_embed(result), ephemeral=True)
+    await interaction.followup.send(embed=build_commodity_embed(result, quantity_scu), ephemeral=True)
 
 
 @commodity_command.autocomplete("name")
@@ -176,7 +187,7 @@ def build_ship_embed(result: ShipResult) -> discord.Embed:
     return embed
 
 
-def build_commodity_embed(result: CommodityResult) -> discord.Embed:
+def build_commodity_embed(result: CommodityResult, quantity_scu: float | None = None) -> discord.Embed:
     flags = []
     if result.is_illegal:
         flags.append("Illegal")
@@ -202,34 +213,67 @@ def build_commodity_embed(result: CommodityResult) -> discord.Embed:
         color=discord.Color.gold(),
     )
     embed.add_field(
-        name="Buy From",
-        value=_format_markets(result.buy_from, "stock"),
+        name="Purchase Locations",
+        value=_format_markets(result.buy_from),
         inline=False,
     )
     embed.add_field(
-        name="Sell To",
-        value=_format_markets(result.sell_to, "demand"),
+        name="Sell Locations",
+        value=_format_markets(result.sell_to),
         inline=False,
     )
+    if quantity_scu is not None:
+        embed.add_field(
+            name=f"Estimate for {_format_number(quantity_scu)} SCU",
+            value=_format_commodity_estimate(result, quantity_scu),
+            inline=False,
+        )
     embed.set_footer(text=f"Source: {result.source_name}")
     return embed
 
 
-def _format_markets(markets: list[CommodityMarket], scu_label: str) -> str:
+def _format_markets(markets: list[CommodityMarket]) -> str:
     if not markets:
         return "No current locations found."
 
     lines = []
-    for market in markets:
-        location = f" - {market.location}" if market.location else ""
-        scu = f", {scu_label}: {_format_number(market.scu)} SCU" if market.scu is not None else ""
-        version = f" ({market.game_version})" if market.game_version else ""
-        line = f"{_format_currency(market.price, 'aUEC')}/SCU at {market.terminal_name}{location}{scu}{version}"
+    for index, market in enumerate(markets, start=1):
+        system = market.system or "Unknown"
+        planet = market.planet or "Unknown"
+        location = market.location or market.terminal_name
+        demand = f"{_format_number(market.demand)} SCU" if market.demand is not None else "Unknown"
+        line = (
+            f"{index}. {_format_currency(market.price, 'aUEC')}/SCU avg | "
+            f"System: {system} | Planet: {planet} | Location: {location} | Demand: {demand}"
+        )
         candidate = "\n".join([*lines, line])
         if len(candidate) > 1000:
             lines.append("More locations available in UEX.")
             break
         lines.append(line)
+    return "\n".join(lines)
+
+
+def _format_commodity_estimate(result: CommodityResult, quantity_scu: float) -> str:
+    lines = []
+    if result.buy_from:
+        purchase = result.buy_from[0]
+        lines.append(
+            f"Estimated buy cost: {_format_currency(purchase.price * quantity_scu, 'aUEC')} "
+            f"at {purchase.location or purchase.terminal_name}"
+        )
+    else:
+        lines.append("Estimated buy cost: No purchase location found.")
+
+    if result.sell_to:
+        sale = result.sell_to[0]
+        lines.append(
+            f"Estimated sell payout: {_format_currency(sale.price * quantity_scu, 'aUEC')} "
+            f"at {sale.location or sale.terminal_name}"
+        )
+    else:
+        lines.append("Estimated sell payout: No sell location found.")
+
     return "\n".join(lines)
 
 
