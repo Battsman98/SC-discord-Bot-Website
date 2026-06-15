@@ -24,6 +24,8 @@ See `docs/commands.md` for the full command reference.
 
 Set `COMMANDS_CHANNEL_ID` in `.env` to have the bot auto-post/update the command reference in a Discord channel on startup.
 
+Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive Hangar status message updated every 60 seconds.
+
 ## Local Setup
 
 Install Python 3.12+ first. On Windows, make sure Python is added to PATH.

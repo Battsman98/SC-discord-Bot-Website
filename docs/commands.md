@@ -106,7 +106,9 @@ Examples:
 
 Shows the current Executive Hangar clock.
 
-Response visibility: private to the user.
+Response visibility: public.
+
+If `EXEC_STATUS_CHANNEL_ID` is set in `.env`, the bot also posts or updates a public Executive Hangar status message in that channel every 60 seconds.
 
 Options: none.
 
@@ -117,6 +119,12 @@ Current output:
 - Light state
 - Relative countdown to the next phase change
 - Exact local time of the next phase change
+
+Data source:
+
+- Sync timestamp is fetched from `https://contestedzonetimers.com/lib/cfg.dat`.
+- The bot calculates status locally from the community timer model used by `contestedzonetimers.com`.
+- This is a community timer, not official CIG server telemetry.
 
 ## `/cztimer`
 

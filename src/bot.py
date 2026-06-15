@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from pathlib import Path
 
 import discord
@@ -30,6 +31,7 @@ class GameAssistBot(commands.Bot):
         self.cache = cache
         self.sources = sources
         self._commands_reference_synced = False
+        self._exec_status_task: asyncio.Task | None = None
 
     async def setup_hook(self) -> None:
         self.tree.add_command(status_command)
@@ -54,6 +56,15 @@ class GameAssistBot(commands.Bot):
 
         self._commands_reference_synced = True
         await self.sync_commands_reference_message()
+        await self.sync_exec_status_message()
+
+        if self.settings.exec_status_channel_id and self._exec_status_task is None:
+            self._exec_status_task = asyncio.create_task(self._exec_status_loop())
+
+    async def _exec_status_loop(self) -> None:
+        while not self.is_closed():
+            await asyncio.sleep(60)
+            await self.sync_exec_status_message()
 
     async def sync_commands_reference_message(self) -> None:
         if not self.settings.commands_channel_id:
@@ -86,7 +97,47 @@ class GameAssistBot(commands.Bot):
         await self.cache.set(cache_key, message.id, 315360000)
         logging.info("Created commands reference message %s", message.id)
 
+    async def sync_exec_status_message(self) -> None:
+        if not self.settings.exec_status_channel_id:
+            return
+
+        try:
+            channel = await self.fetch_channel(self.settings.exec_status_channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.warning("Could not access EXEC_STATUS_CHANNEL_ID %s", self.settings.exec_status_channel_id)
+            return
+
+        if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
+            logging.warning("EXEC_STATUS_CHANNEL_ID does not point to a messageable channel")
+            return
+
+        try:
+            cycle_start = await fetch_exec_cycle_start_unix(self.settings.http_timeout_seconds)
+            status = calculate_exec_hangar_status(cycle_start)
+        except Exception:
+            logging.warning("Could not fetch Executive Hangar timer for status message")
+            return
+
+        embed = build_exec_status_embed(status)
+        cache_key = f"discord:exec-status-message:{self.settings.exec_status_channel_id}"
+        message_id = await self.cache.get(cache_key)
+
+        if isinstance(message_id, int):
+            try:
+                message = await channel.fetch_message(message_id)
+                await message.edit(content=None, embed=embed)
+                logging.info("Updated Executive Hangar status message %s", message_id)
+                return
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logging.info("Could not update previous Executive Hangar status message; creating a new one")
+
+        message = await channel.send(embed=embed)
+        await self.cache.set(cache_key, message.id, 315360000)
+        logging.info("Created Executive Hangar status message %s", message.id)
+
     async def close(self) -> None:
+        if self._exec_status_task:
+            self._exec_status_task.cancel()
         await self.sources.close()
         await self.cache.close()
         await super().close()
@@ -214,14 +265,18 @@ async def exec_command(interaction: discord.Interaction) -> None:
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
 
-    await interaction.response.defer(thinking=True, ephemeral=True)
+    await interaction.response.defer(thinking=True)
     try:
         cycle_start = await fetch_exec_cycle_start_unix(bot.settings.http_timeout_seconds)
     except Exception:
-        await interaction.followup.send("Could not fetch the Executive Hangar timer right now.", ephemeral=True)
+        await interaction.followup.send("Could not fetch the Executive Hangar timer right now.")
         return
 
     status = calculate_exec_hangar_status(cycle_start)
+    await interaction.followup.send(embed=build_exec_status_embed(status))
+
+
+def build_exec_status_embed(status) -> discord.Embed:
     embed = discord.Embed(
         title="Executive Hangar Clock",
         description=f"Status: {status.status}\nPhase: {status.status_detail}",
@@ -231,8 +286,8 @@ async def exec_command(interaction: discord.Interaction) -> None:
     embed.add_field(name="Lights", value=status.lights, inline=False)
     embed.add_field(name="Next Change", value=f"<t:{status.next_change_unix}:R>", inline=True)
     embed.add_field(name="At", value=f"<t:{status.next_change_unix}:T>", inline=True)
-    embed.set_footer(text="Source: contestedzonetimers.com")
-    await interaction.followup.send(embed=embed, ephemeral=True)
+    embed.set_footer(text="Source: contestedzonetimers.com community timer, auto-updated every 60s when pinned")
+    return embed
 
 
 @app_commands.command(name="cztimer", description="Start a local contested-zone countdown.")
