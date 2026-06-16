@@ -132,7 +132,7 @@ Current output:
 - Craft time and tiers
 - Required materials and quantities
 - Missions that can award the blueprint
-- Mission contractor, mission type, drop chance, and required reputation level when available
+- Blueprint missions in this order: contractor, required rep, mission type, mission name, drop rate
 
 Examples:
 

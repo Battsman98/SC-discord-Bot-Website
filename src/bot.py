@@ -1013,21 +1013,20 @@ def _format_blueprint_missions(missions: list[BlueprintMission]) -> str:
 
     lines = []
     for mission in missions[:8]:
-        rep = mission.min_standing_name or "Unknown rep"
+        rep = mission.min_standing_name or "Unknown"
         if mission.min_standing_reputation is not None:
             rep = f"{rep} ({_format_number(mission.min_standing_reputation)} rep)"
-        details = " | ".join(
-            part
-            for part in [
-                mission.contractor,
-                mission.mission_type,
-                _format_drop_chance(mission.drop_chance),
-                rep,
-            ]
-            if part
+        lines.append(
+            " | ".join(
+                [
+                    f"- Contractor: {mission.contractor or 'Unknown'}",
+                    f"Rep: {rep}",
+                    f"Type: {mission.mission_type or 'Unknown'}",
+                    f"Mission: {mission.name}",
+                    f"Drop: {_format_drop_chance(mission.drop_chance) or 'Unknown'}",
+                ]
+            )
         )
-        suffix = f" - {details}" if details else ""
-        lines.append(f"{mission.name}{suffix}")
 
     if len(missions) > 8:
         lines.append(f"{len(missions) - 8} more mission(s) available.")
@@ -1038,7 +1037,7 @@ def _format_drop_chance(value: int | float | None) -> str | None:
     if value is None:
         return None
     percent = float(value) * 100 if float(value) <= 1 else float(value)
-    return f"{_format_number(percent)}% drop"
+    return f"{_format_number(percent)}%"
 
 
 def build_trade_route_embed(
