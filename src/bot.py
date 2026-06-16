@@ -145,6 +145,13 @@ class GameAssistBot(commands.Bot):
             message = await channel.send(embed=embed)
             updated_message_ids.append(message.id)
 
+        for stale_message_id in message_ids[len(embeds):]:
+            try:
+                message = await channel.fetch_message(stale_message_id)
+                await message.delete()
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logging.info("Could not delete stale commands reference message %s", stale_message_id)
+
         await self.cache.set(cache_key, updated_message_ids, 315360000)
         logging.info("Synced %s commands reference message(s)", len(updated_message_ids))
 
@@ -1837,19 +1844,46 @@ def build_commands_reference_embeds() -> list[discord.Embed]:
     markdown = reference_path.read_text(encoding="utf-8").strip()
     if markdown.startswith("# Discord Bot Commands"):
         markdown = markdown.removeprefix("# Discord Bot Commands").strip()
-    chunks = _chunk_text(markdown, 3500)
-    embeds = []
 
-    for index, chunk in enumerate(chunks):
-        embed = discord.Embed(
-            title="Discord Bot Commands" if index == 0 else f"Discord Bot Commands Continued {index + 1}",
-            description=chunk,
-            color=discord.Color.blurple(),
-        )
-        embed.set_footer(text="Auto-updated from docs/commands.md when the bot starts")
-        embeds.append(embed)
+    embeds = []
+    sections = _command_reference_sections(markdown)
+    for command_name, body in sections:
+        chunks = _chunk_text(body, 3500)
+        for index, chunk in enumerate(chunks):
+            title = f"Discord Bot Commands - {command_name}"
+            if len(chunks) > 1:
+                title = f"{title} ({index + 1}/{len(chunks)})"
+            embed = discord.Embed(
+                title=title,
+                description=chunk,
+                color=discord.Color.blurple(),
+            )
+            embed.set_footer(text="Auto-updated from docs/commands.md when the bot starts")
+            embeds.append(embed)
 
     return embeds
+
+
+def _command_reference_sections(markdown: str) -> list[tuple[str, str]]:
+    sections: list[tuple[str, str]] = []
+    current_title: str | None = None
+    current_lines: list[str] = []
+
+    for line in markdown.splitlines():
+        if line.startswith("## "):
+            if current_title is not None:
+                sections.append((current_title, "\n".join(current_lines).strip()))
+            current_title = line.removeprefix("## ").strip()
+            current_lines = []
+            continue
+
+        if current_title is not None:
+            current_lines.append(line)
+
+    if current_title is not None:
+        sections.append((current_title, "\n".join(current_lines).strip()))
+
+    return sections
 
 
 def _chunk_text(text: str, max_length: int) -> list[str]:
