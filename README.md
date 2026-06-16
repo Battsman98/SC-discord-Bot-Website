@@ -40,9 +40,9 @@ Set `AUDIT_LOG_CHANNEL_ID` in `.env` to post a remote audit view of command usag
 
 Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive Hangar status message updated every 60 seconds.
 
-Set comma-separated `BOT_ADMIN_ROLE_IDS` in `.env` to restrict bot management and change commands to specific Discord roles. This includes `/execset`, `/execclear`, `/miningadd`, `/admin channels`, `/admin health`, and `/audit recent`. If no admin role IDs are configured, users with Manage Server can use those commands.
+Set comma-separated `EXEC_ADMIN_ROLE_IDS` in `.env` to restrict change commands to specific Discord roles. This includes `/execset`, `/execclear`, and `/miningadd`.
 
-`EXEC_ADMIN_ROLE_IDS` is still supported as a compatibility fallback for Executive Hangar commands.
+Set comma-separated `BOT_ADMIN_ROLE_IDS` and/or `BOT_ADMIN_USER_IDS` in `.env` to restrict bot management and audit commands. This includes `/admin channels`, `/admin health`, and `/audit recent`. If no admin role IDs or user IDs are configured, users with Manage Server can use those commands.
 
 Set `CZ_TIMERS_CHANNEL_ID` in `.env` to have the bot keep a public Contested Zone timer dashboard with clickable start/reset buttons.
 

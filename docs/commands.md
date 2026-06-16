@@ -153,8 +153,8 @@ Response visibility: private to the user.
 
 Permissions:
 
-- If `BOT_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
-- If no bot admin role IDs are configured, users must have Discord's Manage Server permission.
+- If `EXEC_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
+- If no change command role IDs are configured, users must have Discord's Manage Server permission.
 
 Autocomplete:
 
@@ -326,9 +326,8 @@ Response visibility: private to the user.
 
 Permissions:
 
-- If `BOT_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
-- If `EXEC_ADMIN_ROLE_IDS` is set in `.env`, those roles are used as a compatibility fallback.
-- If no bot or exec admin role IDs are configured, users must have Discord's Manage Server permission.
+- If `EXEC_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
+- If no change command role IDs are configured, users must have Discord's Manage Server permission.
 
 Options:
 
@@ -409,8 +408,9 @@ Response visibility: private to the user.
 
 Permissions:
 
+- If `BOT_ADMIN_USER_IDS` is set in `.env`, those users can use the command directly.
 - If `BOT_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
-- If no bot admin role IDs are configured, users must have Discord's Manage Server permission.
+- If no admin user IDs or role IDs are configured, users must have Discord's Manage Server permission.
 
 Options: none.
 

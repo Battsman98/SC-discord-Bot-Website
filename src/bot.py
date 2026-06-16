@@ -617,7 +617,7 @@ async def miningadd_command(
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
 
-    if not _can_manage_bot(interaction, bot.settings):
+    if not _can_manage_change_commands(interaction, bot.settings):
         await interaction.response.send_message("You do not have permission to add mining locations.", ephemeral=True)
         return
 
@@ -1330,7 +1330,7 @@ async def admin_channels_command(interaction: discord.Interaction) -> None:
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
-    if not _can_manage_bot(interaction, bot.settings):
+    if not _can_manage_admin_commands(interaction, bot.settings):
         await interaction.response.send_message("You do not have permission to view bot management details.", ephemeral=True)
         return
 
@@ -1344,7 +1344,7 @@ async def admin_health_command(interaction: discord.Interaction) -> None:
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
-    if not _can_manage_bot(interaction, bot.settings):
+    if not _can_manage_admin_commands(interaction, bot.settings):
         await interaction.response.send_message("You do not have permission to view bot management details.", ephemeral=True)
         return
 
@@ -1362,7 +1362,7 @@ async def audit_recent_command(interaction: discord.Interaction, limit: int = 10
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
-    if not _can_manage_bot(interaction, bot.settings):
+    if not _can_manage_admin_commands(interaction, bot.settings):
         await interaction.response.send_message("You do not have permission to view audit logs.", ephemeral=True)
         return
     if limit < 1 or limit > 20:
@@ -1545,7 +1545,9 @@ def build_admin_health_embed(bot: GameAssistBot) -> discord.Embed:
         _line("Guild ID", str(settings.discord_guild_id) if settings.discord_guild_id else "Global commands"),
         _line("Command Channels", str(len(settings.command_channel_ids))),
         _line("Audit Log", f"<#{settings.audit_log_channel_id}>" if settings.audit_log_channel_id else "Not configured"),
-        _line("Admin Roles", _format_role_ids(settings.bot_admin_role_ids or settings.exec_admin_role_ids)),
+        _line("Change Command Roles", _format_role_ids(settings.exec_admin_role_ids)),
+        _line("Admin/Audit Roles", _format_role_ids(settings.bot_admin_role_ids)),
+        _line("Admin/Audit Users", _format_user_ids(settings.bot_admin_user_ids)),
         _line("Database", settings.database_path),
         _line("Cache TTL", _format_duration(settings.cache_ttl_seconds)),
     ]
@@ -1585,24 +1587,41 @@ def build_audit_recent_embed(events: list[dict]) -> discord.Embed:
 
 
 def _can_manage_exec_timer(interaction: discord.Interaction, settings: Settings) -> bool:
-    return _can_manage_bot(interaction, settings)
+    return _can_manage_change_commands(interaction, settings)
 
 
-def _can_manage_bot(interaction: discord.Interaction, settings: Settings) -> bool:
+def _can_manage_change_commands(interaction: discord.Interaction, settings: Settings) -> bool:
     user = interaction.user
     if not isinstance(user, discord.Member):
         return False
 
-    role_ids = settings.bot_admin_role_ids or settings.exec_admin_role_ids
-    if role_ids:
+    if settings.exec_admin_role_ids:
         user_role_ids = {role.id for role in user.roles}
-        return bool(user_role_ids.intersection(role_ids))
+        return bool(user_role_ids.intersection(settings.exec_admin_role_ids))
+
+    return user.guild_permissions.manage_guild
+
+
+def _can_manage_admin_commands(interaction: discord.Interaction, settings: Settings) -> bool:
+    user = interaction.user
+    if getattr(user, "id", None) in settings.bot_admin_user_ids:
+        return True
+    if not isinstance(user, discord.Member):
+        return False
+
+    if settings.bot_admin_role_ids:
+        user_role_ids = {role.id for role in user.roles}
+        return bool(user_role_ids.intersection(settings.bot_admin_role_ids))
 
     return user.guild_permissions.manage_guild
 
 
 def _format_role_ids(role_ids: tuple[int, ...]) -> str:
     return ", ".join(f"<@&{role_id}>" for role_id in role_ids) if role_ids else "Manage Server fallback"
+
+
+def _format_user_ids(user_ids: tuple[int, ...]) -> str:
+    return ", ".join(f"<@{user_id}>" for user_id in user_ids) if user_ids else "None configured"
 
 
 @app_commands.command(name="cztimer", description="Start a local contested-zone countdown.")
