@@ -48,9 +48,14 @@ class StarCitizenWikiSource:
         if cached:
             return self._ship_from_cache(cached)
 
-        api_url = f"{self.base_url}/api/v2/vehicles/{quote(normalized_query)}"
-        payload = await self._fetch_json(api_url)
-        data = payload.get("data") if isinstance(payload, dict) else None
+        data = None
+        for candidate in await self._ship_lookup_candidates(normalized_query):
+            api_url = f"{self.base_url}/api/v2/vehicles/{quote(candidate)}"
+            payload = await self._fetch_json(api_url)
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if isinstance(data, dict):
+                break
+
         if not isinstance(data, dict):
             return None
 
@@ -95,6 +100,40 @@ class StarCitizenWikiSource:
         self._ship_names = names
         await self._cache.set("star-citizen-wiki:ship-names:v1", names, 86400)
         return names
+
+    async def _ship_lookup_candidates(self, query: str) -> list[str]:
+        normalized_query = self._normalize_name(query)
+        candidates = [query]
+
+        try:
+            ship_names = await self._get_ship_names()
+        except Exception:
+            return candidates
+
+        exact_matches = [
+            name
+            for name in ship_names
+            if self._normalize_name(name) == normalized_query
+        ]
+        word_matches = [
+            name
+            for name in ship_names
+            if normalized_query in self._normalize_name(name).split()
+            and name not in exact_matches
+        ]
+        contains_matches = [
+            name
+            for name in ship_names
+            if normalized_query in self._normalize_name(name)
+            and name not in exact_matches
+            and name not in word_matches
+        ]
+
+        for candidate in exact_matches + word_matches + contains_matches:
+            if candidate not in candidates:
+                candidates.append(candidate)
+
+        return candidates[:5]
 
     async def _fetch_ship_names(self) -> list[str]:
         names: set[str] = set()

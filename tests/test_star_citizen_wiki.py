@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 
@@ -96,3 +97,61 @@ def test_autocomplete_ships_prefers_starts_with_matches() -> None:
     matches = asyncio.run(source.autocomplete_ships("cut", limit=2))
 
     assert matches == ["Drake Cutlass Black", "Origin 600i Executive Edition"]
+
+
+def test_ship_lookup_candidates_include_canonical_name() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._ship_names = [
+        "Argo RAFT",
+        "Argo RAFT Wikelo Work Special",
+        "Anvil Carrack",
+    ]
+
+    candidates = asyncio.run(source._ship_lookup_candidates("argo raft"))
+
+    assert candidates[:2] == ["argo raft", "Argo RAFT"]
+
+
+def test_lookup_ship_retries_with_canonical_name() -> None:
+    class FakeCache:
+        async def get(self, key: str):
+            return None
+
+        async def set(self, key: str, value, ttl: int) -> None:
+            return None
+
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._cache = FakeCache()
+    source._settings = SimpleNamespace(cache_ttl_seconds=300)
+    source._ship_names = ["Argo RAFT"]
+    requested_urls = []
+
+    async def fake_fetch_json(url: str):
+        requested_urls.append(url)
+        if url.endswith("/Argo%20RAFT"):
+            return {
+                "data": {
+                    "game_name": "Argo RAFT",
+                    "manufacturer": {"name": "Argo Astronautics"},
+                    "type": {"en_EN": "cargo"},
+                    "size": {"en_EN": "small"},
+                    "production_status": {"en_EN": "flight-ready"},
+                    "cargo_capacity": 96,
+                    "crew": {"min": 1, "max": 2},
+                    "description": {"en_EN": "Cargo hauler."},
+                }
+            }
+        return {"data": None}
+
+    async def fake_fetch_pledge_price(data: dict):
+        return None
+
+    source._fetch_json = fake_fetch_json
+    source._fetch_pledge_price = fake_fetch_pledge_price
+
+    result = asyncio.run(source.lookup_ship("argo raft"))
+
+    assert result is not None
+    assert result.name == "Argo RAFT"
+    assert requested_urls[0].endswith("/argo%20raft")
+    assert requested_urls[1].endswith("/Argo%20RAFT")
