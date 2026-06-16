@@ -97,6 +97,7 @@ class MiningLocationResult:
     source_url: str
     source_name: str
     location_basis: str | None = None
+    rock_signatures: list[int] | None = None
 
 
 @dataclass(frozen=True)

@@ -132,11 +132,13 @@ Current output:
 - Planets
 - Moons
 - Points of interest
+- Mineable rock signatures for 1x through 6x rock clusters when available
 
 Location logic:
 
 - Uses direct UEX mining locations when available.
 - If direct locations are empty for the selected filters, uses shared rock/deposit composition data to surface locations from materials that can appear in the same deposit.
+- Rock signatures use Star-Head mining location data and are shown as base signatures multiplied through 6-rock clusters.
 
 Examples:
 

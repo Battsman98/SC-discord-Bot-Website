@@ -34,6 +34,7 @@ class UEXSource:
         self._terminals_by_id: dict[str, dict] | None = None
         self._location_filter_names: list[str] | None = None
         self._mining_associations: dict[str, list[str]] | None = None
+        self._mining_signatures: dict[str, list[int]] | None = None
 
     async def lookup(self, query: str):
         return None
@@ -111,6 +112,7 @@ class UEXSource:
         result = await self._fetch_mining_location_result(commodity, system_code)
         if result is None:
             return None
+        result = await self._with_mining_signatures(result, commodity)
 
         filtered_result = self._filter_mining_result(result, planet)
         if self._has_mining_locations(filtered_result):
@@ -620,6 +622,98 @@ class UEXSource:
         await self._cache.set(cache_key, self._mining_result_to_cache(result), self._settings.cache_ttl_seconds)
         return result
 
+    async def _with_mining_signatures(
+        self,
+        result: MiningLocationResult,
+        commodity: dict,
+    ) -> MiningLocationResult:
+        signatures = await self._get_mining_signatures(self._mining_material_base_name(commodity))
+        return MiningLocationResult(
+            material_name=result.material_name,
+            code=result.code,
+            kind=result.kind,
+            refined_sell_price=result.refined_sell_price,
+            raw_sell_price=result.raw_sell_price,
+            is_harvestable=result.is_harvestable,
+            is_volatile_qt=result.is_volatile_qt,
+            is_volatile_time=result.is_volatile_time,
+            is_explosive=result.is_explosive,
+            systems=result.systems,
+            lagrange_points=result.lagrange_points,
+            planets=result.planets,
+            moons=result.moons,
+            points_of_interest=result.points_of_interest,
+            source_url=result.source_url,
+            source_name=result.source_name,
+            location_basis=result.location_basis,
+            rock_signatures=signatures,
+        )
+
+    async def _get_mining_signatures(self, material_name: str) -> list[int]:
+        signatures = await self._get_mining_signature_map()
+        return signatures.get(self._normalize(material_name), [])
+
+    async def _get_mining_signature_map(self) -> dict[str, list[int]]:
+        if self._mining_signatures is not None:
+            return self._mining_signatures
+
+        cached = await self._cache.get("star-head:mining-signatures:v1")
+        if isinstance(cached, dict):
+            self._mining_signatures = {
+                str(key): sorted(
+                    {
+                        int(value)
+                        for value in values
+                        if self._int_or_none(value) is not None
+                    }
+                )
+                for key, values in cached.items()
+                if isinstance(values, list)
+            }
+            return self._mining_signatures
+
+        html = await self._fetch_text("https://star-head.de/database/mining/locations/")
+        if not html:
+            self._mining_signatures = {}
+            return self._mining_signatures
+
+        app_match = re.search(r'href="([^"]*/entry/app\.[^"]+\.js)"', html)
+        if not app_match:
+            self._mining_signatures = {}
+            return self._mining_signatures
+
+        app_url = app_match.group(1)
+        if app_url.startswith("/"):
+            app_url = f"https://star-head.de{app_url}"
+
+        app_script = await self._fetch_text(app_url)
+        if not app_script:
+            self._mining_signatures = {}
+            return self._mining_signatures
+
+        node_match = re.search(r"_app/immutable/nodes/14\.[^\"']+\.js", app_script)
+        if not node_match:
+            self._mining_signatures = {}
+            return self._mining_signatures
+
+        node_script = await self._fetch_text(f"https://star-head.de/{node_match.group(0)}")
+        self._mining_signatures = self._parse_star_head_signatures(node_script or "")
+        await self._cache.set("star-head:mining-signatures:v1", self._mining_signatures, 24 * 60 * 60)
+        return self._mining_signatures
+
+    def _parse_star_head_signatures(self, script: str) -> dict[str, list[int]]:
+        signatures: dict[str, set[int]] = {}
+        for match in re.finditer(r"\{signature:(?P<signature>\d+),materials:\[(?P<materials>[^\]]+)\]\}", script):
+            signature = int(match.group("signature"))
+            materials = re.findall(r'"([^"]+)"', match.group("materials"))
+            for material in materials:
+                signatures.setdefault(self._normalize(material), set()).add(signature)
+
+        return {
+            material: sorted(values)
+            for material, values in signatures.items()
+        }
+
     async def _expand_mining_result_from_associated_deposits(
         self,
         result: MiningLocationResult,
@@ -664,6 +758,7 @@ class UEXSource:
             source_url=merged.source_url,
             source_name="UEX + Star Citizen Mining Mom",
             location_basis=basis,
+            rock_signatures=merged.rock_signatures or [],
         )
 
     async def _get_associated_mining_material_names(self, material_name: str) -> list[str]:
@@ -766,6 +861,7 @@ class UEXSource:
             points_of_interest=sections["Points of Interest"],
             source_url=source_url,
             source_name=self.name,
+            rock_signatures=[],
         )
 
     def _parse_mining_sections(self, lines: list[str]) -> dict[str, list[str]]:
@@ -817,6 +913,7 @@ class UEXSource:
             source_url=result.source_url,
             source_name=result.source_name,
             location_basis=result.location_basis,
+            rock_signatures=result.rock_signatures or [],
         )
 
     def _has_mining_locations(self, result: MiningLocationResult) -> bool:
@@ -853,6 +950,7 @@ class UEXSource:
             source_url=primary.source_url,
             source_name=primary.source_name,
             location_basis=primary.location_basis,
+            rock_signatures=primary.rock_signatures or [],
         )
 
     def _merge_location_names(self, first: list[str], second: list[str]) -> list[str]:
@@ -1372,6 +1470,7 @@ class UEXSource:
     def _mining_result_from_cache(self, data: dict) -> MiningLocationResult:
         cached = data.copy()
         cached.setdefault("location_basis", None)
+        cached.setdefault("rock_signatures", [])
         return MiningLocationResult(**cached)
 
     async def close(self) -> None:

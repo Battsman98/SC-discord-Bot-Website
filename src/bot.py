@@ -1494,6 +1494,7 @@ def build_mining_embed(
     embed.add_field(name="Planets", value=_format_location_group(result.planets), inline=False)
     embed.add_field(name="Moons", value=_format_location_group(result.moons), inline=False)
     embed.add_field(name="Points of Interest", value=_format_location_group(result.points_of_interest), inline=False)
+    embed.add_field(name="Rock Signatures", value=_format_rock_signatures(result.rock_signatures), inline=False)
     embed.set_footer(text=f"Source: {result.source_name} mining locations")
     return embed
 
@@ -1955,6 +1956,19 @@ def _format_mining_flags(result: MiningLocationResult) -> str | None:
     if result.is_explosive:
         flags.append("Explosive")
     return ", ".join(flags) if flags else None
+
+
+def _format_rock_signatures(signatures: list[int] | None) -> str:
+    if not signatures:
+        return "No rock signature data found."
+
+    lines = []
+    for signature in signatures[:8]:
+        clusters = [f"{count}x {_format_number(signature * count)}" for count in range(1, 7)]
+        lines.append(f"{_format_number(signature)}: {' | '.join(clusters)}")
+    if len(signatures) > 8:
+        lines.append("More signatures available in Star-Head.")
+    return _limit_lines(lines, 1000)
 
 
 def _format_commodity_estimate(result: CommodityResult, quantity_scu: float) -> str:

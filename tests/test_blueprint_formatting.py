@@ -1,5 +1,16 @@
-from src.bot import _blueprint_mission_page_count, _blueprint_result_label, _format_blueprint_missions
+from src.bot import (
+    _blueprint_mission_page_count,
+    _blueprint_result_label,
+    _format_blueprint_missions,
+    _format_rock_signatures,
+)
 from src.sources.base import BlueprintMission, BlueprintResult
+
+
+def test_format_rock_signatures_shows_clusters_to_six() -> None:
+    text = _format_rock_signatures([3185])
+
+    assert text == "3,185: 1x 3,185 | 2x 6,370 | 3x 9,555 | 4x 12,740 | 5x 15,925 | 6x 19,110"
 
 
 def test_format_blueprint_missions_uses_simple_ordered_fields() -> None:

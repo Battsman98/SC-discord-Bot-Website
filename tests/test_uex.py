@@ -218,6 +218,23 @@ def test_mining_material_slug_preserves_raw_suffix() -> None:
     assert source._mining_material_slug({"name": "Gold (Ore)", "is_refinable": 1}) == "gold-ore"
 
 
+def test_parse_star_head_signatures_groups_by_material() -> None:
+    source = UEXSource.__new__(UEXSource)
+    script = '''
+    const Dt=[
+        {signature:3185,materials:["Stileron","Taranite"]},
+        {signature:3570,materials:["Borase","Gold","Bexalite"]},
+        {signature:3585,materials:["Gold","Borase","Bexalite"]}
+    ];
+    '''
+
+    signatures = source._parse_star_head_signatures(script)
+
+    assert signatures["stileron"] == [3185]
+    assert signatures["taranite"] == [3185]
+    assert signatures["borase"] == [3570, 3585]
+
+
 def test_merge_mining_location_results_keeps_primary_material() -> None:
     source = UEXSource.__new__(UEXSource)
     primary = source._parse_mining_location_result(
