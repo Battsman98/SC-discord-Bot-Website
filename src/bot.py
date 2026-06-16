@@ -10,6 +10,7 @@ from src.cache import SQLiteCache
 from src.config import Settings
 from src.sources.base import CommodityMarket, CommodityResult, ShipResult
 from src.sources.registry import SourceRegistry, build_default_registry
+from src.sources.sc_trade_tools import build_trade_route_url
 from src.timers import (
     ExecHangarStatus,
     calculate_countdown_end_unix,
@@ -106,20 +107,29 @@ class GameAssistBot(commands.Bot):
 
         embeds = build_commands_reference_embeds()
         cache_key = f"discord:commands-reference-message:{self.settings.commands_channel_id}"
-        message_id = await self.cache.get(cache_key)
+        cached_message_ids = await self.cache.get(cache_key)
+        message_ids: list[int] = []
+        if isinstance(cached_message_ids, int):
+            message_ids = [cached_message_ids]
+        elif isinstance(cached_message_ids, list):
+            message_ids = [message_id for message_id in cached_message_ids if isinstance(message_id, int)]
 
-        if isinstance(message_id, int):
-            try:
-                message = await channel.fetch_message(message_id)
-                await message.edit(content=None, embeds=embeds)
-                logging.info("Updated commands reference message %s", message_id)
-                return
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                logging.info("Could not update previous commands reference message; creating a new one")
+        updated_message_ids: list[int] = []
+        for index, embed in enumerate(embeds):
+            if index < len(message_ids):
+                try:
+                    message = await channel.fetch_message(message_ids[index])
+                    await message.edit(content=None, embed=embed)
+                    updated_message_ids.append(message.id)
+                    continue
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    logging.info("Could not update commands reference message part %s; creating a new one", index + 1)
 
-        message = await channel.send(embeds=embeds)
-        await self.cache.set(cache_key, message.id, 315360000)
-        logging.info("Created commands reference message %s", message.id)
+            message = await channel.send(embed=embed)
+            updated_message_ids.append(message.id)
+
+        await self.cache.set(cache_key, updated_message_ids, 315360000)
+        logging.info("Synced %s commands reference message(s)", len(updated_message_ids))
 
     async def sync_exec_status_message(self) -> None:
         if not self.settings.exec_status_channel_id:
@@ -275,23 +285,55 @@ async def ship_name_autocomplete(
 
 @app_commands.command(name="commodity", description="Look up Star Citizen commodity prices and locations.")
 @app_commands.describe(
-    name="The commodity name to search for.",
+    route_mode="Choose commodity prices or a circular route link.",
+    name="Commodity name or code. Required for commodity prices.",
     system="Optional star system filter for both purchase and sell locations.",
     purchase_system="Optional system filter for purchase locations only.",
     sell_system="Optional system filter for sell locations only.",
     quantity_scu="Optional SCU amount for estimated buy cost and sell payout.",
+    route_ship="Ship for circular route planning.",
+    investment="aUEC investment for circular route planning.",
+    max_stops="Maximum circular route stops, from 1 to 5.",
+)
+@app_commands.choices(
+    route_mode=[
+        app_commands.Choice(name="Commodity Prices", value="commodity_prices"),
+        app_commands.Choice(name="Circular Route", value="circular_route"),
+    ]
 )
 async def commodity_command(
     interaction: discord.Interaction,
-    name: str,
+    name: str | None = None,
+    route_mode: app_commands.Choice[str] | None = None,
     system: str | None = None,
     purchase_system: str | None = None,
     sell_system: str | None = None,
     quantity_scu: float | None = None,
+    route_ship: str = "Ironclad Assault",
+    investment: int = 1_000_000,
+    max_stops: int = 5,
 ) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    selected_mode = route_mode.value if route_mode else "commodity_prices"
+    if selected_mode == "circular_route":
+        if investment <= 0:
+            await interaction.response.send_message("Investment must be greater than 0 aUEC.", ephemeral=True)
+            return
+        if max_stops < 1 or max_stops > 5:
+            await interaction.response.send_message("Max stops must be between 1 and 5.", ephemeral=True)
+            return
+
+        route_url = build_trade_route_url(route_ship, investment, max_stops)
+        embed = build_circular_route_embed(route_ship, investment, max_stops, route_url, bool(bot.settings.sc_trade_tools_token))
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
+    if not name:
+        await interaction.response.send_message("Commodity name or code is required for commodity price lookups.", ephemeral=True)
         return
 
     if quantity_scu is not None and quantity_scu <= 0:
@@ -749,6 +791,40 @@ def build_commodity_embed(
             inline=False,
         )
     embed.set_footer(text=f"Source: {result.source_name}")
+    return embed
+
+
+def build_circular_route_embed(
+    ship: str,
+    investment: int,
+    max_stops: int,
+    route_url: str,
+    has_api_token: bool,
+) -> discord.Embed:
+    embed = discord.Embed(
+        title="Circular Route",
+        description=(
+            f"Ship: {ship}\n"
+            f"Investment: {_format_currency(investment, 'aUEC')}\n"
+            f"Max Stops: {max_stops}\n"
+            f"[Open SC Trade Tools route]({route_url})"
+        ),
+        url=route_url,
+        color=discord.Color.teal(),
+    )
+    if has_api_token:
+        embed.add_field(
+            name="API",
+            value="SC Trade Tools API token is configured. Direct in-Discord route results can be wired next.",
+            inline=False,
+        )
+    else:
+        embed.add_field(
+            name="API",
+            value="Direct route results require a SC Trade Tools API token. For now, this opens the prefilled route planner.",
+            inline=False,
+        )
+    embed.set_footer(text="Source: SC Trade Tools")
     return embed
 
 

@@ -67,11 +67,15 @@ Options:
 
 | Option | Required | Purpose |
 | --- | --- | --- |
-| `name` | Yes | Commodity name or code, such as `Gold`, `Agricium`, `GOLD`, or `AGRI`. |
+| `route_mode` | No | Choose `Commodity Prices` or `Circular Route`. Defaults to `Commodity Prices`. |
+| `name` | No | Commodity name or code, such as `Gold`, `Agricium`, `GOLD`, or `AGRI`. Required for commodity price lookups. |
 | `system` | No | Filters both purchase and sell locations to one star system. |
 | `purchase_system` | No | Filters purchase locations only. Overrides `system` for purchase locations. |
 | `sell_system` | No | Filters sell locations only. Overrides `system` for sell locations. |
 | `quantity_scu` | No | SCU amount used to estimate buy cost and sell payout. |
+| `route_ship` | No | Ship name for circular route planning. Defaults to `Ironclad Assault`. |
+| `investment` | No | aUEC investment for circular route planning. Defaults to `1,000,000`. |
+| `max_stops` | No | Maximum circular route stops, from 1 to 5. Defaults to `5`. |
 
 Current output:
 
@@ -100,7 +104,14 @@ Examples:
 /commodity Gold system:Stanton
 /commodity Gold purchase_system:Stanton sell_system:Pyro
 /commodity Gold purchase_system:Stanton sell_system:Pyro quantity_scu:100
+/commodity route_mode:Circular Route route_ship:Ironclad Assault investment:1000000 max_stops:5
 ```
+
+Circular route behavior:
+
+- Generates a prefilled SC Trade Tools route planner link.
+- Uses `https://sc-trade.tools/trade-routes`.
+- Direct in-Discord circular route results require a SC Trade Tools API token in `SC_TRADE_TOOLS_TOKEN`.
 
 ## `/exec`
 

@@ -32,6 +32,8 @@ Set comma-separated `EXEC_ADMIN_ROLE_IDS` in `.env` to restrict `/execset` and `
 
 Set `CZ_TIMERS_CHANNEL_ID` in `.env` to have the bot keep a public Contested Zone timer dashboard with clickable start/reset buttons.
 
+Set `SC_TRADE_TOOLS_TOKEN` in `.env` when you have a SC Trade Tools API token and want direct in-Discord trade route results instead of prefilled route links.
+
 ## Local Setup
 
 Install Python 3.12+ first. On Windows, make sure Python is added to PATH.
