@@ -83,7 +83,7 @@ class SCCraftToolsSource:
         if location:
             params["location"] = location
 
-        cache_key = f"sc-craft:blueprints:v4:{urlencode(params, doseq=True)}"
+        cache_key = f"sc-craft:blueprints:v5:{urlencode(params, doseq=True)}"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, list):
             return [self._blueprint_from_cache(row) for row in cached if isinstance(row, dict)]
@@ -184,9 +184,10 @@ class SCCraftToolsSource:
 
     def _parse_blueprint(self, row: dict, missions_by_id: dict) -> BlueprintResult:
         mission_rows = row.get("missions") if isinstance(row.get("missions"), list) else []
+        name = str(row.get("name") or "Unknown blueprint")
         raw_category = row.get("category")
         return BlueprintResult(
-            name=str(row.get("name") or "Unknown blueprint"),
+            name=name,
             category=self._display_category(raw_category),
             craft_time_seconds=self._int_or_none(row.get("craft_time_seconds")),
             tiers=self._int_or_none(row.get("tiers")),
@@ -198,7 +199,7 @@ class SCCraftToolsSource:
                 if isinstance(mission, dict)
             ],
             source_name=self.name,
-            source_url=f"{self.base_url}/?search={str(row.get('name') or '').replace(' ', '+')}",
+            source_url=f"{self.base_url}/?{urlencode({'search': name})}",
             component_size=self._component_size(raw_category),
         )
 

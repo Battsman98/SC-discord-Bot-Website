@@ -67,6 +67,22 @@ def test_parse_blueprint_extracts_component_size_from_category() -> None:
     assert result.component_size == "Size 1"
 
 
+def test_parse_blueprint_encodes_source_url_for_quoted_names() -> None:
+    source = SCCraftToolsSource.__new__(SCCraftToolsSource)
+
+    result = source._parse_blueprint(
+        {
+            "name": 'P6-LR "Archangel" Sniper Rifle',
+            "category": "Weapons / Sniper",
+            "ingredients": [],
+            "missions": [],
+        },
+        {},
+    )
+
+    assert result.source_url == "https://sc-craft.tools/?search=P6-LR+%22Archangel%22+Sniper+Rifle"
+
+
 def test_autocomplete_blueprint_filter_uses_config_hints() -> None:
     source = SCCraftToolsSource.__new__(SCCraftToolsSource)
     source._config = {
