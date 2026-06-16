@@ -49,6 +49,7 @@ def test_command_channel_directory_groups_commands_by_channel() -> None:
         commands_channel_id=456,
         exec_status_channel_id=None,
         exec_admin_role_ids=(),
+        bot_admin_role_ids=(),
         cz_timers_channel_id=None,
         audit_log_channel_id=None,
         command_channel_ids={

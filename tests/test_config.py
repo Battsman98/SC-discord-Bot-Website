@@ -16,6 +16,7 @@ def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("COMMANDS_CHANNEL_ID", "456")
     monkeypatch.setenv("EXEC_STATUS_CHANNEL_ID", "789")
     monkeypatch.setenv("EXEC_ADMIN_ROLE_IDS", "111,222")
+    monkeypatch.setenv("BOT_ADMIN_ROLE_IDS", "333,444")
     monkeypatch.setenv("CZ_TIMERS_CHANNEL_ID", "333")
     monkeypatch.setenv("AUDIT_LOG_CHANNEL_ID", "444")
     monkeypatch.setenv("COMMAND_CHANNEL_IDS", "ship:100,trade routing=200;/item locator:300")
@@ -28,6 +29,7 @@ def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.commands_channel_id == 456
     assert settings.exec_status_channel_id == 789
     assert settings.exec_admin_role_ids == (111, 222)
+    assert settings.bot_admin_role_ids == (333, 444)
     assert settings.cz_timers_channel_id == 333
     assert settings.audit_log_channel_id == 444
     assert settings.command_channel_ids == {

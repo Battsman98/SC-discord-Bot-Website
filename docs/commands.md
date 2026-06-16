@@ -151,6 +151,11 @@ Adds a community-reported mining location for a material. Added locations appear
 
 Response visibility: private to the user.
 
+Permissions:
+
+- If `BOT_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
+- If no bot admin role IDs are configured, users must have Discord's Manage Server permission.
+
 Autocomplete:
 
 - `material` supports mineable material dropdown suggestions.
@@ -321,8 +326,9 @@ Response visibility: private to the user.
 
 Permissions:
 
-- If `EXEC_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
-- If no role IDs are configured yet, users must have Discord's Manage Server permission.
+- If `BOT_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
+- If `EXEC_ADMIN_ROLE_IDS` is set in `.env`, those roles are used as a compatibility fallback.
+- If no bot or exec admin role IDs are configured, users must have Discord's Manage Server permission.
 
 Options:
 
@@ -394,3 +400,44 @@ Examples:
 /cztimer timer:Blue keycard terminal - 15 min
 /cztimer timer:Compboard/tablet - 30 min started_minutes_ago:5
 ```
+
+## `/admin channels`
+
+Shows the current bot channel directory and configured bot support channels.
+
+Response visibility: private to the user.
+
+Permissions:
+
+- If `BOT_ADMIN_ROLE_IDS` is set in `.env`, users must have one of those roles.
+- If no bot admin role IDs are configured, users must have Discord's Manage Server permission.
+
+Options: none.
+
+## `/admin health`
+
+Shows bot health and configuration status.
+
+Response visibility: private to the user.
+
+Permissions:
+
+- Same permission rules as `/admin channels`.
+
+Options: none.
+
+## `/audit recent`
+
+Shows recent bot audit events.
+
+Response visibility: private to the user.
+
+Permissions:
+
+- Same permission rules as `/admin channels`.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `limit` | No | Number of recent audit events to show, from 1 to 20. Defaults to `10`. |

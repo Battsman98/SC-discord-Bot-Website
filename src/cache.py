@@ -24,6 +24,16 @@ class SQLiteCache:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                fields_json TEXT NOT NULL
+            )
+            """
+        )
         connection.commit()
         return cls(connection)
 
@@ -61,6 +71,48 @@ class SQLiteCache:
     async def delete(self, cache_key: str) -> None:
         self._connection.execute("DELETE FROM cache_entries WHERE cache_key = ?", (cache_key,))
         self._connection.commit()
+
+    async def add_audit_event(self, title: str, fields: dict[str, Any]) -> None:
+        now = int(time.time())
+        clean_fields = {str(key): str(value) for key, value in fields.items()}
+        self._connection.execute(
+            """
+            INSERT INTO audit_events (created_at, title, fields_json)
+            VALUES (?, ?, ?)
+            """,
+            (now, title, json.dumps(clean_fields)),
+        )
+        self._connection.execute(
+            """
+            DELETE FROM audit_events
+            WHERE id NOT IN (
+                SELECT id FROM audit_events
+                ORDER BY id DESC
+                LIMIT 1000
+            )
+            """
+        )
+        self._connection.commit()
+
+    async def recent_audit_events(self, limit: int = 10) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            """
+            SELECT id, created_at, title, fields_json
+            FROM audit_events
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (max(1, min(limit, 25)),),
+        ).fetchall()
+        return [
+            {
+                "id": row[0],
+                "created_at": row[1],
+                "title": row[2],
+                "fields": json.loads(row[3]),
+            }
+            for row in rows
+        ]
 
     async def close(self) -> None:
         self._connection.close()

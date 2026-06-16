@@ -11,6 +11,7 @@ class Settings:
     commands_channel_id: int | None
     exec_status_channel_id: int | None
     exec_admin_role_ids: tuple[int, ...]
+    bot_admin_role_ids: tuple[int, ...]
     cz_timers_channel_id: int | None
     audit_log_channel_id: int | None
     command_channel_ids: dict[str, int]
@@ -38,6 +39,11 @@ class Settings:
             for role_id in os.getenv("EXEC_ADMIN_ROLE_IDS", "").split(",")
             if role_id.strip()
         )
+        bot_admin_role_ids = tuple(
+            int(role_id.strip())
+            for role_id in os.getenv("BOT_ADMIN_ROLE_IDS", "").split(",")
+            if role_id.strip()
+        )
 
         return cls(
             discord_token=discord_token,
@@ -45,6 +51,7 @@ class Settings:
             commands_channel_id=int(commands_channel_id) if commands_channel_id else None,
             exec_status_channel_id=int(exec_status_channel_id) if exec_status_channel_id else None,
             exec_admin_role_ids=exec_admin_role_ids,
+            bot_admin_role_ids=bot_admin_role_ids,
             cz_timers_channel_id=int(cz_timers_channel_id) if cz_timers_channel_id else None,
             audit_log_channel_id=int(audit_log_channel_id) if audit_log_channel_id else None,
             command_channel_ids=_parse_command_channel_ids(os.getenv("COMMAND_CHANNEL_IDS", "")),
