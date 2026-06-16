@@ -57,6 +57,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(execset_command)
         self.tree.add_command(execclear_command)
         self.tree.add_command(cztimer_command)
+        self.tree.add_command(trade_group)
 
         if self.settings.discord_guild_id:
             guild = discord.Object(id=self.settings.discord_guild_id)
@@ -285,55 +286,23 @@ async def ship_name_autocomplete(
 
 @app_commands.command(name="commodity", description="Look up Star Citizen commodity prices and locations.")
 @app_commands.describe(
-    route_mode="Choose commodity prices or a circular route link.",
-    name="Commodity name or code. Required for commodity prices.",
+    name="Commodity name or code.",
     system="Optional star system filter for both purchase and sell locations.",
     purchase_system="Optional system filter for purchase locations only.",
     sell_system="Optional system filter for sell locations only.",
     quantity_scu="Optional SCU amount for estimated buy cost and sell payout.",
-    route_ship="Ship for circular route planning.",
-    investment="aUEC investment for circular route planning.",
-    max_stops="Maximum circular route stops, from 1 to 5.",
-)
-@app_commands.choices(
-    route_mode=[
-        app_commands.Choice(name="Commodity Prices", value="commodity_prices"),
-        app_commands.Choice(name="Circular Route", value="circular_route"),
-    ]
 )
 async def commodity_command(
     interaction: discord.Interaction,
-    name: str | None = None,
-    route_mode: app_commands.Choice[str] | None = None,
+    name: str,
     system: str | None = None,
     purchase_system: str | None = None,
     sell_system: str | None = None,
     quantity_scu: float | None = None,
-    route_ship: str = "Ironclad Assault",
-    investment: int = 1_000_000,
-    max_stops: int = 5,
 ) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
-        return
-
-    selected_mode = route_mode.value if route_mode else "commodity_prices"
-    if selected_mode == "circular_route":
-        if investment <= 0:
-            await interaction.response.send_message("Investment must be greater than 0 aUEC.", ephemeral=True)
-            return
-        if max_stops < 1 or max_stops > 5:
-            await interaction.response.send_message("Max stops must be between 1 and 5.", ephemeral=True)
-            return
-
-        route_url = build_trade_route_url(route_ship, investment, max_stops)
-        embed = build_circular_route_embed(route_ship, investment, max_stops, route_url, bool(bot.settings.sc_trade_tools_token))
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-        return
-
-    if not name:
-        await interaction.response.send_message("Commodity name or code is required for commodity price lookups.", ephemeral=True)
         return
 
     if quantity_scu is not None and quantity_scu <= 0:
@@ -383,6 +352,45 @@ async def commodity_system_autocomplete(
     if not matches and normalized:
         matches = [system for system in systems if normalized in system.lower()]
     return [app_commands.Choice(name=system, value=system) for system in matches[:25]]
+
+
+trade_group = app_commands.Group(name="trade", description="Trade planning tools.")
+
+
+@trade_group.command(name="routing", description="Create a Star Citizen trade route planner link.")
+@app_commands.describe(
+    route_type="Route type to create.",
+    ship="Ship for route planning.",
+    investment="aUEC investment for route planning.",
+    max_stops="Maximum route stops, from 1 to 5.",
+)
+@app_commands.choices(
+    route_type=[
+        app_commands.Choice(name="Circular Route", value="circular_route"),
+    ]
+)
+async def trade_routing_command(
+    interaction: discord.Interaction,
+    route_type: app_commands.Choice[str],
+    ship: str = "Ironclad Assault",
+    investment: int = 1_000_000,
+    max_stops: int = 5,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    if investment <= 0:
+        await interaction.response.send_message("Investment must be greater than 0 aUEC.", ephemeral=True)
+        return
+    if max_stops < 1 or max_stops > 5:
+        await interaction.response.send_message("Max stops must be between 1 and 5.", ephemeral=True)
+        return
+
+    route_url = build_trade_route_url(ship, investment, max_stops)
+    embed = build_trade_route_embed(route_type.name, ship, investment, max_stops, route_url, bool(bot.settings.sc_trade_tools_token))
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @app_commands.command(name="exec", description="Show the current Executive Hangar clock.")
@@ -794,7 +802,8 @@ def build_commodity_embed(
     return embed
 
 
-def build_circular_route_embed(
+def build_trade_route_embed(
+    route_type: str,
     ship: str,
     investment: int,
     max_stops: int,
@@ -802,7 +811,7 @@ def build_circular_route_embed(
     has_api_token: bool,
 ) -> discord.Embed:
     embed = discord.Embed(
-        title="Circular Route",
+        title=route_type,
         description=(
             f"Ship: {ship}\n"
             f"Investment: {_format_currency(investment, 'aUEC')}\n"

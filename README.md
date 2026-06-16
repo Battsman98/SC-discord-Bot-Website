@@ -17,6 +17,7 @@ Python Discord bot for collecting information from approved websites/APIs and se
 - `/lookup` searches Star Citizen game information.
 - `/ship` looks up a Star Citizen ship or vehicle.
 - `/commodity` looks up commodity pricing and locations.
+- `/trade routing` creates a trade route planner link.
 - `/exec` shows the Executive Hangar clock.
 - `/execset` corrects the Executive Hangar clock for approved users.
 - `/execclear` clears an Executive Hangar manual override.
