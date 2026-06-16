@@ -357,6 +357,107 @@ def test_calculate_trade_route_legs_returns_empty_for_unknown_start() -> None:
     assert legs == []
 
 
+def test_calculate_trade_route_legs_allows_lower_profit_leg_when_loop_is_profitable() -> None:
+    source = UEXSource.__new__(UEXSource)
+    legs = source._calculate_trade_route_legs(
+        [
+            {
+                "commodity_name": "Compboard",
+                "terminal_name": "A",
+                "price_sell_avg": 100,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Compboard",
+                "terminal_name": "B",
+                "price_buy_avg": 200,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Waste",
+                "terminal_name": "B",
+                "price_sell_avg": 50,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Waste",
+                "terminal_name": "A",
+                "price_buy_avg": 10,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+        ],
+        cargo_capacity_scu=10,
+        investment=10_000,
+        max_stops=2,
+        starting_point="A",
+    )
+
+    assert len(legs) == 2
+    assert sum(float(leg.profit) for leg in legs) == 600
+    assert legs[0].buy_terminal == "A"
+    assert legs[1].sell_terminal == "A"
+
+
+def test_calculate_trade_route_legs_matches_location_alias_as_start() -> None:
+    source = UEXSource.__new__(UEXSource)
+    legs = source._calculate_trade_route_legs(
+        [
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "ArcCorp 045",
+                "outpost_name": "ArcCorp Mining Area 045",
+                "price_sell_avg": 100,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "Area 18",
+                "city_name": "Area 18",
+                "price_buy_avg": 200,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Waste",
+                "terminal_name": "Area 18",
+                "city_name": "Area 18",
+                "price_sell_avg": 1,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Waste",
+                "terminal_name": "ArcCorp 045",
+                "outpost_name": "ArcCorp Mining Area 045",
+                "price_buy_avg": 2,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+        ],
+        cargo_capacity_scu=10,
+        investment=10_000,
+        max_stops=2,
+        starting_point="ArcCorp Mining Area 045",
+    )
+
+    assert len(legs) == 2
+    assert legs[0].buy_terminal == "ArcCorp 045"
+    assert legs[-1].sell_terminal == "ArcCorp 045"
+
+
 def test_enrich_price_rows_adds_terminal_location_details() -> None:
     source = UEXSource.__new__(UEXSource)
 

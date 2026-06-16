@@ -323,6 +323,7 @@ class UEXSource:
     ) -> list[TradeRouteLeg]:
         normalized_start = self._normalize(self._trade_location_value(starting_point))
         normalized_stay_system = self._normalize(stay_system)
+        start_keys = self._trade_start_keys(prices, normalized_start)
         rows_by_commodity: dict[str, list[dict]] = {}
 
         for row in prices:
@@ -357,7 +358,7 @@ class UEXSource:
                     if self._same_terminal(purchase, sale):
                         continue
                     sell_price = self._number(sale.get("price_buy_avg") or sale.get("price_buy"))
-                    if sell_price is None or sell_price <= buy_price:
+                    if sell_price is None:
                         continue
 
                     quantity_scu = min(
@@ -390,13 +391,13 @@ class UEXSource:
                         )
                     )
 
-        return self._best_circular_route(candidates, max_stops, normalized_start)
+        return self._best_circular_route(candidates, max_stops, start_keys)
 
     def _best_circular_route(
         self,
         candidates: list[TradeRouteLeg],
         max_stops: int,
-        normalized_start: str,
+        start_keys: set[str],
     ) -> list[TradeRouteLeg]:
         max_stops = max(2, max_stops)
         candidates.sort(key=lambda leg: float(leg.profit), reverse=True)
@@ -421,7 +422,7 @@ class UEXSource:
         start_candidates = [
             leg
             for leg in sorted(best_by_pair.values(), key=lambda leg: float(leg.profit), reverse=True)
-            if self._terminal_key(leg.buy_terminal) == normalized_start
+            if self._terminal_key(leg.buy_terminal) in start_keys
         ][:1000]
 
         def route_profit(route: list[TradeRouteLeg]) -> float:
@@ -479,6 +480,26 @@ class UEXSource:
 
     def _terminal_key(self, terminal_name: str) -> str:
         return self._normalize(terminal_name)
+
+    def _trade_start_keys(self, rows: list[dict], normalized_start: str) -> set[str]:
+        start_keys = {normalized_start}
+        for row in rows:
+            terminal_name = self._string_or_none(row.get("terminal_name"))
+            if not terminal_name:
+                continue
+            aliases = {
+                self._normalize(terminal_name),
+                self._normalize(self._location(row)),
+                self._normalize(row.get("outpost_name")),
+                self._normalize(row.get("city_name")),
+                self._normalize(row.get("space_station_name")),
+                self._normalize(row.get("poi_name")),
+                self._normalize(self._trade_location_display(row)),
+                self._normalize(self._trade_location_value(self._trade_location_display(row))),
+            }
+            if normalized_start in aliases:
+                start_keys.add(self._terminal_key(terminal_name))
+        return {key for key in start_keys if key}
 
     def _trade_location_display(self, row: dict) -> str:
         terminal_name = str(row.get("terminal_name") or "Unknown terminal")
