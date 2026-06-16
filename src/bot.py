@@ -165,7 +165,7 @@ class GameAssistBot(commands.Bot):
             logging.warning("COMMANDS_CHANNEL_ID does not point to a messageable channel")
             return
 
-        embeds = build_commands_reference_embeds()
+        embeds = build_commands_reference_embeds(self.settings)
         cache_key = f"discord:commands-reference-message:{self.settings.commands_channel_id}"
         cached_message_ids = await self.cache.get(cache_key)
         message_ids: list[int] = []
@@ -2125,13 +2125,16 @@ def _format_route_location(
     return " / ".join(parts) or terminal
 
 
-def build_commands_reference_embeds() -> list[discord.Embed]:
+def build_commands_reference_embeds(settings: Settings | None = None) -> list[discord.Embed]:
     reference_path = Path("docs/commands.md")
     markdown = reference_path.read_text(encoding="utf-8").strip()
     if markdown.startswith("# Discord Bot Commands"):
         markdown = markdown.removeprefix("# Discord Bot Commands").strip()
 
     embeds = []
+    if settings and settings.command_channel_ids:
+        embeds.append(build_command_channel_directory_embed(settings))
+
     sections = _command_reference_sections(markdown)
     for command_name, body in sections:
         chunks = _chunk_text(body, 3500)
@@ -2148,6 +2151,25 @@ def build_commands_reference_embeds() -> list[discord.Embed]:
             embeds.append(embed)
 
     return embeds
+
+
+def build_command_channel_directory_embed(settings: Settings) -> discord.Embed:
+    channel_commands: dict[int, list[str]] = {}
+    for command_name, channel_id in settings.command_channel_ids.items():
+        channel_commands.setdefault(channel_id, []).append(f"/{command_name}")
+
+    lines = []
+    for channel_id, command_names in sorted(channel_commands.items(), key=lambda item: min(item[1])):
+        commands = ", ".join(sorted(command_names))
+        lines.append(f"<#{channel_id}>: {commands}")
+
+    embed = discord.Embed(
+        title="Discord Bot Commands - Channel Directory",
+        description="\n".join(lines) if lines else "No command channel restrictions configured.",
+        color=discord.Color.blurple(),
+    )
+    embed.set_footer(text="Channel names are rendered by Discord from the configured channel IDs")
+    return embed
 
 
 def _command_reference_sections(markdown: str) -> list[tuple[str, str]]:
