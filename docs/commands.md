@@ -118,7 +118,7 @@ Behavior:
 Autocomplete:
 
 - `name` supports blueprint/item name suggestions.
-- `category`, `material`, `mission_type`, `contractor`, and `location` support dropdown suggestions from current crafting data.
+- `category`, `material`, `mission_type`, and `contractor` support dropdown suggestions from current crafting data.
 
 Options:
 
@@ -129,7 +129,6 @@ Options:
 | `material` | No | Required material/resource used by the blueprint. |
 | `mission_type` | No | Mission type that can award the blueprint. |
 | `contractor` | No | Mission contractor that can award the blueprint. |
-| `location` | No | Mission location or system. |
 
 At least one option is required.
 
@@ -147,7 +146,7 @@ Examples:
 /blueprint name:Aril Arms
 /blueprint material:Iron category:Vehiclegear / Salvage
 /blueprint mission_type:Salvage contractor:Adagio Holdings
-/blueprint location:Stanton material:Tungsten
+/blueprint material:Tungsten
 ```
 
 ## `/trade routing`

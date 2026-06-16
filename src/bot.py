@@ -371,7 +371,6 @@ async def commodity_system_autocomplete(
     material="Optional required material or resource.",
     mission_type="Optional mission type that can award the blueprint.",
     contractor="Optional mission contractor.",
-    location="Optional mission location or system.",
 )
 async def blueprint_command(
     interaction: discord.Interaction,
@@ -380,14 +379,13 @@ async def blueprint_command(
     material: str | None = None,
     mission_type: str | None = None,
     contractor: str | None = None,
-    location: str | None = None,
 ) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
 
-    if not any([name, category, material, mission_type, contractor, location]):
+    if not any([name, category, material, mission_type, contractor]):
         await interaction.response.send_message("Add a blueprint name or at least one filter.", ephemeral=True)
         return
 
@@ -399,7 +397,6 @@ async def blueprint_command(
         material=material,
         mission_type=mission_type,
         contractor=contractor,
-        location=location,
         limit=result_limit,
     )
 
@@ -415,7 +412,6 @@ async def blueprint_command(
                 material=material,
                 mission_type=mission_type,
                 contractor=contractor,
-                location=location,
                 limit=BLUEPRINT_PAGE_SIZE,
                 page=2,
             )
@@ -427,7 +423,6 @@ async def blueprint_command(
                 material=material,
                 mission_type=mission_type,
                 contractor=contractor,
-                location=location,
                 page=1,
                 has_next=has_next,
             ),
@@ -437,7 +432,6 @@ async def blueprint_command(
                 material=material,
                 mission_type=mission_type,
                 contractor=contractor,
-                location=location,
                 page=1,
                 has_next=has_next,
             ),
@@ -447,7 +441,7 @@ async def blueprint_command(
 
     await interaction.followup.send(
         embeds=[
-            build_blueprint_embed(result, name, category, material, mission_type, contractor, location)
+            build_blueprint_embed(result, name, category, material, mission_type, contractor)
             for result in results
         ],
         ephemeral=True,
@@ -471,7 +465,6 @@ async def blueprint_name_autocomplete(
 @blueprint_command.autocomplete("material")
 @blueprint_command.autocomplete("mission_type")
 @blueprint_command.autocomplete("contractor")
-@blueprint_command.autocomplete("location")
 async def blueprint_filter_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -485,7 +478,6 @@ async def blueprint_filter_autocomplete(
         "material": "resource",
         "mission_type": "mission_type",
         "contractor": "contractor",
-        "location": "location",
     }
     names = await bot.sources.autocomplete_blueprint_filter(
         field_map.get(_focused_option_name(interaction), "category"),
@@ -528,7 +520,6 @@ class BlueprintSelectView(discord.ui.View):
         material: str | None = None,
         mission_type: str | None = None,
         contractor: str | None = None,
-        location: str | None = None,
         page: int = 1,
         has_next: bool = False,
     ) -> None:
@@ -537,7 +528,6 @@ class BlueprintSelectView(discord.ui.View):
         self.material = material
         self.mission_type = mission_type
         self.contractor = contractor
-        self.location = location
         self.page = page
         self.has_next = has_next
         self.add_item(BlueprintSelect(results))
@@ -567,7 +557,6 @@ class BlueprintSelectView(discord.ui.View):
             material=self.material,
             mission_type=self.mission_type,
             contractor=self.contractor,
-            location=self.location,
             limit=BLUEPRINT_PAGE_SIZE,
             page=page,
         )
@@ -578,7 +567,6 @@ class BlueprintSelectView(discord.ui.View):
                 material=self.material,
                 mission_type=self.mission_type,
                 contractor=self.contractor,
-                location=self.location,
                 limit=BLUEPRINT_PAGE_SIZE,
                 page=page + 1,
             )
@@ -590,7 +578,6 @@ class BlueprintSelectView(discord.ui.View):
                 material=self.material,
                 mission_type=self.mission_type,
                 contractor=self.contractor,
-                location=self.location,
                 page=page,
                 has_next=has_next,
             ),
@@ -600,7 +587,6 @@ class BlueprintSelectView(discord.ui.View):
                 material=self.material,
                 mission_type=self.mission_type,
                 contractor=self.contractor,
-                location=self.location,
                 page=page,
                 has_next=has_next,
             ),
@@ -1122,7 +1108,6 @@ def build_blueprint_embed(
     material: str | None = None,
     mission_type: str | None = None,
     contractor: str | None = None,
-    location: str | None = None,
 ) -> discord.Embed:
     description = [
         _line("Category", result.category),
@@ -1133,7 +1118,6 @@ def build_blueprint_embed(
         _line("Material Filter", material),
         _line("Mission Type Filter", mission_type),
         _line("Contractor Filter", contractor),
-        _line("Location Filter", location),
     ]
     embed = discord.Embed(
         title=result.name,
@@ -1153,7 +1137,6 @@ def build_blueprint_selection_embed(
     material: str | None = None,
     mission_type: str | None = None,
     contractor: str | None = None,
-    location: str | None = None,
     page: int = 1,
     has_next: bool = False,
 ) -> discord.Embed:
@@ -1162,7 +1145,6 @@ def build_blueprint_selection_embed(
         _line("Material Filter", material),
         _line("Mission Type Filter", mission_type),
         _line("Contractor Filter", contractor),
-        _line("Location Filter", location),
     ]
     embed = discord.Embed(
         title="Blueprint Results",
