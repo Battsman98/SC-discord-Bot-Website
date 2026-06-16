@@ -555,20 +555,24 @@ class BlueprintDetailView(discord.ui.View):
         self.contractor = contractor
         self.page = page
         self.page_count = _blueprint_mission_page_count(result.missions)
-        self.previous_page.disabled = page <= 1
-        self.next_page.disabled = page >= self.page_count
+        self.previous_page.disabled = self.page_count <= 1
+        self.next_page.disabled = self.page_count <= 1
 
-    @discord.ui.button(label="Previous Missions", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="Previous Page", style=discord.ButtonStyle.secondary, row=0)
     async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         del button
         await self._show_page(interaction, self.page - 1)
 
-    @discord.ui.button(label="Next Missions", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="Next Page", style=discord.ButtonStyle.secondary, row=0)
     async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         del button
         await self._show_page(interaction, self.page + 1)
 
     async def _show_page(self, interaction: discord.Interaction, page: int) -> None:
+        if page < 1:
+            page = self.page_count
+        elif page > self.page_count:
+            page = 1
         await interaction.response.edit_message(
             embed=build_blueprint_embed(
                 self.result,

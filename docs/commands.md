@@ -139,7 +139,7 @@ Current output:
 - Required materials and quantities
 - Missions that can award the blueprint
 - Blueprint missions grouped by contractor and drop rate, showing the lowest required rep and mission names underneath
-- Blueprint mission sections over 25 lines include mission page buttons
+- Blueprint mission sections over 25 lines include page buttons that cycle through additional mission details
 
 Examples:
 
