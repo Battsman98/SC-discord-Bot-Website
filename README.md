@@ -30,6 +30,8 @@ Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive H
 
 Set comma-separated `EXEC_ADMIN_ROLE_IDS` in `.env` to restrict `/execset` and `/execclear` to specific Discord roles. If no role IDs are configured, users with Manage Server can use those commands.
 
+Set `CZ_TIMERS_CHANNEL_ID` in `.env` to have the bot keep a public Contested Zone timer dashboard with clickable start/reset buttons.
+
 ## Local Setup
 
 Install Python 3.12+ first. On Windows, make sure Python is added to PATH.

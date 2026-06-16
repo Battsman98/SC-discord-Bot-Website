@@ -20,6 +20,13 @@ from src.timers import (
 
 
 EXEC_OVERRIDE_CACHE_KEY = "exec:cycle-start-override"
+CZ_TIMERS_CACHE_KEY = "cz:dashboard:timers"
+CZ_TIMER_DEFINITIONS = {
+    "blue_keycard": ("Blue Keycards", 15 * 60),
+    "compboard": ("Compboards / Tablets", 30 * 60),
+    "red_keycard": ("Red Keycards", 30 * 60),
+    "timer_door": ("Timer Doors", 20 * 60),
+}
 
 
 class GameAssistBot(commands.Bot):
@@ -37,8 +44,10 @@ class GameAssistBot(commands.Bot):
         self.sources = sources
         self._commands_reference_synced = False
         self._exec_status_task: asyncio.Task | None = None
+        self._cz_timers_task: asyncio.Task | None = None
 
     async def setup_hook(self) -> None:
+        self.add_view(CZTimerDashboardView())
         self.tree.add_command(status_command)
         self.tree.add_command(lookup_command)
         self.tree.add_command(ship_command)
@@ -64,14 +73,22 @@ class GameAssistBot(commands.Bot):
         self._commands_reference_synced = True
         await self.sync_commands_reference_message()
         await self.sync_exec_status_message()
+        await self.sync_cz_timers_message()
 
         if self.settings.exec_status_channel_id and self._exec_status_task is None:
             self._exec_status_task = asyncio.create_task(self._exec_status_loop())
+        if self.settings.cz_timers_channel_id and self._cz_timers_task is None:
+            self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
 
     async def _exec_status_loop(self) -> None:
         while not self.is_closed():
             await asyncio.sleep(60)
             await self.sync_exec_status_message()
+
+    async def _cz_timers_loop(self) -> None:
+        while not self.is_closed():
+            await asyncio.sleep(60)
+            await self.sync_cz_timers_message()
 
     async def sync_commands_reference_message(self) -> None:
         if not self.settings.commands_channel_id:
@@ -141,6 +158,39 @@ class GameAssistBot(commands.Bot):
         await self.cache.set(cache_key, message.id, 315360000)
         logging.info("Created Executive Hangar status message %s", message.id)
 
+    async def sync_cz_timers_message(self) -> None:
+        if not self.settings.cz_timers_channel_id:
+            return
+
+        try:
+            channel = await self.fetch_channel(self.settings.cz_timers_channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.warning("Could not access CZ_TIMERS_CHANNEL_ID %s", self.settings.cz_timers_channel_id)
+            return
+
+        if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
+            logging.warning("CZ_TIMERS_CHANNEL_ID does not point to a messageable channel")
+            return
+
+        timers = await get_cz_dashboard_timers(self.cache)
+        embed = build_cz_dashboard_embed(timers)
+        view = CZTimerDashboardView()
+        cache_key = f"discord:cz-timers-message:{self.settings.cz_timers_channel_id}"
+        message_id = await self.cache.get(cache_key)
+
+        if isinstance(message_id, int):
+            try:
+                message = await channel.fetch_message(message_id)
+                await message.edit(content=None, embed=embed, view=view)
+                logging.info("Updated CZ timers dashboard message %s", message_id)
+                return
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logging.info("Could not update previous CZ timers dashboard; creating a new one")
+
+        message = await channel.send(embed=embed, view=view)
+        await self.cache.set(cache_key, message.id, 315360000)
+        logging.info("Created CZ timers dashboard message %s", message.id)
+
     async def resolve_exec_cycle_start(self) -> tuple[int, str]:
         override = await self.cache.get(EXEC_OVERRIDE_CACHE_KEY)
         if isinstance(override, dict) and isinstance(override.get("cycle_start_unix"), int):
@@ -171,6 +221,8 @@ class GameAssistBot(commands.Bot):
     async def close(self) -> None:
         if self._exec_status_task:
             self._exec_status_task.cancel()
+        if self._cz_timers_task:
+            self._cz_timers_task.cancel()
         await self.sources.close()
         await self.cache.close()
         await super().close()
@@ -468,6 +520,143 @@ async def cztimer_command(
     )
     embed.set_footer(text="Local helper timer based on known contested-zone durations")
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class CZTimerDashboardView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Start Blue Keycards", style=discord.ButtonStyle.primary, custom_id="cz:start:blue_keycard", row=0)
+    async def start_blue_keycard(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "start", "blue_keycard")
+
+    @discord.ui.button(label="Reset Blue Keycards", style=discord.ButtonStyle.secondary, custom_id="cz:reset:blue_keycard", row=0)
+    async def reset_blue_keycard(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "reset", "blue_keycard")
+
+    @discord.ui.button(label="Start Compboards", style=discord.ButtonStyle.primary, custom_id="cz:start:compboard", row=1)
+    async def start_compboard(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "start", "compboard")
+
+    @discord.ui.button(label="Reset Compboards", style=discord.ButtonStyle.secondary, custom_id="cz:reset:compboard", row=1)
+    async def reset_compboard(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "reset", "compboard")
+
+    @discord.ui.button(label="Start Red Keycards", style=discord.ButtonStyle.primary, custom_id="cz:start:red_keycard", row=2)
+    async def start_red_keycard(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "start", "red_keycard")
+
+    @discord.ui.button(label="Reset Red Keycards", style=discord.ButtonStyle.secondary, custom_id="cz:reset:red_keycard", row=2)
+    async def reset_red_keycard(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "reset", "red_keycard")
+
+    @discord.ui.button(label="Start Timer Doors", style=discord.ButtonStyle.primary, custom_id="cz:start:timer_door", row=3)
+    async def start_timer_door(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "start", "timer_door")
+
+    @discord.ui.button(label="Reset Timer Doors", style=discord.ButtonStyle.secondary, custom_id="cz:reset:timer_door", row=3)
+    async def reset_timer_door(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "reset", "timer_door")
+
+    @discord.ui.button(label="Reset All", style=discord.ButtonStyle.danger, custom_id="cz:reset:all", row=4)
+    async def reset_all(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await handle_cz_timer_button(interaction, "reset_all", None)
+
+
+async def handle_cz_timer_button(
+    interaction: discord.Interaction,
+    action: str,
+    timer_key: str | None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    timers = await get_cz_dashboard_timers(bot.cache)
+    now = int(discord.utils.utcnow().timestamp())
+
+    if action == "start" and timer_key in CZ_TIMER_DEFINITIONS:
+        label, duration = CZ_TIMER_DEFINITIONS[timer_key]
+        timers[timer_key] = {
+            "end_unix": now + duration,
+            "updated_by": interaction.user.id,
+            "updated_by_name": str(interaction.user),
+            "updated_at_unix": now,
+        }
+        message = f"{label} timer started."
+    elif action == "reset" and timer_key in CZ_TIMER_DEFINITIONS:
+        label, _duration = CZ_TIMER_DEFINITIONS[timer_key]
+        timers.pop(timer_key, None)
+        message = f"{label} timer reset."
+    elif action == "reset_all":
+        timers = {}
+        message = "All CZ timers reset."
+    else:
+        await interaction.response.send_message("Unknown CZ timer action.", ephemeral=True)
+        return
+
+    await set_cz_dashboard_timers(bot.cache, timers)
+    embed = build_cz_dashboard_embed(timers)
+    await interaction.response.edit_message(embed=embed, view=CZTimerDashboardView())
+    await interaction.followup.send(message, ephemeral=True)
+
+
+async def get_cz_dashboard_timers(cache: SQLiteCache) -> dict:
+    timers = await cache.get(CZ_TIMERS_CACHE_KEY)
+    return timers if isinstance(timers, dict) else {}
+
+
+async def set_cz_dashboard_timers(cache: SQLiteCache, timers: dict) -> None:
+    await cache.set(CZ_TIMERS_CACHE_KEY, timers, 315360000)
+
+
+def build_cz_dashboard_embed(timers: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title="Contested Zone Timers",
+        description="Use the buttons below to start or reset shared CZ timers.",
+        color=discord.Color.orange(),
+    )
+
+    for key, (label, duration) in CZ_TIMER_DEFINITIONS.items():
+        timer = timers.get(key)
+        value = _format_cz_timer_value(timer, duration)
+        embed.add_field(name=label, value=value, inline=False)
+
+    embed.set_footer(text="Shared dashboard. Timers update when buttons are used and refresh every 60s while the bot is running.")
+    return embed
+
+
+def _format_cz_timer_value(timer: object, duration: int) -> str:
+    if not isinstance(timer, dict):
+        return f"Ready\nDefault duration: {_format_duration(duration)}"
+
+    end_unix = timer.get("end_unix")
+    if not isinstance(end_unix, int):
+        return f"Ready\nDefault duration: {_format_duration(duration)}"
+
+    now = int(discord.utils.utcnow().timestamp())
+    user_id = timer.get("updated_by")
+    user = f"<@{user_id}>" if isinstance(user_id, int) else str(timer.get("updated_by_name") or "Unknown user")
+
+    if end_unix <= now:
+        return f"Ready\nLast started by: {user}"
+
+    return f"Ready <t:{end_unix}:R>\nAt <t:{end_unix}:T>\nStarted by: {user}"
+
+
+def _format_duration(seconds: int) -> str:
+    minutes = seconds // 60
+    return f"{minutes} min"
 
 
 async def send_lookup(interaction: discord.Interaction, query: str) -> None:

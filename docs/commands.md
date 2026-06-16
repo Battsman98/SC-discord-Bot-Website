@@ -174,6 +174,8 @@ Starts a local contested-zone countdown helper.
 
 Response visibility: private to the user.
 
+If `CZ_TIMERS_CHANNEL_ID` is set in `.env`, the bot also posts or updates a public Contested Zone timer dashboard with clickable buttons.
+
 Options:
 
 | Option | Required | Purpose |
@@ -187,6 +189,18 @@ Timer choices:
 - Compboard/tablet - 30 min
 - Red supervisor keycard - 30 min
 - Ruin timer door cycle - 20 min
+
+Public dashboard buttons:
+
+- Start Blue Keycards
+- Reset Blue Keycards
+- Start Compboards
+- Reset Compboards
+- Start Red Keycards
+- Reset Red Keycards
+- Start Timer Doors
+- Reset Timer Doors
+- Reset All
 
 Examples:
 
