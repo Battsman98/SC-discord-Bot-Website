@@ -138,7 +138,8 @@ Current output:
 - Craft time and tiers
 - Required materials and quantities
 - Missions that can award the blueprint
-- Blueprint missions grouped by contractor, required rep, and drop rate, with mission names listed underneath
+- Blueprint missions grouped by contractor, lowest required rep, and drop rate, with mission names listed underneath
+- Blueprint mission sections over 25 lines include mission page buttons
 
 Examples:
 
