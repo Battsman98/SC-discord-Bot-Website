@@ -391,6 +391,7 @@ async def blueprint_command(
         return
 
     await interaction.response.defer(thinking=True, ephemeral=True)
+    result_limit = 3 if name else 25
     results = await bot.sources.lookup_blueprints(
         query=name,
         category=category,
@@ -398,11 +399,26 @@ async def blueprint_command(
         mission_type=mission_type,
         contractor=contractor,
         location=location,
-        limit=3,
+        limit=result_limit,
     )
 
     if not results:
         await interaction.followup.send("No blueprints found for those filters.", ephemeral=True)
+        return
+
+    if not name:
+        await interaction.followup.send(
+            embed=build_blueprint_selection_embed(
+                results,
+                category=category,
+                material=material,
+                mission_type=mission_type,
+                contractor=contractor,
+                location=location,
+            ),
+            view=BlueprintSelectView(results),
+            ephemeral=True,
+        )
         return
 
     await interaction.followup.send(
@@ -452,6 +468,38 @@ async def blueprint_filter_autocomplete(
         current,
     )
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
+
+
+class BlueprintSelect(discord.ui.Select):
+    def __init__(self, results: list[BlueprintResult]) -> None:
+        self.results = results[:25]
+        options = [
+            discord.SelectOption(
+                label=result.name[:100],
+                description=(result.category or "Blueprint")[:100],
+                value=str(index),
+            )
+            for index, result in enumerate(self.results)
+        ]
+        super().__init__(
+            placeholder="Select a blueprint for full details",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        result = self.results[int(self.values[0])]
+        await interaction.response.edit_message(
+            embed=build_blueprint_embed(result),
+            view=None,
+        )
+
+
+class BlueprintSelectView(discord.ui.View):
+    def __init__(self, results: list[BlueprintResult]) -> None:
+        super().__init__(timeout=300)
+        self.add_item(BlueprintSelect(results))
 
 
 trade_group = app_commands.Group(name="trade", description="Trade planning tools.")
@@ -994,6 +1042,40 @@ def build_blueprint_embed(
     return embed
 
 
+def build_blueprint_selection_embed(
+    results: list[BlueprintResult],
+    category: str | None = None,
+    material: str | None = None,
+    mission_type: str | None = None,
+    contractor: str | None = None,
+    location: str | None = None,
+) -> discord.Embed:
+    description = [
+        _line("Category Filter", category),
+        _line("Material Filter", material),
+        _line("Mission Type Filter", mission_type),
+        _line("Contractor Filter", contractor),
+        _line("Location Filter", location),
+    ]
+    embed = discord.Embed(
+        title="Blueprint Results",
+        description="\n".join(line for line in description if line) or "Available blueprints matching your filters.",
+        color=discord.Color.dark_gold(),
+    )
+    lines = []
+    for index, result in enumerate(results[:25], start=1):
+        category_label = f" - {result.category}" if result.category else ""
+        lines.append(f"{index}. {result.name}{category_label}")
+
+    embed.add_field(
+        name="Available Blueprints",
+        value=_limit_lines(lines, 1000),
+        inline=False,
+    )
+    embed.set_footer(text="Select a blueprint below to view materials and mission details.")
+    return embed
+
+
 def _format_blueprint_ingredients(ingredients: list[BlueprintIngredient]) -> str:
     if not ingredients:
         return "No material data found."
@@ -1011,25 +1093,38 @@ def _format_blueprint_missions(missions: list[BlueprintMission]) -> str:
     if not missions:
         return "No mission drop data found."
 
-    lines = []
-    for mission in missions[:8]:
+    unique_lines = []
+    seen = set()
+    for mission in missions:
         rep = mission.min_standing_name or "Unknown"
         if mission.min_standing_reputation is not None:
             rep = f"{rep} ({_format_number(mission.min_standing_reputation)} rep)"
-        lines.append(
+        drop = _format_drop_chance(mission.drop_chance) or "Unknown"
+        key = (
+            mission.contractor or "Unknown",
+            rep,
+            mission.mission_type or "Unknown",
+            drop,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_lines.append(
             " | ".join(
                 [
                     f"- Contractor: {mission.contractor or 'Unknown'}",
                     f"Rep: {rep}",
                     f"Type: {mission.mission_type or 'Unknown'}",
                     f"Mission: {mission.name}",
-                    f"Drop: {_format_drop_chance(mission.drop_chance) or 'Unknown'}",
+                    f"Drop: {drop}",
                 ]
             )
         )
 
-    if len(missions) > 8:
-        lines.append(f"{len(missions) - 8} more mission(s) available.")
+    lines = unique_lines[:8]
+    hidden_count = len(unique_lines) - len(lines)
+    if hidden_count > 0:
+        lines.append(f"{hidden_count} more mission(s) available.")
     return _limit_lines(lines, 1000)
 
 

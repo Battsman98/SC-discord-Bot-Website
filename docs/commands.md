@@ -108,6 +108,12 @@ Searches Star Citizen crafting blueprints using SC Craft Tools data.
 
 Response visibility: private to the user.
 
+Behavior:
+
+- `name` shows full blueprint details immediately.
+- Filter-only searches show a selectable list of matching blueprints first.
+- Selecting a blueprint from the list opens its materials and mission details.
+
 Autocomplete:
 
 - `name` supports blueprint/item name suggestions.
