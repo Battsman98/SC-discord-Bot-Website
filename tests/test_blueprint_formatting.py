@@ -1,5 +1,5 @@
-from src.bot import _format_blueprint_missions
-from src.sources.base import BlueprintMission
+from src.bot import _blueprint_result_label, _format_blueprint_missions
+from src.sources.base import BlueprintMission, BlueprintResult
 
 
 def test_format_blueprint_missions_uses_simple_ordered_fields() -> None:
@@ -50,3 +50,20 @@ def test_format_blueprint_missions_deduplicates_similar_reward_paths() -> None:
     assert text.count("Covalex Independent Contractors") == 1
     assert "Rank - Cargo Haul" in text
     assert "Rank - Direct Cargo Haul" not in text
+
+
+def test_blueprint_result_label_includes_component_size() -> None:
+    result = BlueprintResult(
+        name="Atlas",
+        category="Quantum Drive",
+        craft_time_seconds=None,
+        tiers=None,
+        version=None,
+        ingredients=[],
+        missions=[],
+        source_name="SC Craft Tools",
+        source_url="https://sc-craft.tools",
+        component_size="Size 1",
+    )
+
+    assert _blueprint_result_label(result) == "Quantum Drive | Size 1"

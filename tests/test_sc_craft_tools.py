@@ -50,6 +50,23 @@ def test_parse_blueprint_includes_materials_and_mission_rep() -> None:
     assert result.missions[0].drop_chance == 1
 
 
+def test_parse_blueprint_extracts_component_size_from_category() -> None:
+    source = SCCraftToolsSource.__new__(SCCraftToolsSource)
+
+    result = source._parse_blueprint(
+        {
+            "name": "Atlas",
+            "category": "Vehiclegear / Quantumdrive / Size1",
+            "ingredients": [],
+            "missions": [],
+        },
+        {},
+    )
+
+    assert result.category == "Quantum Drive"
+    assert result.component_size == "Size 1"
+
+
 def test_autocomplete_blueprint_filter_uses_config_hints() -> None:
     source = SCCraftToolsSource.__new__(SCCraftToolsSource)
     source._config = {

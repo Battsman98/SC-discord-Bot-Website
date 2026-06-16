@@ -108,6 +108,7 @@ class BlueprintResult:
     missions: list[BlueprintMission]
     source_name: str
     source_url: str
+    component_size: str | None = None
 
 
 @dataclass(frozen=True)

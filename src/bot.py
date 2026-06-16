@@ -500,7 +500,7 @@ class BlueprintSelect(discord.ui.Select):
         options = [
             discord.SelectOption(
                 label=result.name[:100],
-                description=(result.category or "Blueprint")[:100],
+                description=_blueprint_result_label(result)[:100],
                 value=str(index),
             )
             for index, result in enumerate(self.results)
@@ -1171,8 +1171,7 @@ def build_blueprint_selection_embed(
     )
     lines = []
     for index, result in enumerate(results[:25], start=1):
-        category_label = f" - {result.category}" if result.category else ""
-        lines.append(f"{index}. {result.name}{category_label}")
+        lines.append(f"{index}. {result.name} - {_blueprint_result_label(result)}")
 
     embed.add_field(
         name="Available Blueprints",
@@ -1184,6 +1183,11 @@ def build_blueprint_selection_embed(
         page_hint = f"{page_hint} | More results available"
     embed.set_footer(text=f"{page_hint} | Select a blueprint below to view materials and mission details.")
     return embed
+
+
+def _blueprint_result_label(result: BlueprintResult) -> str:
+    details = [value for value in [result.category, result.component_size] if value]
+    return " | ".join(details) if details else "Blueprint"
 
 
 def _format_blueprint_ingredients(ingredients: list[BlueprintIngredient]) -> str:

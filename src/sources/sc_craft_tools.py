@@ -83,7 +83,7 @@ class SCCraftToolsSource:
         if location:
             params["location"] = location
 
-        cache_key = f"sc-craft:blueprints:v3:{urlencode(params, doseq=True)}"
+        cache_key = f"sc-craft:blueprints:v4:{urlencode(params, doseq=True)}"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, list):
             return [self._blueprint_from_cache(row) for row in cached if isinstance(row, dict)]
@@ -184,9 +184,10 @@ class SCCraftToolsSource:
 
     def _parse_blueprint(self, row: dict, missions_by_id: dict) -> BlueprintResult:
         mission_rows = row.get("missions") if isinstance(row.get("missions"), list) else []
+        raw_category = row.get("category")
         return BlueprintResult(
             name=str(row.get("name") or "Unknown blueprint"),
-            category=self._display_category(row.get("category")),
+            category=self._display_category(raw_category),
             craft_time_seconds=self._int_or_none(row.get("craft_time_seconds")),
             tiers=self._int_or_none(row.get("tiers")),
             version=self._string_or_none(row.get("version")),
@@ -198,6 +199,7 @@ class SCCraftToolsSource:
             ],
             source_name=self.name,
             source_url=f"{self.base_url}/?search={str(row.get('name') or '').replace(' ', '+')}",
+            component_size=self._component_size(raw_category),
         )
 
     def _parse_ingredients(self, value: object) -> list[BlueprintIngredient]:
@@ -283,6 +285,18 @@ class SCCraftToolsSource:
             return self._title_category(" ".join(rest) if rest else "Weapons")
         return self._title_category(" ".join(rest or parts))
 
+    def _component_size(self, value: object) -> str | None:
+        raw = self._string_or_none(value)
+        if raw is None:
+            return None
+
+        for part in raw.split("/"):
+            normalized = self._normalize(part)
+            if normalized.startswith("size"):
+                number = normalized.removeprefix("size").strip()
+                return f"Size {number}" if number else self._title_category(normalized)
+        return None
+
     def _display_vehicle_category(self, parts: list[str]) -> str:
         cleaned = [part for part in parts if not self._normalize(part).startswith("size")]
         if not cleaned:
@@ -332,6 +346,7 @@ class SCCraftToolsSource:
     def _blueprint_from_cache(self, data: dict) -> BlueprintResult:
         cached = data.copy()
         cached["category"] = self._display_category(cached.get("category"))
+        cached.setdefault("component_size", None)
         cached["ingredients"] = [
             BlueprintIngredient(**ingredient)
             for ingredient in cached.get("ingredients", [])
