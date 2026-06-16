@@ -1,12 +1,17 @@
+import asyncio
+
 from src.bot import (
     _blueprint_mission_page_count,
     _blueprint_result_label,
+    add_community_mining_location,
+    apply_community_mining_locations,
     _format_blueprint_missions,
     _format_mining_location_page,
     _mining_location_page_count,
     _format_rock_signatures,
     build_mining_embed,
 )
+from src.cache import SQLiteCache
 from src.sources.base import BlueprintMission, BlueprintResult, MiningLocationResult, MiningSystemLocations
 
 
@@ -57,7 +62,7 @@ def test_build_mining_embed_groups_locations_and_omits_kind() -> None:
     locations = _format_mining_location_page(result)
 
     assert "Code: BORA" in embed.description
-    assert "Rock Signatures: 3,570:" in embed.description
+    assert "Rock Signatures:\n3,570:" in embed.description
     assert "Kind" not in embed.description
     assert "**Stanton**" in locations
     assert "Lagrange Points: HUR-L1" in locations
@@ -66,6 +71,57 @@ def test_build_mining_embed_groups_locations_and_omits_kind() -> None:
     assert len(embed.fields) == 1
     assert embed.fields[0].name == "Mining Locations"
     assert _mining_location_page_count(result) == 1
+
+
+def test_community_mining_locations_merge_into_grouped_output(tmp_path) -> None:
+    async def run() -> str:
+        cache = await SQLiteCache.create(str(tmp_path / "cache.sqlite"))
+        result = MiningLocationResult(
+            material_name="Borase",
+            code="BORA",
+            kind=None,
+            refined_sell_price=None,
+            raw_sell_price=None,
+            is_harvestable=False,
+            is_volatile_qt=False,
+            is_volatile_time=False,
+            is_explosive=False,
+            systems=["Stanton"],
+            lagrange_points=[],
+            planets=[],
+            moons=[],
+            points_of_interest=[],
+            source_url="https://uexcorp.space/mining/locations/commodity/borase-ore/",
+            source_name="UEX",
+            rock_signatures=[3570],
+            location_groups=[
+                MiningSystemLocations(
+                    system="Stanton",
+                    lagrange_points=[],
+                    planets=[],
+                    moons=[],
+                    points_of_interest=[],
+                )
+            ],
+        )
+        await add_community_mining_location(
+            cache,
+            {
+                "material": "Borase",
+                "system": "Stanton",
+                "location_type": "moons",
+                "location": "Aberdeen",
+                "reported_by": "Tester",
+            },
+        )
+        merged = await apply_community_mining_locations(cache, result)
+        await cache.close()
+        return _format_mining_location_page(merged)
+
+    text = asyncio.run(run())
+
+    assert "**Stanton**" in text
+    assert "Moons: Aberdeen (Community)" in text
 
 
 def test_format_blueprint_missions_uses_simple_ordered_fields() -> None:

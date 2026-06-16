@@ -145,6 +145,32 @@ Examples:
 /mining material:Hadanite planet:Daymar
 ```
 
+## `/miningadd`
+
+Adds a community-reported mining location for a material. Added locations appear in future `/mining` results with `(Community)` next to the location.
+
+Response visibility: private to the user.
+
+Autocomplete:
+
+- `material` supports mineable material dropdown suggestions.
+- `system` supports `Stanton`, `Pyro`, and `Nyx`.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `material` | Yes | Mineable material name or code. |
+| `system` | Yes | Star system where the material was found. |
+| `location_type` | Yes | Lagrange Point, Planet, Moon, or Point of Interest. |
+| `location` | Yes | Location name to add. |
+
+Example:
+
+```text
+/miningadd material:Borase system:Stanton location_type:Moon location:Aberdeen
+```
+
 ## `/blueprint`
 
 Searches Star Citizen crafting blueprints using SC Craft Tools data.

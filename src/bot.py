@@ -17,6 +17,7 @@ from src.sources.base import (
     ItemLocatorResult,
     ItemPurchaseLocation,
     MiningLocationResult,
+    MiningSystemLocations,
     ShipResult,
     TradeRouteLeg,
     TradeRouteResult,
@@ -36,6 +37,7 @@ CZ_TIMERS_CACHE_KEY = "cz:dashboard:timers"
 BLUEPRINT_PAGE_SIZE = 25
 BLUEPRINT_MISSION_LINES_PER_PAGE = 25
 MINING_LOCATION_LINES_PER_PAGE = 25
+MINING_COMMUNITY_LOCATIONS_CACHE_KEY = "mining:community-locations:v1"
 CZ_TIMER_DEFINITIONS = {
     "blue_keycard": ("Blue Keycards", 15 * 60),
     "compboard": ("Compboards / Tablets", 30 * 60),
@@ -68,6 +70,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(ship_command)
         self.tree.add_command(commodity_command)
         self.tree.add_command(mining_command)
+        self.tree.add_command(miningadd_command)
         self.tree.add_command(blueprint_command)
         self.tree.add_command(item_group)
         self.tree.add_command(exec_command)
@@ -400,6 +403,7 @@ async def mining_command(
     if result is None:
         await interaction.followup.send(f"No mining material found for `{material}`.", ephemeral=True)
         return
+    result = await apply_community_mining_locations(bot.cache, result)
 
     kwargs = {
         "embed": build_mining_embed(result, system, planet),
@@ -450,6 +454,69 @@ async def mining_planet_autocomplete(
         app_commands.Choice(name=name[:100], value=name[:100])
         for name in names[:25]
     ]
+
+
+@app_commands.command(name="miningadd", description="Add a community-reported mining location for a material.")
+@app_commands.describe(
+    material="Mineable material name or code.",
+    system="Star system where the material was found.",
+    location_type="Type of location to add.",
+    location="Planet, moon, lagrange point, or point of interest name.",
+)
+@app_commands.choices(
+    location_type=[
+        app_commands.Choice(name="Lagrange Point", value="lagrange_points"),
+        app_commands.Choice(name="Planet", value="planets"),
+        app_commands.Choice(name="Moon", value="moons"),
+        app_commands.Choice(name="Point of Interest", value="points_of_interest"),
+    ]
+)
+async def miningadd_command(
+    interaction: discord.Interaction,
+    material: str,
+    system: str,
+    location_type: app_commands.Choice[str],
+    location: str,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    result = await bot.sources.lookup_mining_material(material)
+    if result is None:
+        await interaction.followup.send(f"No mining material found for `{material}`.", ephemeral=True)
+        return
+
+    entry = {
+        "material": result.material_name,
+        "system": system.strip(),
+        "location_type": location_type.value,
+        "location": location.strip(),
+        "reported_by": str(interaction.user),
+    }
+    await add_community_mining_location(bot.cache, entry)
+    await interaction.followup.send(
+        f"Added `{location.strip()}` to `{result.material_name}` mining locations in `{system.strip()}`.",
+        ephemeral=True,
+    )
+
+
+@miningadd_command.autocomplete("material")
+async def miningadd_material_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    return await mining_material_autocomplete(interaction, current)
+
+
+@miningadd_command.autocomplete("system")
+async def miningadd_system_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    return await commodity_system_autocomplete(interaction, current)
 
 
 class MiningLocationView(discord.ui.View):
@@ -1521,7 +1588,7 @@ def build_mining_embed(
 ) -> discord.Embed:
     description = [
         _line("Code", result.code),
-        _line("Rock Signatures", _format_rock_signatures(result.rock_signatures)),
+        _format_mining_signature_block(result.rock_signatures),
         _line("System Filter", system),
         _line("Location Filter", planet),
         _line("Location Basis", result.location_basis),
@@ -1993,6 +2060,118 @@ def _format_location_group(locations: list[str]) -> str:
     return "\n".join(lines)
 
 
+async def add_community_mining_location(cache: SQLiteCache, entry: dict) -> None:
+    entries = await _community_mining_entries(cache)
+    key = _normalize_text(entry.get("material"))
+    material_entries = entries.setdefault(key, [])
+    new_entry = {
+        "material": str(entry.get("material") or "").strip(),
+        "system": str(entry.get("system") or "").strip(),
+        "location_type": str(entry.get("location_type") or "").strip(),
+        "location": str(entry.get("location") or "").strip(),
+        "reported_by": str(entry.get("reported_by") or "").strip(),
+    }
+    duplicate = any(
+        _normalize_text(existing.get("system")) == _normalize_text(new_entry["system"])
+        and _normalize_text(existing.get("location_type")) == _normalize_text(new_entry["location_type"])
+        and _normalize_text(existing.get("location")) == _normalize_text(new_entry["location"])
+        for existing in material_entries
+        if isinstance(existing, dict)
+    )
+    if not duplicate:
+        material_entries.append(new_entry)
+    await cache.set(MINING_COMMUNITY_LOCATIONS_CACHE_KEY, entries, 315360000)
+
+
+async def apply_community_mining_locations(
+    cache: SQLiteCache,
+    result: MiningLocationResult,
+) -> MiningLocationResult:
+    entries = await _community_mining_entries(cache)
+    material_entries = entries.get(_normalize_text(result.material_name), [])
+    if not material_entries:
+        return result
+
+    groups_by_system: dict[str, MiningSystemLocations] = {
+        _normalize_text(group.system): group
+        for group in result.location_groups or []
+    }
+    groups = list(result.location_groups or [])
+    systems = list(result.systems)
+    lagrange_points = list(result.lagrange_points)
+    planets = list(result.planets)
+    moons = list(result.moons)
+    points_of_interest = list(result.points_of_interest)
+
+    for entry in material_entries:
+        if not isinstance(entry, dict):
+            continue
+        system = str(entry.get("system") or "").strip()
+        location_type = str(entry.get("location_type") or "").strip()
+        location = str(entry.get("location") or "").strip()
+        if not system or location_type not in _mining_location_type_labels() or not location:
+            continue
+
+        system_key = _normalize_text(system)
+        if system_key not in groups_by_system:
+            group = MiningSystemLocations(system=system, lagrange_points=[], planets=[], moons=[], points_of_interest=[])
+            groups_by_system[system_key] = group
+            groups.append(group)
+        group = groups_by_system[system_key]
+        _append_unique(getattr(group, location_type), f"{location} (Community)")
+        _append_unique(systems, system)
+        _append_unique(
+            {
+                "lagrange_points": lagrange_points,
+                "planets": planets,
+                "moons": moons,
+                "points_of_interest": points_of_interest,
+            }[location_type],
+            f"{location} (Community)",
+        )
+
+    return MiningLocationResult(
+        material_name=result.material_name,
+        code=result.code,
+        kind=result.kind,
+        refined_sell_price=result.refined_sell_price,
+        raw_sell_price=result.raw_sell_price,
+        is_harvestable=result.is_harvestable,
+        is_volatile_qt=result.is_volatile_qt,
+        is_volatile_time=result.is_volatile_time,
+        is_explosive=result.is_explosive,
+        systems=systems,
+        lagrange_points=lagrange_points,
+        planets=planets,
+        moons=moons,
+        points_of_interest=points_of_interest,
+        source_url=result.source_url,
+        source_name=result.source_name,
+        location_basis=result.location_basis,
+        rock_signatures=result.rock_signatures or [],
+        location_groups=groups,
+    )
+
+
+async def _community_mining_entries(cache: SQLiteCache) -> dict:
+    entries = await cache.get(MINING_COMMUNITY_LOCATIONS_CACHE_KEY)
+    return entries if isinstance(entries, dict) else {}
+
+
+def _mining_location_type_labels() -> dict[str, str]:
+    return {
+        "lagrange_points": "Lagrange Points",
+        "planets": "Planets",
+        "moons": "Moons",
+        "points_of_interest": "Points of Interest",
+    }
+
+
+def _append_unique(values: list[str], value: str) -> None:
+    if all(_normalize_text(existing) != _normalize_text(value) for existing in values):
+        values.append(value)
+
+
 def _mining_location_lines(result: MiningLocationResult) -> list[str]:
     groups = result.location_groups or []
     if not groups and result.systems:
@@ -2033,6 +2212,10 @@ def _mining_location_detail_line(label: str, locations: list[str]) -> str | None
     if not locations:
         return None
     return f"{label}: {', '.join(locations)}"
+
+
+def _normalize_text(value: object) -> str:
+    return " ".join(str(value or "").lower().replace("-", " ").split())
 
 
 def _mining_location_pages(result: MiningLocationResult) -> list[list[str]]:
@@ -2078,6 +2261,10 @@ def _format_rock_signatures(signatures: list[int] | None) -> str:
     if len(signatures) > 8:
         lines.append("More signatures available in Star-Head.")
     return _limit_lines(lines, 1000)
+
+
+def _format_mining_signature_block(signatures: list[int] | None) -> str:
+    return f"Rock Signatures:\n{_format_rock_signatures(signatures)}"
 
 
 def _format_commodity_estimate(result: CommodityResult, quantity_scu: float) -> str:
