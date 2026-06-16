@@ -18,8 +18,8 @@ def test_format_blueprint_missions_uses_simple_ordered_fields() -> None:
     )
 
     assert text == (
-        "- Contractor: Adagio Holdings | Rep: Jr. Contractor (800 rep) | Drop: 100%\n"
-        "  - Type: Salvage | Mission: Adagio Holdings in Need of Salvagers"
+        "- Contractor: Adagio Holdings | Minimum Rep: Jr. Contractor (800 rep) | Drop Rate: 100%\n"
+        "  - Adagio Holdings in Need of Salvagers"
     )
 
 
@@ -48,19 +48,19 @@ def test_format_blueprint_missions_groups_shared_reward_paths() -> None:
     )
 
     assert text == (
-        "- Contractor: Covalex Independent Contractors | Rep: Master (237,750 rep) | Drop: 100%\n"
-        "  - Type: Hauling - Interstellar | Mission: Rank - Cargo Haul\n"
-        "  - Type: Hauling - Interstellar | Mission: Rank - Direct Cargo Haul"
+        "- Contractor: Covalex Independent Contractors | Minimum Rep: Master (237,750 rep) | Drop Rate: 100%\n"
+        "  - Rank - Cargo Haul\n"
+        "  - Rank - Direct Cargo Haul"
     )
     assert "Rank - Cargo Haul" in text
     assert "Rank - Direct Cargo Haul" in text
 
 
-def test_format_blueprint_missions_keeps_lowest_rep_for_same_contract() -> None:
+def test_format_blueprint_missions_keeps_lowest_rep_for_same_contractor_drop() -> None:
     text = _format_blueprint_missions(
         [
             BlueprintMission(
-                name="Rank - Cargo Haul",
+                name="Senior Cargo Haul",
                 contractor="Covalex Independent Contractors",
                 mission_type="Hauling - Interstellar",
                 locations="Stanton",
@@ -69,7 +69,7 @@ def test_format_blueprint_missions_keeps_lowest_rep_for_same_contract() -> None:
                 drop_chance=1,
             ),
             BlueprintMission(
-                name="Rank - Cargo Haul",
+                name="Junior Cargo Haul",
                 contractor="Covalex Independent Contractors",
                 mission_type="Hauling - Interstellar",
                 locations="Stanton",
@@ -80,9 +80,10 @@ def test_format_blueprint_missions_keeps_lowest_rep_for_same_contract() -> None:
         ]
     )
 
-    assert "Rep: Junior (800 rep)" in text
-    assert "Rep: Master" not in text
-    assert text.count("Rank - Cargo Haul") == 1
+    assert "Minimum Rep: Junior (800 rep)" in text
+    assert "Minimum Rep: Master" not in text
+    assert "Senior Cargo Haul" in text
+    assert "Junior Cargo Haul" in text
 
 
 def test_format_blueprint_missions_pages_after_25_lines() -> None:

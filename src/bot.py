@@ -391,72 +391,81 @@ async def blueprint_command(
         return
 
     await interaction.response.defer(thinking=True, ephemeral=True)
-    result_limit = 3 if name else 25
-    results = await bot.sources.lookup_blueprints(
-        query=name,
-        category=category,
-        material=material,
-        mission_type=mission_type,
-        contractor=contractor,
-        limit=result_limit,
-    )
+    try:
+        result_limit = 3 if name else 25
+        results = await bot.sources.lookup_blueprints(
+            query=name,
+            category=category,
+            material=material,
+            mission_type=mission_type,
+            contractor=contractor,
+            limit=result_limit,
+        )
 
-    if not results:
-        await interaction.followup.send("No blueprints found for those filters.", ephemeral=True)
-        return
+        if not results:
+            await interaction.followup.send("No blueprints found for those filters.", ephemeral=True)
+            return
 
-    if not name:
-        has_next = bool(
-            await bot.sources.lookup_blueprints(
-                query=None,
-                category=category,
-                material=material,
-                mission_type=mission_type,
-                contractor=contractor,
-                limit=BLUEPRINT_PAGE_SIZE,
-                page=2,
+        if not name:
+            has_next = bool(
+                await bot.sources.lookup_blueprints(
+                    query=None,
+                    category=category,
+                    material=material,
+                    mission_type=mission_type,
+                    contractor=contractor,
+                    limit=BLUEPRINT_PAGE_SIZE,
+                    page=2,
+                )
             )
-        )
+            await interaction.followup.send(
+                embed=build_blueprint_selection_embed(
+                    results,
+                    category=category,
+                    material=material,
+                    mission_type=mission_type,
+                    contractor=contractor,
+                    page=1,
+                    has_next=has_next,
+                ),
+                view=BlueprintSelectView(
+                    results,
+                    category=category,
+                    material=material,
+                    mission_type=mission_type,
+                    contractor=contractor,
+                    page=1,
+                    has_next=has_next,
+                ),
+                ephemeral=True,
+            )
+            return
+
+        if len(results) == 1:
+            result = results[0]
+            has_next = _blueprint_mission_page_count(result.missions) > 1
+            kwargs = {
+                "embed": build_blueprint_embed(result, name, category, material, mission_type, contractor, mission_page=1),
+                "ephemeral": True,
+            }
+            if has_next:
+                kwargs["view"] = BlueprintDetailView(result, name, category, material, mission_type, contractor, page=1)
+            await interaction.followup.send(**kwargs)
+            return
+
         await interaction.followup.send(
-            embed=build_blueprint_selection_embed(
-                results,
-                category=category,
-                material=material,
-                mission_type=mission_type,
-                contractor=contractor,
-                page=1,
-                has_next=has_next,
-            ),
-            view=BlueprintSelectView(
-                results,
-                category=category,
-                material=material,
-                mission_type=mission_type,
-                contractor=contractor,
-                page=1,
-                has_next=has_next,
-            ),
+            embeds=[
+                build_blueprint_embed(result, name, category, material, mission_type, contractor, mission_page=1)
+                for result in results
+            ],
             ephemeral=True,
         )
-        return
-
-    if len(results) == 1:
-        result = results[0]
-        has_next = _blueprint_mission_page_count(result.missions) > 1
+    except Exception:
+        logging.exception("Blueprint command failed")
         await interaction.followup.send(
-            embed=build_blueprint_embed(result, name, category, material, mission_type, contractor, mission_page=1),
-            view=BlueprintDetailView(result, name, category, material, mission_type, contractor, page=1) if has_next else None,
+            "Blueprint lookup hit an internal error. I logged the details so it can be fixed.",
             ephemeral=True,
         )
-        return
-
-    await interaction.followup.send(
-        embeds=[
-            build_blueprint_embed(result, name, category, material, mission_type, contractor, mission_page=1)
-            for result in results
-        ],
-        ephemeral=True,
-    )
 
 
 @blueprint_command.autocomplete("name")
@@ -518,10 +527,12 @@ class BlueprintSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction) -> None:
         result = self.results[int(self.values[0])]
         has_next = _blueprint_mission_page_count(result.missions) > 1
-        await interaction.response.edit_message(
-            embed=build_blueprint_embed(result, mission_page=1),
-            view=BlueprintDetailView(result, page=1) if has_next else None,
-        )
+        kwargs = {"embed": build_blueprint_embed(result, mission_page=1)}
+        if has_next:
+            kwargs["view"] = BlueprintDetailView(result, page=1)
+        else:
+            kwargs["view"] = None
+        await interaction.response.edit_message(**kwargs)
 
 
 class BlueprintDetailView(discord.ui.View):
@@ -1265,14 +1276,13 @@ def _format_blueprint_ingredients(ingredients: list[BlueprintIngredient]) -> str
 def _blueprint_mission_lines(missions: list[BlueprintMission]) -> list[str]:
     groups = []
     group_indexes = {}
-    for mission in _lowest_rep_blueprint_missions(missions):
+    for mission in missions:
         rep = mission.min_standing_name or "Unknown"
         if mission.min_standing_reputation is not None:
             rep = f"{rep} ({_format_number(mission.min_standing_reputation)} rep)"
         drop = _format_drop_chance(mission.drop_chance) or "Unknown"
         key = (
             mission.contractor or "Unknown",
-            rep,
             drop,
         )
         if key not in group_indexes:
@@ -1281,30 +1291,36 @@ def _blueprint_mission_lines(missions: list[BlueprintMission]) -> list[str]:
                 {
                     "contractor": mission.contractor or "Unknown",
                     "rep": rep,
+                    "rep_value": _mission_rep_value(mission),
                     "drop": drop,
                     "missions": [],
                     "seen_missions": set(),
                 }
             )
-
-        mission_type = mission.mission_type or "Unknown"
-        mission_name = mission.name or "Unknown mission"
-        mission_key = (mission_type, mission_name)
         group = groups[group_indexes[key]]
-        if mission_key in group["seen_missions"]:
+        if _mission_rep_value(mission) < group["rep_value"]:
+            group["rep"] = rep
+            group["rep_value"] = _mission_rep_value(mission)
+
+        mission_name = mission.name or "Unknown mission"
+        if mission_name in group["seen_missions"]:
             continue
-        group["seen_missions"].add(mission_key)
-        group["missions"].append((mission_type, mission_name))
+        group["seen_missions"].add(mission_name)
+        group["missions"].append(mission_name)
 
     lines = []
     for group in groups:
         lines.append(
             " | ".join(
-                [f"- Contractor: {group['contractor']}", f"Rep: {group['rep']}", f"Drop: {group['drop']}"]
+                [
+                    f"- Contractor: {group['contractor']}",
+                    f"Minimum Rep: {group['rep']}",
+                    f"Drop Rate: {group['drop']}",
+                ]
             )
         )
-        for mission_type, mission_name in group["missions"]:
-            lines.append(f"  - Type: {mission_type} | Mission: {mission_name}")
+        for mission_name in group["missions"]:
+            lines.append(f"  - {mission_name}")
     return lines
 
 
@@ -1323,21 +1339,6 @@ def _format_blueprint_missions(missions: list[BlueprintMission], page: int = 1) 
 def _blueprint_mission_page_count(missions: list[BlueprintMission]) -> int:
     line_count = len(_blueprint_mission_lines(missions))
     return max(1, (line_count + BLUEPRINT_MISSION_LINES_PER_PAGE - 1) // BLUEPRINT_MISSION_LINES_PER_PAGE)
-
-
-def _lowest_rep_blueprint_missions(missions: list[BlueprintMission]) -> list[BlueprintMission]:
-    best_by_contract: dict[tuple[str, str, str, str], BlueprintMission] = {}
-    for mission in missions:
-        key = (
-            mission.contractor or "Unknown",
-            mission.mission_type or "Unknown",
-            mission.name or "Unknown mission",
-            _format_drop_chance(mission.drop_chance) or "Unknown",
-        )
-        current = best_by_contract.get(key)
-        if current is None or _mission_rep_value(mission) < _mission_rep_value(current):
-            best_by_contract[key] = mission
-    return list(best_by_contract.values())
 
 
 def _mission_rep_value(mission: BlueprintMission) -> float:
