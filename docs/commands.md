@@ -112,7 +112,7 @@ Options:
 
 | Option | Required | Purpose |
 | --- | --- | --- |
-| `route_type` | Yes | Route type. Currently supports `Circular Route`. |
+| `route_type` | No | Route type. Defaults to `Circular Route`. |
 | `ship` | No | Ship name for route planning. Defaults to `Ironclad Assault`. |
 | `investment` | No | aUEC investment for route planning. Defaults to `1,000,000`. |
 | `max_stops` | No | Maximum route stops, from 1 to 5. Defaults to `5`. |
@@ -120,7 +120,7 @@ Options:
 Examples:
 
 ```text
-/trade routing route_type:Circular Route
+/trade routing
 /trade routing route_type:Circular Route ship:Ironclad Assault investment:1000000 max_stops:5
 ```
 

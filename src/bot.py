@@ -359,7 +359,7 @@ trade_group = app_commands.Group(name="trade", description="Trade planning tools
 
 @trade_group.command(name="routing", description="Create a Star Citizen trade route planner link.")
 @app_commands.describe(
-    route_type="Route type to create.",
+    route_type="Optional route type. Defaults to Circular Route.",
     ship="Ship for route planning.",
     investment="aUEC investment for route planning.",
     max_stops="Maximum route stops, from 1 to 5.",
@@ -371,7 +371,7 @@ trade_group = app_commands.Group(name="trade", description="Trade planning tools
 )
 async def trade_routing_command(
     interaction: discord.Interaction,
-    route_type: app_commands.Choice[str],
+    route_type: app_commands.Choice[str] | None = None,
     ship: str = "Ironclad Assault",
     investment: int = 1_000_000,
     max_stops: int = 5,
@@ -389,7 +389,8 @@ async def trade_routing_command(
         return
 
     route_url = build_trade_route_url(ship, investment, max_stops)
-    embed = build_trade_route_embed(route_type.name, ship, investment, max_stops, route_url, bool(bot.settings.sc_trade_tools_token))
+    route_type_name = route_type.name if route_type else "Circular Route"
+    embed = build_trade_route_embed(route_type_name, ship, investment, max_stops, route_url, bool(bot.settings.sc_trade_tools_token))
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
