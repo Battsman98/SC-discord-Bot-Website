@@ -35,30 +35,32 @@ class SCCraftToolsSource:
         contractor: str | None = None,
         location: str | None = None,
         limit: int = 3,
+        page: int = 1,
     ) -> list[BlueprintResult]:
         category_values = await self._category_filter_values(category) if category else [None]
         all_results: list[BlueprintResult] = []
         seen_names: set[str] = set()
+        offset = max(0, page - 1) * limit
+        required_results = offset + limit
         for category_value in category_values:
-            results = await self._lookup_blueprints_page(
+            results = await self._lookup_blueprints_all(
                 query=query,
                 category=category_value,
                 material=material,
                 mission_type=mission_type,
                 contractor=contractor,
                 location=location,
-                limit=limit,
             )
             for result in results:
                 if result.name in seen_names:
                     continue
                 seen_names.add(result.name)
                 all_results.append(result)
-                if len(all_results) >= limit:
-                    return all_results
-        return all_results
+                if len(all_results) >= required_results:
+                    return all_results[offset:required_results]
+        return all_results[offset:required_results]
 
-    async def _lookup_blueprints_page(
+    async def _lookup_blueprints_all(
         self,
         query: str | None = None,
         category: str | None = None,
@@ -66,12 +68,8 @@ class SCCraftToolsSource:
         mission_type: str | None = None,
         contractor: str | None = None,
         location: str | None = None,
-        limit: int = 3,
     ) -> list[BlueprintResult]:
-        params = {
-            "limit": max(1, min(limit, 25)),
-            "page": 1,
-        }
+        params = {"limit": 25, "page": 1}
         if query:
             params["search"] = query
         if category:
@@ -85,15 +83,29 @@ class SCCraftToolsSource:
         if location:
             params["location"] = location
 
-        cache_key = f"sc-craft:blueprints:v2:{urlencode(params, doseq=True)}"
+        cache_key = f"sc-craft:blueprints:v3:{urlencode(params, doseq=True)}"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, list):
             return [self._blueprint_from_cache(row) for row in cached if isinstance(row, dict)]
 
+        payloads = []
         payload = await self._fetch_json(f"{self.base_url}/api/blueprints?{urlencode(params)}")
-        rows = payload.get("items") if isinstance(payload, dict) else []
-        if not isinstance(rows, list):
-            return []
+        if isinstance(payload, dict):
+            payloads.append(payload)
+
+        pagination = payload.get("pagination") if isinstance(payload, dict) else {}
+        total_pages = self._int_or_none(pagination.get("pages") if isinstance(pagination, dict) else None) or 1
+        for page_number in range(2, total_pages + 1):
+            params["page"] = page_number
+            payload = await self._fetch_json(f"{self.base_url}/api/blueprints?{urlencode(params)}")
+            if isinstance(payload, dict):
+                payloads.append(payload)
+
+        rows = []
+        for payload in payloads:
+            payload_rows = payload.get("items") if isinstance(payload, dict) else []
+            if isinstance(payload_rows, list):
+                rows.extend(row for row in payload_rows if isinstance(row, dict))
 
         config = await self._get_config()
         missions = config.get("missions") if isinstance(config, dict) else {}

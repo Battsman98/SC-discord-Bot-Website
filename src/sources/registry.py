@@ -85,12 +85,13 @@ class SourceRegistry:
         contractor: str | None = None,
         location: str | None = None,
         limit: int = 3,
+        page: int = 1,
     ) -> list[BlueprintResult]:
         for source in self._sources:
             lookup = getattr(source, "lookup_blueprints", None)
             if lookup is None:
                 continue
-            results = await lookup(query, category, material, mission_type, contractor, location, limit)
+            results = await lookup(query, category, material, mission_type, contractor, location, limit, page)
             if results:
                 return results
         return []

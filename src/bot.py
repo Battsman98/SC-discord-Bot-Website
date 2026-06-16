@@ -30,6 +30,7 @@ from src.timers import (
 
 EXEC_OVERRIDE_CACHE_KEY = "exec:cycle-start-override"
 CZ_TIMERS_CACHE_KEY = "cz:dashboard:timers"
+BLUEPRINT_PAGE_SIZE = 25
 CZ_TIMER_DEFINITIONS = {
     "blue_keycard": ("Blue Keycards", 15 * 60),
     "compboard": ("Compboards / Tablets", 30 * 60),
@@ -407,6 +408,18 @@ async def blueprint_command(
         return
 
     if not name:
+        has_next = bool(
+            await bot.sources.lookup_blueprints(
+                query=None,
+                category=category,
+                material=material,
+                mission_type=mission_type,
+                contractor=contractor,
+                location=location,
+                limit=BLUEPRINT_PAGE_SIZE,
+                page=2,
+            )
+        )
         await interaction.followup.send(
             embed=build_blueprint_selection_embed(
                 results,
@@ -415,8 +428,19 @@ async def blueprint_command(
                 mission_type=mission_type,
                 contractor=contractor,
                 location=location,
+                page=1,
+                has_next=has_next,
             ),
-            view=BlueprintSelectView(results),
+            view=BlueprintSelectView(
+                results,
+                category=category,
+                material=material,
+                mission_type=mission_type,
+                contractor=contractor,
+                location=location,
+                page=1,
+                has_next=has_next,
+            ),
             ephemeral=True,
         )
         return
@@ -497,9 +521,90 @@ class BlueprintSelect(discord.ui.Select):
 
 
 class BlueprintSelectView(discord.ui.View):
-    def __init__(self, results: list[BlueprintResult]) -> None:
+    def __init__(
+        self,
+        results: list[BlueprintResult],
+        category: str | None = None,
+        material: str | None = None,
+        mission_type: str | None = None,
+        contractor: str | None = None,
+        location: str | None = None,
+        page: int = 1,
+        has_next: bool = False,
+    ) -> None:
         super().__init__(timeout=300)
+        self.category = category
+        self.material = material
+        self.mission_type = mission_type
+        self.contractor = contractor
+        self.location = location
+        self.page = page
+        self.has_next = has_next
         self.add_item(BlueprintSelect(results))
+        self.previous_page.disabled = page <= 1
+        self.next_page.disabled = not has_next
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary, row=1)
+    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page - 1)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary, row=1)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page + 1)
+
+    async def _show_page(self, interaction: discord.Interaction, page: int) -> None:
+        bot = interaction.client
+        if not isinstance(bot, GameAssistBot):
+            await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        results = await bot.sources.lookup_blueprints(
+            query=None,
+            category=self.category,
+            material=self.material,
+            mission_type=self.mission_type,
+            contractor=self.contractor,
+            location=self.location,
+            limit=BLUEPRINT_PAGE_SIZE,
+            page=page,
+        )
+        has_next = bool(
+            await bot.sources.lookup_blueprints(
+                query=None,
+                category=self.category,
+                material=self.material,
+                mission_type=self.mission_type,
+                contractor=self.contractor,
+                location=self.location,
+                limit=BLUEPRINT_PAGE_SIZE,
+                page=page + 1,
+            )
+        )
+        await interaction.edit_original_response(
+            embed=build_blueprint_selection_embed(
+                results,
+                category=self.category,
+                material=self.material,
+                mission_type=self.mission_type,
+                contractor=self.contractor,
+                location=self.location,
+                page=page,
+                has_next=has_next,
+            ),
+            view=BlueprintSelectView(
+                results,
+                category=self.category,
+                material=self.material,
+                mission_type=self.mission_type,
+                contractor=self.contractor,
+                location=self.location,
+                page=page,
+                has_next=has_next,
+            ),
+        )
 
 
 trade_group = app_commands.Group(name="trade", description="Trade planning tools.")
@@ -1049,6 +1154,8 @@ def build_blueprint_selection_embed(
     mission_type: str | None = None,
     contractor: str | None = None,
     location: str | None = None,
+    page: int = 1,
+    has_next: bool = False,
 ) -> discord.Embed:
     description = [
         _line("Category Filter", category),
@@ -1072,7 +1179,10 @@ def build_blueprint_selection_embed(
         value=_limit_lines(lines, 1000),
         inline=False,
     )
-    embed.set_footer(text="Select a blueprint below to view materials and mission details.")
+    page_hint = f"Page {page}"
+    if has_next:
+        page_hint = f"{page_hint} | More results available"
+    embed.set_footer(text=f"{page_hint} | Select a blueprint below to view materials and mission details.")
     return embed
 
 

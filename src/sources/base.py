@@ -171,6 +171,7 @@ class GameInfoSource(Protocol):
         contractor: str | None = None,
         location: str | None = None,
         limit: int = 3,
+        page: int = 1,
     ) -> list[BlueprintResult]:
         ...
 

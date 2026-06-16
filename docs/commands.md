@@ -113,6 +113,7 @@ Behavior:
 - `name` shows full blueprint details immediately.
 - Filter-only searches show a selectable list of matching blueprints first.
 - Selecting a blueprint from the list opens its materials and mission details.
+- Result lists over 25 blueprints include page buttons.
 
 Autocomplete:
 
