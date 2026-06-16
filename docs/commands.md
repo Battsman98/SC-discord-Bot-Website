@@ -124,7 +124,7 @@ Options:
 | Option | Required | Purpose |
 | --- | --- | --- |
 | `name` | No | Blueprint or crafted item name to search for. |
-| `category` | No | Blueprint category, such as armour, ammo, or vehicle gear. |
+| `category` | No | Blueprint category, such as Quantum Drive, Power Plant, Heavy Armor, Flight Suits, Helmets, or Weapons. |
 | `material` | No | Required material/resource used by the blueprint. |
 | `mission_type` | No | Mission type that can award the blueprint. |
 | `contractor` | No | Mission contractor that can award the blueprint. |

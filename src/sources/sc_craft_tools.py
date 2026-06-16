@@ -36,8 +36,40 @@ class SCCraftToolsSource:
         location: str | None = None,
         limit: int = 3,
     ) -> list[BlueprintResult]:
+        category_values = await self._category_filter_values(category) if category else [None]
+        all_results: list[BlueprintResult] = []
+        seen_names: set[str] = set()
+        for category_value in category_values:
+            results = await self._lookup_blueprints_page(
+                query=query,
+                category=category_value,
+                material=material,
+                mission_type=mission_type,
+                contractor=contractor,
+                location=location,
+                limit=limit,
+            )
+            for result in results:
+                if result.name in seen_names:
+                    continue
+                seen_names.add(result.name)
+                all_results.append(result)
+                if len(all_results) >= limit:
+                    return all_results
+        return all_results
+
+    async def _lookup_blueprints_page(
+        self,
+        query: str | None = None,
+        category: str | None = None,
+        material: str | None = None,
+        mission_type: str | None = None,
+        contractor: str | None = None,
+        location: str | None = None,
+        limit: int = 3,
+    ) -> list[BlueprintResult]:
         params = {
-            "limit": max(1, min(limit, 5)),
+            "limit": max(1, min(limit, 25)),
             "page": 1,
         }
         if query:
@@ -53,7 +85,7 @@ class SCCraftToolsSource:
         if location:
             params["location"] = location
 
-        cache_key = f"sc-craft:blueprints:v1:{urlencode(params, doseq=True)}"
+        cache_key = f"sc-craft:blueprints:v2:{urlencode(params, doseq=True)}"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, list):
             return [self._blueprint_from_cache(row) for row in cached if isinstance(row, dict)]
@@ -104,7 +136,8 @@ class SCCraftToolsSource:
             else:
                 name = value
             if name:
-                names.append(str(name))
+                names.append(self._display_category(str(name)) if filter_name == "category" else str(name))
+        names = list(dict.fromkeys(names))
 
         normalized_query = self._normalize(query)
         if not normalized_query:
@@ -141,7 +174,7 @@ class SCCraftToolsSource:
         mission_rows = row.get("missions") if isinstance(row.get("missions"), list) else []
         return BlueprintResult(
             name=str(row.get("name") or "Unknown blueprint"),
-            category=self._string_or_none(row.get("category")),
+            category=self._display_category(row.get("category")),
             craft_time_seconds=self._int_or_none(row.get("craft_time_seconds")),
             tiers=self._int_or_none(row.get("tiers")),
             version=self._string_or_none(row.get("version")),
@@ -195,6 +228,89 @@ class SCCraftToolsSource:
             return options[0].get(key)
         return None
 
+    async def _category_filter_values(self, category: str | None) -> list[str | None]:
+        if not category:
+            return [None]
+
+        config = await self._get_config()
+        hints = config.get("filterHints") if isinstance(config, dict) else {}
+        values = hints.get("category") if isinstance(hints, dict) else []
+        raw_categories = []
+        for value in values if isinstance(values, list) else []:
+            raw = value.get("name") if isinstance(value, dict) else value
+            if raw:
+                raw_categories.append(str(raw))
+
+        normalized_category = self._normalize(category)
+        matches = [
+            raw
+            for raw in raw_categories
+            if self._normalize(raw) == normalized_category
+            or self._normalize(self._display_category(raw)) == normalized_category
+        ]
+        return matches or [category]
+
+    def _display_category(self, value: object) -> str | None:
+        raw = self._string_or_none(value)
+        if raw is None:
+            return None
+
+        parts = [part.strip() for part in raw.split("/") if part.strip()]
+        if not parts:
+            return raw
+
+        root = parts[0].lower()
+        rest = parts[1:]
+        if root == "vehiclegear":
+            return self._display_vehicle_category(rest)
+        if root == "armour":
+            return self._display_armour_category(rest)
+        if root == "ammo" and rest:
+            return f"{self._title_category(' '.join(rest))} Ammo"
+        if root == "weapons":
+            return self._title_category(" ".join(rest) if rest else "Weapons")
+        return self._title_category(" ".join(rest or parts))
+
+    def _display_vehicle_category(self, parts: list[str]) -> str:
+        cleaned = [part for part in parts if not self._normalize(part).startswith("size")]
+        if not cleaned:
+            return "Vehicle Gear"
+        aliases = {
+            "mininglaser": "Mining Laser",
+            "powerplant": "Power Plant",
+            "quantumdrive": "Quantum Drive",
+            "tractorbeam": "Tractor Beam",
+            "refuelling nozzle": "Refueling Nozzle",
+        }
+        key = self._normalize(" ".join(cleaned))
+        if key in aliases:
+            return aliases[key]
+        if cleaned[0].lower() == "weapons":
+            return self._title_category(" ".join(cleaned[1:] or cleaned))
+        return self._title_category(" ".join(cleaned))
+
+    def _display_armour_category(self, parts: list[str]) -> str:
+        normalized_parts = [self._normalize(part) for part in parts]
+        if "flightsuit" in normalized_parts or "undersuit" in normalized_parts:
+            return "Flight Suits"
+        for weight in ("heavy", "medium", "light"):
+            if weight in normalized_parts:
+                return f"{weight.title()} Armor"
+        if parts:
+            return f"{self._title_category(' '.join(parts))} Armor"
+        return "Armor"
+
+    def _title_category(self, value: str) -> str:
+        aliases = {
+            "lmg": "LMG",
+            "smg": "SMG",
+        }
+        words = []
+        for word in value.replace("-", " ").split():
+            normalized = word.lower()
+            words.append(aliases.get(normalized, normalized.title()))
+        return " ".join(words)
+
     def _blueprint_to_cache(self, result: BlueprintResult) -> dict:
         data = result.__dict__.copy()
         data["ingredients"] = [ingredient.__dict__ for ingredient in result.ingredients]
@@ -203,6 +319,7 @@ class SCCraftToolsSource:
 
     def _blueprint_from_cache(self, data: dict) -> BlueprintResult:
         cached = data.copy()
+        cached["category"] = self._display_category(cached.get("category"))
         cached["ingredients"] = [
             BlueprintIngredient(**ingredient)
             for ingredient in cached.get("ingredients", [])

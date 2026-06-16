@@ -40,7 +40,7 @@ def test_parse_blueprint_includes_materials_and_mission_rep() -> None:
     )
 
     assert result.name == "Abrade Scraper Module"
-    assert result.category == "Vehiclegear / Salvage"
+    assert result.category == "Salvage"
     assert result.ingredients[0].name == "Iron"
     assert result.ingredients[0].quantity == 0.04
     assert result.missions[0].contractor == "Adagio Holdings"
@@ -57,6 +57,8 @@ def test_autocomplete_blueprint_filter_uses_config_hints() -> None:
             "category": [
                 "Armour / Salvager / Medium",
                 "Vehiclegear / Salvage",
+                "Vehiclegear / Quantumdrive / Size1",
+                "Vehiclegear / Quantumdrive / Size2",
             ],
             "resource": [
                 {"name": "Iron"},
@@ -66,10 +68,39 @@ def test_autocomplete_blueprint_filter_uses_config_hints() -> None:
     }
 
     categories = asyncio.run(source.autocomplete_blueprint_filter("category", "veh", 5))
+    quantum_categories = asyncio.run(source.autocomplete_blueprint_filter("category", "quant", 5))
     resources = asyncio.run(source.autocomplete_blueprint_filter("resource", "co", 5))
 
-    assert categories == ["Vehiclegear / Salvage"]
+    assert categories == []
+    assert quantum_categories == ["Quantum Drive"]
     assert resources == ["Copper"]
+
+
+def test_category_filter_values_matches_display_category() -> None:
+    source = SCCraftToolsSource.__new__(SCCraftToolsSource)
+    source._config = {
+        "filterHints": {
+            "category": [
+                "Vehiclegear / Quantumdrive / Size1",
+                "Vehiclegear / Quantumdrive / Size2",
+                "Vehiclegear / Powerplant",
+                "Armour / Combat / Heavy",
+                "Armour / Engineer / Heavy",
+            ],
+        }
+    }
+
+    quantum = asyncio.run(source._category_filter_values("Quantum Drive"))
+    heavy_armor = asyncio.run(source._category_filter_values("Heavy Armor"))
+
+    assert quantum == [
+        "Vehiclegear / Quantumdrive / Size1",
+        "Vehiclegear / Quantumdrive / Size2",
+    ]
+    assert heavy_armor == [
+        "Armour / Combat / Heavy",
+        "Armour / Engineer / Heavy",
+    ]
 
 
 def test_blueprint_cache_round_trip() -> None:
