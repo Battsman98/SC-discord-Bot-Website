@@ -186,6 +186,38 @@ Route behavior:
 - `stay_system` can make a closed loop impossible when UEX does not have a profitable loop inside that system.
 - Does not require a SC Trade Tools API token.
 
+## `/item locator`
+
+Finds in-game buyable Star Citizen items using UEX item and item price data.
+
+Response visibility: private to the user.
+
+Behavior:
+
+- Search/filter results show a selectable item list first.
+- Selecting an item opens buy locations and prices.
+- Result lists over 25 items include page buttons.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `name` | No | Item name to search for. |
+| `category` | No | Item category, such as Quantum Drives, Guns, Helmets, or Undersuits. |
+| `section` | No | Item section, such as Systems, Vehicle Weapons, Armor, or Utility. |
+| `size` | No | Item size, usually for ship components and vehicle weapons. |
+
+At least one option is required.
+
+Examples:
+
+```text
+/item locator name:Atlas
+/item locator category:Quantum Drives size:1
+/item locator section:Armor category:Helmets
+/item locator section:Vehicle Weapons category:Guns
+```
+
 ## `/exec`
 
 Shows the current Executive Hangar clock.

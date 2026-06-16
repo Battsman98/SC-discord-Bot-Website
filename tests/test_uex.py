@@ -538,3 +538,41 @@ def test_trade_location_value_accepts_autocomplete_display() -> None:
 
     assert source._trade_location_value("ARC-L3 - ARC-L3 Modern Express Station (Stanton)") == "ARC-L3"
     assert source._trade_location_value("Jackson's Swap (Pyro)") == "Jackson's Swap"
+
+
+def test_item_category_is_supported_for_buyable_locator_categories() -> None:
+    source = UEXSource.__new__(UEXSource)
+
+    assert source._item_category_is_supported(
+        {"section": "Systems", "name": "Quantum Drives", "is_game_related": 1}
+    )
+    assert source._item_category_is_supported(
+        {"section": "Vehicle Weapons", "name": "Guns", "is_game_related": 1}
+    )
+    assert not source._item_category_is_supported(
+        {"section": "Miscellaneous", "name": "Foods", "is_game_related": 1}
+    )
+
+
+def test_filter_items_matches_query_category_section_and_size() -> None:
+    source = UEXSource.__new__(UEXSource)
+    items = [
+        {
+            "name": "Atlas",
+            "section": "Systems",
+            "category": "Quantum Drives",
+            "company_name": "Roberts Space Industries",
+            "size": "1",
+        },
+        {
+            "name": "Durango",
+            "section": "Systems",
+            "category": "Power Plants",
+            "company_name": "Juno Starwerk",
+            "size": "3",
+        },
+    ]
+
+    assert source._filter_items(items, query="atlas", category="Quantum Drives", section="Systems", size="1") == [
+        items[0]
+    ]

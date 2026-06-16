@@ -4,7 +4,14 @@ import aiohttp
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import CommodityMarket, CommodityResult, TradeRouteLeg, TradeRouteResult
+from src.sources.base import (
+    CommodityMarket,
+    CommodityResult,
+    ItemLocatorResult,
+    ItemPurchaseLocation,
+    TradeRouteLeg,
+    TradeRouteResult,
+)
 
 
 class UEXSource:
@@ -17,6 +24,10 @@ class UEXSource:
         self._session = session
         self._commodities: list[dict] | None = None
         self._all_prices: list[dict] | None = None
+        self._item_categories: list[dict] | None = None
+        self._items_by_category: dict[int, list[dict]] = {}
+        self._all_item_prices: list[dict] | None = None
+        self._buyable_items: list[dict] | None = None
         self._terminals_by_id: dict[str, dict] | None = None
 
     async def lookup(self, query: str):
@@ -78,6 +89,75 @@ class UEXSource:
                 or normalized_query in self._normalize(row.get("code"))
             )
             and self._display_name(row) not in starts
+        ]
+        return (starts + contains)[:limit]
+
+    async def lookup_items(
+        self,
+        query: str | None = None,
+        category: str | None = None,
+        section: str | None = None,
+        size: str | None = None,
+        limit: int = 25,
+        page: int = 1,
+    ) -> list[ItemLocatorResult]:
+        items = await self._get_buyable_items()
+        filtered = self._filter_items(items, query, category, section, size)
+        start = max(0, page - 1) * limit
+        return [self._item_result(row, []) for row in filtered[start : start + limit]]
+
+    async def lookup_item_by_id(self, item_id: int) -> ItemLocatorResult | None:
+        items = await self._get_buyable_items()
+        item = next((row for row in items if self._int_or_none(row.get("id")) == item_id), None)
+        if item is None:
+            return None
+
+        prices = await self._fetch_item_prices(item_id)
+        purchases = [
+            self._item_purchase_location(row)
+            for row in prices
+            if self._positive(row.get("price_buy"))
+        ]
+        purchases.sort(key=lambda purchase: (float(purchase.price), purchase.terminal_name.lower()))
+        return self._item_result(item, purchases)
+
+    async def autocomplete_items(self, query: str, limit: int = 25) -> list[str]:
+        items = await self._get_buyable_items()
+        normalized_query = self._normalize(query)
+        names = [str(row.get("name")) for row in items if row.get("name")]
+        if not normalized_query:
+            return names[:limit]
+
+        starts = [name for name in names if self._normalize(name).startswith(normalized_query)]
+        contains = [
+            name
+            for name in names
+            if normalized_query in self._normalize(name) and name not in starts
+        ]
+        return (starts + contains)[:limit]
+
+    async def autocomplete_item_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        items = await self._get_buyable_items()
+        key_map = {"category": "category", "section": "section", "size": "size"}
+        key = key_map.get(filter_name)
+        if key is None:
+            return []
+
+        values = []
+        for row in items:
+            value = self._string_or_none(row.get(key))
+            if value and value not in values:
+                values.append(value)
+        values.sort(key=str.lower)
+
+        normalized_query = self._normalize(query)
+        if not normalized_query:
+            return values[:limit]
+        starts = [value for value in values if self._normalize(value).startswith(normalized_query)]
+        contains = [
+            value
+            for value in values
+            if normalized_query in self._normalize(value) and value not in starts
         ]
         return (starts + contains)[:limit]
 
@@ -213,6 +293,100 @@ class UEXSource:
         )
         return self._all_prices
 
+    async def _get_item_categories(self) -> list[dict]:
+        if self._item_categories is not None:
+            return self._item_categories
+
+        cached = await self._cache.get("uex:item-categories:v1")
+        if isinstance(cached, list):
+            self._item_categories = [row for row in cached if isinstance(row, dict)]
+            return self._item_categories
+
+        payload = await self._fetch_json(f"{self.base_url}/categories?type=item")
+        rows = payload.get("data") if isinstance(payload, dict) else []
+        self._item_categories = [row for row in rows if isinstance(row, dict)]
+        await self._cache.set("uex:item-categories:v1", self._item_categories, 86400)
+        return self._item_categories
+
+    async def _fetch_items_by_category(self, category_id: int) -> list[dict]:
+        if category_id in self._items_by_category:
+            return self._items_by_category[category_id]
+
+        cache_key = f"uex:items:category:{category_id}:v1"
+        cached = await self._cache.get(cache_key)
+        if isinstance(cached, list):
+            self._items_by_category[category_id] = [row for row in cached if isinstance(row, dict)]
+            return self._items_by_category[category_id]
+
+        payload = await self._fetch_json(f"{self.base_url}/items?id_category={category_id}")
+        rows = payload.get("data") if isinstance(payload, dict) else []
+        if not isinstance(rows, list):
+            rows = []
+        self._items_by_category[category_id] = [row for row in rows if isinstance(row, dict)]
+        await self._cache.set(cache_key, self._items_by_category[category_id], 86400)
+        return self._items_by_category[category_id]
+
+    async def _fetch_all_item_prices(self) -> list[dict]:
+        if self._all_item_prices is not None:
+            return self._all_item_prices
+
+        cached = await self._cache.get("uex:items-prices-all:v1")
+        if isinstance(cached, list):
+            self._all_item_prices = [row for row in cached if isinstance(row, dict)]
+            return self._all_item_prices
+
+        payload = await self._fetch_json(f"{self.base_url}/items_prices_all")
+        rows = payload.get("data") if isinstance(payload, dict) else []
+        self._all_item_prices = [row for row in rows if isinstance(row, dict)]
+        await self._cache.set("uex:items-prices-all:v1", self._all_item_prices, self._settings.cache_ttl_seconds)
+        return self._all_item_prices
+
+    async def _fetch_item_prices(self, item_id: int) -> list[dict]:
+        cache_key = f"uex:items-prices:item:{item_id}:v1"
+        cached = await self._cache.get(cache_key)
+        if isinstance(cached, list):
+            return [row for row in cached if isinstance(row, dict)]
+
+        payload = await self._fetch_json(f"{self.base_url}/items_prices?id_item={item_id}")
+        rows = payload.get("data") if isinstance(payload, dict) else []
+        prices = [row for row in rows if isinstance(row, dict)]
+        await self._cache.set(cache_key, prices, self._settings.cache_ttl_seconds)
+        return prices
+
+    async def _get_buyable_items(self) -> list[dict]:
+        if self._buyable_items is not None:
+            return self._buyable_items
+
+        categories = [
+            row
+            for row in await self._get_item_categories()
+            if self._item_category_is_supported(row)
+        ]
+        prices = await self._fetch_all_item_prices()
+        buyable_ids = {
+            self._int_or_none(row.get("id_item"))
+            for row in prices
+            if self._positive(row.get("price_buy"))
+        }
+        buyable_ids.discard(None)
+
+        items = []
+        for category in categories:
+            category_id = self._int_or_none(category.get("id"))
+            if category_id is None:
+                continue
+            for item in await self._fetch_items_by_category(category_id):
+                if self._int_or_none(item.get("id")) in buyable_ids:
+                    items.append(item)
+
+        unique: dict[int, dict] = {}
+        for item in items:
+            item_id = self._int_or_none(item.get("id"))
+            if item_id is not None:
+                unique[item_id] = item
+        self._buyable_items = sorted(unique.values(), key=lambda row: str(row.get("name", "")).lower())
+        return self._buyable_items
+
     async def _fetch_terminals_by_id(self) -> dict[str, dict]:
         if self._terminals_by_id is not None:
             return self._terminals_by_id
@@ -297,6 +471,101 @@ class UEXSource:
             location=self._location(row),
             price=row.get(price_key) or row.get(price_key.replace("_avg", "")),
             demand=row.get(demand_key) or row.get(demand_key.replace("_avg", "")) or None,
+            game_version=self._string_or_none(row.get("game_version")),
+        )
+
+    def _item_category_is_supported(self, row: dict) -> bool:
+        if not self._positive(row.get("is_game_related")):
+            return False
+        section = self._normalize(row.get("section"))
+        name = self._normalize(row.get("name"))
+        supported_sections = {
+            "armor",
+            "clothing",
+            "personal weapons",
+            "systems",
+            "undersuits",
+            "utility",
+            "vehicle weapons",
+            "avionics",
+            "propulsion",
+            "module",
+        }
+        supported_names = {
+            "bombs",
+            "bomb racks",
+            "coolers",
+            "flight blade",
+            "guns",
+            "helmets",
+            "jump modules",
+            "missile racks",
+            "missiles",
+            "personal weapons",
+            "power plants",
+            "quantum drives",
+            "radar",
+            "shield generators",
+            "tractor beams",
+            "turrets",
+            "undersuits",
+        }
+        return section in supported_sections or name in supported_names
+
+    def _filter_items(
+        self,
+        items: list[dict],
+        query: str | None = None,
+        category: str | None = None,
+        section: str | None = None,
+        size: str | None = None,
+    ) -> list[dict]:
+        normalized_query = self._normalize(query)
+        normalized_category = self._normalize(category)
+        normalized_section = self._normalize(section)
+        normalized_size = self._normalize(size)
+
+        filtered = []
+        for item in items:
+            if normalized_query and not (
+                normalized_query in self._normalize(item.get("name"))
+                or normalized_query in self._normalize(item.get("category"))
+                or normalized_query in self._normalize(item.get("section"))
+                or normalized_query in self._normalize(item.get("company_name"))
+            ):
+                continue
+            if normalized_category and self._normalize(item.get("category")) != normalized_category:
+                continue
+            if normalized_section and self._normalize(item.get("section")) != normalized_section:
+                continue
+            if normalized_size and self._normalize(item.get("size")) != normalized_size:
+                continue
+            filtered.append(item)
+        return filtered
+
+    def _item_result(self, row: dict, purchases: list[ItemPurchaseLocation]) -> ItemLocatorResult:
+        item_id = self._int_or_none(row.get("id")) or 0
+        slug = self._string_or_none(row.get("slug")) or str(item_id)
+        return ItemLocatorResult(
+            id=item_id,
+            name=str(row.get("name") or "Unknown item"),
+            section=self._string_or_none(row.get("section")),
+            category=self._string_or_none(row.get("category")),
+            company_name=self._string_or_none(row.get("company_name")),
+            size=self._string_or_none(row.get("size")),
+            wiki_url=self._string_or_none(row.get("wiki")),
+            source_url=f"https://uexcorp.space/items/info/{quote(slug)}",
+            source_name=self.name,
+            purchases=purchases,
+        )
+
+    def _item_purchase_location(self, row: dict) -> ItemPurchaseLocation:
+        return ItemPurchaseLocation(
+            terminal_name=str(row.get("terminal_name") or "Unknown terminal"),
+            system=self._string_or_none(row.get("star_system_name")),
+            planet=self._string_or_none(row.get("planet_name") or row.get("orbit_name") or row.get("moon_name")),
+            location=self._location(row),
+            price=row.get("price_buy"),
             game_version=self._string_or_none(row.get("game_version")),
         )
 
@@ -611,6 +880,12 @@ class UEXSource:
     def _number(self, value: object) -> float | None:
         try:
             return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _int_or_none(self, value: object) -> int | None:
+        try:
+            return int(value)
         except (TypeError, ValueError):
             return None
 

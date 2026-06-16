@@ -112,6 +112,30 @@ class BlueprintResult:
 
 
 @dataclass(frozen=True)
+class ItemPurchaseLocation:
+    terminal_name: str
+    system: str | None
+    planet: str | None
+    location: str | None
+    price: int | float
+    game_version: str | None
+
+
+@dataclass(frozen=True)
+class ItemLocatorResult:
+    id: int
+    name: str
+    section: str | None
+    category: str | None
+    company_name: str | None
+    size: str | None
+    wiki_url: str | None
+    source_url: str
+    source_name: str
+    purchases: list[ItemPurchaseLocation]
+
+
+@dataclass(frozen=True)
 class TradeRouteLeg:
     commodity_name: str
     buy_price: int | float
@@ -180,6 +204,26 @@ class GameInfoSource(Protocol):
         ...
 
     async def autocomplete_blueprint_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def lookup_items(
+        self,
+        query: str | None = None,
+        category: str | None = None,
+        section: str | None = None,
+        size: str | None = None,
+        limit: int = 25,
+        page: int = 1,
+    ) -> list[ItemLocatorResult]:
+        ...
+
+    async def lookup_item_by_id(self, item_id: int) -> ItemLocatorResult | None:
+        ...
+
+    async def autocomplete_items(self, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def autocomplete_item_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
         ...
 
     async def lookup_trade_routes(

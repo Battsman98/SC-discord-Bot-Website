@@ -14,6 +14,8 @@ from src.sources.base import (
     BlueprintResult,
     CommodityMarket,
     CommodityResult,
+    ItemLocatorResult,
+    ItemPurchaseLocation,
     ShipResult,
     TradeRouteLeg,
     TradeRouteResult,
@@ -64,6 +66,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(ship_command)
         self.tree.add_command(commodity_command)
         self.tree.add_command(blueprint_command)
+        self.tree.add_command(item_group)
         self.tree.add_command(exec_command)
         self.tree.add_command(execset_command)
         self.tree.add_command(execclear_command)
@@ -676,6 +679,207 @@ class BlueprintSelectView(discord.ui.View):
         )
 
 
+item_group = app_commands.Group(name="item", description="Item lookup tools.")
+
+
+@item_group.command(name="locator", description="Find in-game buyable Star Citizen items.")
+@app_commands.describe(
+    name="Item name to search.",
+    category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
+    section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
+    size="Optional item size.",
+)
+async def item_locator_command(
+    interaction: discord.Interaction,
+    name: str | None = None,
+    category: str | None = None,
+    section: str | None = None,
+    size: str | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    if not any([name, category, section, size]):
+        await interaction.response.send_message("Add an item name or at least one filter.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    results = await bot.sources.lookup_items(
+        query=name,
+        category=category,
+        section=section,
+        size=size,
+        limit=BLUEPRINT_PAGE_SIZE,
+        page=1,
+    )
+    if not results:
+        await interaction.followup.send("No in-game buyable items found for those filters.", ephemeral=True)
+        return
+
+    if name and len(results) == 1:
+        detail = await bot.sources.lookup_item_by_id(results[0].id)
+        await interaction.followup.send(
+            embed=build_item_locator_embed(detail or results[0], name, category, section, size),
+            ephemeral=True,
+        )
+        return
+
+    has_next = bool(
+        await bot.sources.lookup_items(
+            query=name,
+            category=category,
+            section=section,
+            size=size,
+            limit=BLUEPRINT_PAGE_SIZE,
+            page=2,
+        )
+    )
+    await interaction.followup.send(
+        embed=build_item_locator_selection_embed(results, name, category, section, size, page=1, has_next=has_next),
+        view=ItemLocatorSelectView(results, name, category, section, size, page=1, has_next=has_next),
+        ephemeral=True,
+    )
+
+
+@item_locator_command.autocomplete("name")
+async def item_locator_name_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+    names = await bot.sources.autocomplete_items(current)
+    return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
+
+
+@item_locator_command.autocomplete("category")
+@item_locator_command.autocomplete("section")
+@item_locator_command.autocomplete("size")
+async def item_locator_filter_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+    names = await bot.sources.autocomplete_item_filter(_focused_option_name(interaction), current)
+    return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
+
+
+class ItemLocatorSelect(discord.ui.Select):
+    def __init__(self, results: list[ItemLocatorResult]) -> None:
+        self.results = results[:25]
+        options = [
+            discord.SelectOption(
+                label=result.name[:100],
+                description=_item_locator_result_label(result)[:100],
+                value=str(result.id),
+            )
+            for result in self.results
+        ]
+        super().__init__(
+            placeholder="Select an item for buy locations",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        bot = interaction.client
+        if not isinstance(bot, GameAssistBot):
+            await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        result = await bot.sources.lookup_item_by_id(int(self.values[0]))
+        if result is None:
+            await interaction.edit_original_response(content="That item is no longer available in UEX.", embed=None, view=None)
+            return
+        await interaction.edit_original_response(embed=build_item_locator_embed(result), view=None)
+
+
+class ItemLocatorSelectView(discord.ui.View):
+    def __init__(
+        self,
+        results: list[ItemLocatorResult],
+        name: str | None = None,
+        category: str | None = None,
+        section: str | None = None,
+        size: str | None = None,
+        page: int = 1,
+        has_next: bool = False,
+    ) -> None:
+        super().__init__(timeout=300)
+        self.name = name
+        self.category = category
+        self.section = section
+        self.size = size
+        self.page = page
+        self.has_next = has_next
+        self.add_item(ItemLocatorSelect(results))
+        self.previous_page.disabled = page <= 1
+        self.next_page.disabled = not has_next
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary, row=1)
+    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page - 1)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary, row=1)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page + 1)
+
+    async def _show_page(self, interaction: discord.Interaction, page: int) -> None:
+        bot = interaction.client
+        if not isinstance(bot, GameAssistBot):
+            await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        results = await bot.sources.lookup_items(
+            query=self.name,
+            category=self.category,
+            section=self.section,
+            size=self.size,
+            limit=BLUEPRINT_PAGE_SIZE,
+            page=page,
+        )
+        has_next = bool(
+            await bot.sources.lookup_items(
+                query=self.name,
+                category=self.category,
+                section=self.section,
+                size=self.size,
+                limit=BLUEPRINT_PAGE_SIZE,
+                page=page + 1,
+            )
+        )
+        await interaction.edit_original_response(
+            embed=build_item_locator_selection_embed(
+                results,
+                self.name,
+                self.category,
+                self.section,
+                self.size,
+                page=page,
+                has_next=has_next,
+            ),
+            view=ItemLocatorSelectView(
+                results,
+                self.name,
+                self.category,
+                self.section,
+                self.size,
+                page=page,
+                has_next=has_next,
+            ),
+        )
+
+
 trade_group = app_commands.Group(name="trade", description="Trade planning tools.")
 
 
@@ -1262,6 +1466,98 @@ def build_blueprint_selection_embed(
 def _blueprint_result_label(result: BlueprintResult) -> str:
     details = [value for value in [result.category, result.component_size] if value]
     return " | ".join(details) if details else "Blueprint"
+
+
+def build_item_locator_selection_embed(
+    results: list[ItemLocatorResult],
+    name: str | None = None,
+    category: str | None = None,
+    section: str | None = None,
+    size: str | None = None,
+    page: int = 1,
+    has_next: bool = False,
+) -> discord.Embed:
+    description = [
+        _line("Search", name),
+        _line("Category Filter", category),
+        _line("Section Filter", section),
+        _line("Size Filter", size),
+    ]
+    embed = discord.Embed(
+        title="Item Locator Results",
+        description="\n".join(line for line in description if line) or "In-game buyable items matching your filters.",
+        color=discord.Color.green(),
+    )
+    lines = [
+        f"{index}. {result.name} - {_item_locator_result_label(result)}"
+        for index, result in enumerate(results[:25], start=1)
+    ]
+    embed.add_field(name="Available Items", value=_limit_lines(lines, 1000), inline=False)
+    page_hint = f"Page {page}"
+    if has_next:
+        page_hint = f"{page_hint} | More results available"
+    embed.set_footer(text=f"{page_hint} | Select an item below to view buy locations.")
+    return embed
+
+
+def build_item_locator_embed(
+    result: ItemLocatorResult,
+    name: str | None = None,
+    category: str | None = None,
+    section: str | None = None,
+    size: str | None = None,
+) -> discord.Embed:
+    description = [
+        _line("Section", result.section),
+        _line("Category", result.category),
+        _line("Size", _item_size_label(result.size)),
+        _line("Manufacturer", result.company_name),
+        _line("Search", name),
+        _line("Category Filter", category),
+        _line("Section Filter", section),
+        _line("Size Filter", size),
+    ]
+    embed = discord.Embed(
+        title=result.name,
+        description="\n".join(line for line in description if line),
+        url=result.wiki_url or result.source_url,
+        color=discord.Color.green(),
+    )
+    embed.add_field(name="Purchase Locations", value=_format_item_purchase_locations(result.purchases), inline=False)
+    embed.set_footer(text=f"Source: {result.source_name}")
+    return embed
+
+
+def _item_locator_result_label(result: ItemLocatorResult) -> str:
+    details = [
+        value
+        for value in [result.section, result.category, _item_size_label(result.size)]
+        if value
+    ]
+    return " | ".join(details) if details else "Item"
+
+
+def _item_size_label(size: str | None) -> str | None:
+    if not size:
+        return None
+    return f"Size {size}" if str(size).isdigit() else str(size)
+
+
+def _format_item_purchase_locations(purchases: list[ItemPurchaseLocation]) -> str:
+    if not purchases:
+        return "No current in-game purchase locations found."
+
+    lines = []
+    for purchase in purchases[:25]:
+        place = " / ".join(part for part in [purchase.system, purchase.planet, purchase.location] if part)
+        if not place:
+            place = "Unknown location"
+        lines.append(
+            f"{_format_currency(purchase.price, 'aUEC')} at {purchase.terminal_name} - {place}"
+        )
+    if len(purchases) > 25:
+        lines.append(f"{len(purchases) - 25} more location(s) available in UEX.")
+    return _limit_lines(lines, 1000)
 
 
 def _format_blueprint_ingredients(ingredients: list[BlueprintIngredient]) -> str:

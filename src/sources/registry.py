@@ -2,7 +2,15 @@ import aiohttp
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import BlueprintResult, CommodityResult, GameInfoSource, LookupResult, ShipResult, TradeRouteResult
+from src.sources.base import (
+    BlueprintResult,
+    CommodityResult,
+    GameInfoSource,
+    ItemLocatorResult,
+    LookupResult,
+    ShipResult,
+    TradeRouteResult,
+)
 from src.sources.sc_craft_tools import SCCraftToolsSource
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 from src.sources.uex import UEXSource
@@ -120,6 +128,70 @@ class SourceRegistry:
 
         for source in self._sources:
             autocomplete = getattr(source, "autocomplete_blueprint_filter", None)
+            if autocomplete is None:
+                continue
+            for name in await autocomplete(filter_name, query, limit):
+                if name in seen:
+                    continue
+                seen.add(name)
+                matches.append(name)
+                if len(matches) >= limit:
+                    return matches
+
+        return matches
+
+    async def lookup_items(
+        self,
+        query: str | None = None,
+        category: str | None = None,
+        section: str | None = None,
+        size: str | None = None,
+        limit: int = 25,
+        page: int = 1,
+    ) -> list[ItemLocatorResult]:
+        for source in self._sources:
+            lookup = getattr(source, "lookup_items", None)
+            if lookup is None:
+                continue
+            results = await lookup(query, category, section, size, limit, page)
+            if results:
+                return results
+        return []
+
+    async def lookup_item_by_id(self, item_id: int) -> ItemLocatorResult | None:
+        for source in self._sources:
+            lookup = getattr(source, "lookup_item_by_id", None)
+            if lookup is None:
+                continue
+            result = await lookup(item_id)
+            if result is not None:
+                return result
+        return None
+
+    async def autocomplete_items(self, query: str, limit: int = 25) -> list[str]:
+        seen: set[str] = set()
+        matches: list[str] = []
+
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_items", None)
+            if autocomplete is None:
+                continue
+            for name in await autocomplete(query, limit):
+                if name in seen:
+                    continue
+                seen.add(name)
+                matches.append(name)
+                if len(matches) >= limit:
+                    return matches
+
+        return matches
+
+    async def autocomplete_item_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        seen: set[str] = set()
+        matches: list[str] = []
+
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_item_filter", None)
             if autocomplete is None:
                 continue
             for name in await autocomplete(filter_name, query, limit):
