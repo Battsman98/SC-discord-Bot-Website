@@ -3,6 +3,7 @@ from src.bot import (
     _blueprint_result_label,
     _format_blueprint_missions,
     _format_mining_location_page,
+    _mining_location_page_count,
     _format_rock_signatures,
     build_mining_embed,
 )
@@ -64,6 +65,7 @@ def test_build_mining_embed_groups_locations_and_omits_kind() -> None:
     assert "Planets: Bloom" in locations
     assert len(embed.fields) == 1
     assert embed.fields[0].name == "Mining Locations"
+    assert _mining_location_page_count(result) == 1
 
 
 def test_format_blueprint_missions_uses_simple_ordered_fields() -> None:

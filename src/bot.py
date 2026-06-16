@@ -401,8 +401,13 @@ async def mining_command(
         await interaction.followup.send(f"No mining material found for `{material}`.", ephemeral=True)
         return
 
-    view = MiningLocationView(result, system, planet) if _mining_location_page_count(result) > 1 else None
-    await interaction.followup.send(embed=build_mining_embed(result, system, planet), view=view, ephemeral=True)
+    kwargs = {
+        "embed": build_mining_embed(result, system, planet),
+        "ephemeral": True,
+    }
+    if _mining_location_page_count(result) > 1:
+        kwargs["view"] = MiningLocationView(result, system, planet)
+    await interaction.followup.send(**kwargs)
 
 
 @mining_command.autocomplete("material")
