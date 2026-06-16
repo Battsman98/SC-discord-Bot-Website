@@ -1189,8 +1189,8 @@ def _format_blueprint_missions(missions: list[BlueprintMission]) -> str:
     if not missions:
         return "No mission drop data found."
 
-    unique_lines = []
-    seen = set()
+    groups = []
+    group_indexes = {}
     for mission in missions:
         rep = mission.min_standing_name or "Unknown"
         if mission.min_standing_reputation is not None:
@@ -1199,28 +1199,38 @@ def _format_blueprint_missions(missions: list[BlueprintMission]) -> str:
         key = (
             mission.contractor or "Unknown",
             rep,
-            mission.mission_type or "Unknown",
             drop,
         )
-        if key in seen:
+        if key not in group_indexes:
+            group_indexes[key] = len(groups)
+            groups.append(
+                {
+                    "contractor": mission.contractor or "Unknown",
+                    "rep": rep,
+                    "drop": drop,
+                    "missions": [],
+                    "seen_missions": set(),
+                }
+            )
+
+        mission_type = mission.mission_type or "Unknown"
+        mission_name = mission.name or "Unknown mission"
+        mission_key = (mission_type, mission_name)
+        group = groups[group_indexes[key]]
+        if mission_key in group["seen_missions"]:
             continue
-        seen.add(key)
-        unique_lines.append(
+        group["seen_missions"].add(mission_key)
+        group["missions"].append((mission_type, mission_name))
+
+    lines = []
+    for group in groups:
+        lines.append(
             " | ".join(
-                [
-                    f"- Contractor: {mission.contractor or 'Unknown'}",
-                    f"Rep: {rep}",
-                    f"Type: {mission.mission_type or 'Unknown'}",
-                    f"Mission: {mission.name}",
-                    f"Drop: {drop}",
-                ]
+                [f"- Contractor: {group['contractor']}", f"Rep: {group['rep']}", f"Drop: {group['drop']}"]
             )
         )
-
-    lines = unique_lines[:8]
-    hidden_count = len(unique_lines) - len(lines)
-    if hidden_count > 0:
-        lines.append(f"{hidden_count} more mission(s) available.")
+        for mission_type, mission_name in group["missions"]:
+            lines.append(f"  - Type: {mission_type} | Mission: {mission_name}")
     return _limit_lines(lines, 1000)
 
 

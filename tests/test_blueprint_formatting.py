@@ -18,12 +18,12 @@ def test_format_blueprint_missions_uses_simple_ordered_fields() -> None:
     )
 
     assert text == (
-        "- Contractor: Adagio Holdings | Rep: Jr. Contractor (800 rep) | "
-        "Type: Salvage | Mission: Adagio Holdings in Need of Salvagers | Drop: 100%"
+        "- Contractor: Adagio Holdings | Rep: Jr. Contractor (800 rep) | Drop: 100%\n"
+        "  - Type: Salvage | Mission: Adagio Holdings in Need of Salvagers"
     )
 
 
-def test_format_blueprint_missions_deduplicates_similar_reward_paths() -> None:
+def test_format_blueprint_missions_groups_shared_reward_paths() -> None:
     text = _format_blueprint_missions(
         [
             BlueprintMission(
@@ -47,9 +47,13 @@ def test_format_blueprint_missions_deduplicates_similar_reward_paths() -> None:
         ]
     )
 
-    assert text.count("Covalex Independent Contractors") == 1
+    assert text == (
+        "- Contractor: Covalex Independent Contractors | Rep: Master (237,750 rep) | Drop: 100%\n"
+        "  - Type: Hauling - Interstellar | Mission: Rank - Cargo Haul\n"
+        "  - Type: Hauling - Interstellar | Mission: Rank - Direct Cargo Haul"
+    )
     assert "Rank - Cargo Haul" in text
-    assert "Rank - Direct Cargo Haul" not in text
+    assert "Rank - Direct Cargo Haul" in text
 
 
 def test_blueprint_result_label_includes_component_size() -> None:
