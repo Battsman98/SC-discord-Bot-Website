@@ -17,7 +17,7 @@ Python Discord bot for collecting information from approved websites/APIs and se
 - `/lookup` searches Star Citizen game information.
 - `/ship` looks up a Star Citizen ship or vehicle.
 - `/commodity` looks up commodity pricing and locations.
-- `/trade routing` creates a trade route planner link.
+- `/trade routing` calculates UEX-based circular trade route candidates.
 - `/exec` shows the Executive Hangar clock.
 - `/execset` corrects the Executive Hangar clock for approved users.
 - `/execclear` clears an Executive Hangar manual override.
@@ -32,8 +32,6 @@ Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive H
 Set comma-separated `EXEC_ADMIN_ROLE_IDS` in `.env` to restrict `/execset` and `/execclear` to specific Discord roles. If no role IDs are configured, users with Manage Server can use those commands.
 
 Set `CZ_TIMERS_CHANNEL_ID` in `.env` to have the bot keep a public Contested Zone timer dashboard with clickable start/reset buttons.
-
-Set `SC_TRADE_TOOLS_TOKEN` in `.env` when you have a SC Trade Tools API token and want direct in-Discord trade route results instead of prefilled route links.
 
 ## Local Setup
 

@@ -8,9 +8,8 @@ from discord.ext import commands
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import CommodityMarket, CommodityResult, ShipResult
+from src.sources.base import CommodityMarket, CommodityResult, ShipResult, TradeRouteLeg, TradeRouteResult
 from src.sources.registry import SourceRegistry, build_default_registry
-from src.sources.sc_trade_tools import build_trade_route_url
 from src.timers import (
     ExecHangarStatus,
     calculate_countdown_end_unix,
@@ -357,12 +356,14 @@ async def commodity_system_autocomplete(
 trade_group = app_commands.Group(name="trade", description="Trade planning tools.")
 
 
-@trade_group.command(name="routing", description="Create a Star Citizen trade route planner link.")
+@trade_group.command(name="routing", description="Find Star Citizen trade route candidates from UEX.")
 @app_commands.describe(
     route_type="Optional route type. Defaults to Circular Route.",
     ship="Ship for route planning.",
     investment="aUEC investment for route planning.",
     max_stops="Maximum route stops, from 1 to 5.",
+    purchase_system="Optional system filter for purchase locations.",
+    sell_system="Optional system filter for sell locations.",
 )
 @app_commands.choices(
     route_type=[
@@ -375,6 +376,8 @@ async def trade_routing_command(
     ship: str = "Ironclad Assault",
     investment: int = 1_000_000,
     max_stops: int = 5,
+    purchase_system: str | None = None,
+    sell_system: str | None = None,
 ) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
@@ -388,10 +391,58 @@ async def trade_routing_command(
         await interaction.response.send_message("Max stops must be between 1 and 5.", ephemeral=True)
         return
 
-    route_url = build_trade_route_url(ship, investment, max_stops)
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    ship_result = await bot.sources.lookup_ship(ship)
+    if ship_result is None:
+        await interaction.followup.send(f"No ship or vehicle found for `{ship}`.", ephemeral=True)
+        return
+    if ship_result.cargo_capacity is None or ship_result.cargo_capacity <= 0:
+        await interaction.followup.send(f"`{ship_result.name}` does not have a usable cargo capacity for trade routing.", ephemeral=True)
+        return
+
+    result = await bot.sources.lookup_trade_routes(
+        ship_result.name,
+        ship_result.cargo_capacity,
+        investment,
+        max_stops,
+        purchase_system,
+        sell_system,
+    )
     route_type_name = route_type.name if route_type else "Circular Route"
-    embed = build_trade_route_embed(route_type_name, ship, investment, max_stops, route_url, bool(bot.settings.sc_trade_tools_token))
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    if result is None or not result.legs:
+        await interaction.followup.send(
+            "No profitable UEX route candidates found for those filters right now.",
+            ephemeral=True,
+        )
+        return
+
+    embed = build_trade_route_embed(route_type_name, result, max_stops, purchase_system, sell_system)
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@trade_routing_command.autocomplete("ship")
+async def trade_ship_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    names = await bot.sources.autocomplete_ships(current)
+    return [
+        app_commands.Choice(name=name[:100], value=name[:100])
+        for name in names[:25]
+    ]
+
+
+@trade_routing_command.autocomplete("purchase_system")
+@trade_routing_command.autocomplete("sell_system")
+async def trade_system_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    return await commodity_system_autocomplete(interaction, current)
 
 
 @app_commands.command(name="exec", description="Show the current Executive Hangar clock.")
@@ -805,37 +856,55 @@ def build_commodity_embed(
 
 def build_trade_route_embed(
     route_type: str,
-    ship: str,
-    investment: int,
+    result: TradeRouteResult,
     max_stops: int,
-    route_url: str,
-    has_api_token: bool,
+    purchase_system: str | None = None,
+    sell_system: str | None = None,
 ) -> discord.Embed:
+    description = [
+        _line("Ship", result.ship),
+        _line("Cargo", f"{_format_number(result.cargo_capacity_scu)} SCU"),
+        _line("Investment", _format_currency(result.investment, "aUEC")),
+        _line("Max Stops", str(max_stops)),
+        _line("Purchase System", purchase_system),
+        _line("Sell System", sell_system),
+    ]
     embed = discord.Embed(
         title=route_type,
-        description=(
-            f"Ship: {ship}\n"
-            f"Investment: {_format_currency(investment, 'aUEC')}\n"
-            f"Max Stops: {max_stops}\n"
-            f"[Open SC Trade Tools route]({route_url})"
-        ),
-        url=route_url,
+        description="\n".join(line for line in description if line),
         color=discord.Color.teal(),
     )
-    if has_api_token:
+
+    for index, leg in enumerate(result.legs, start=1):
         embed.add_field(
-            name="API",
-            value="SC Trade Tools API token is configured. Direct in-Discord route results can be wired next.",
+            name=f"{index}. {leg.commodity_name} - {_format_currency(leg.profit, 'aUEC')} profit",
+            value=_format_trade_route_leg(leg),
             inline=False,
         )
-    else:
-        embed.add_field(
-            name="API",
-            value="Direct route results require a SC Trade Tools API token. For now, this opens the prefilled route planner.",
-            inline=False,
-        )
-    embed.set_footer(text="Source: SC Trade Tools")
+
+    embed.set_footer(text=f"Source: {result.source_name} average prices, stock, and demand")
     return embed
+
+
+def _format_trade_route_leg(leg: TradeRouteLeg) -> str:
+    buy_location = _format_route_location(leg.buy_system, leg.buy_planet, leg.buy_location, leg.buy_terminal)
+    sell_location = _format_route_location(leg.sell_system, leg.sell_planet, leg.sell_location, leg.sell_terminal)
+    return (
+        f"Buy: {_format_currency(leg.buy_price, 'aUEC')}/SCU at {buy_location}\n"
+        f"Sell: {_format_currency(leg.sell_price, 'aUEC')}/SCU at {sell_location}\n"
+        f"Quantity: {_format_number(leg.quantity_scu)} SCU | "
+        f"Cost: {_format_currency(leg.investment_used, 'aUEC')}"
+    )
+
+
+def _format_route_location(
+    system: str | None,
+    planet: str | None,
+    location: str | None,
+    terminal: str,
+) -> str:
+    parts = [part for part in [system, planet, location or terminal] if part]
+    return " / ".join(parts) or terminal
 
 
 def build_commands_reference_embeds() -> list[discord.Embed]:

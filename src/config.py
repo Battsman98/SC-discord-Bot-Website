@@ -12,7 +12,6 @@ class Settings:
     exec_status_channel_id: int | None
     exec_admin_role_ids: tuple[int, ...]
     cz_timers_channel_id: int | None
-    sc_trade_tools_token: str | None
     command_prefix: str
     database_path: str
     http_timeout_seconds: int
@@ -31,7 +30,6 @@ class Settings:
         commands_channel_id = os.getenv("COMMANDS_CHANNEL_ID", "").strip()
         exec_status_channel_id = os.getenv("EXEC_STATUS_CHANNEL_ID", "").strip()
         cz_timers_channel_id = os.getenv("CZ_TIMERS_CHANNEL_ID", "").strip()
-        sc_trade_tools_token = os.getenv("SC_TRADE_TOOLS_TOKEN", "").strip()
         exec_admin_role_ids = tuple(
             int(role_id.strip())
             for role_id in os.getenv("EXEC_ADMIN_ROLE_IDS", "").split(",")
@@ -45,7 +43,6 @@ class Settings:
             exec_status_channel_id=int(exec_status_channel_id) if exec_status_channel_id else None,
             exec_admin_role_ids=exec_admin_role_ids,
             cz_timers_channel_id=int(cz_timers_channel_id) if cz_timers_channel_id else None,
-            sc_trade_tools_token=sc_trade_tools_token or None,
             command_prefix=os.getenv("BOT_COMMAND_PREFIX", "!"),
             database_path=os.getenv("DATABASE_PATH", "data/bot.sqlite3"),
             http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "15")),

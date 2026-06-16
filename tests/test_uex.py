@@ -207,3 +207,131 @@ def test_parse_commodity_can_filter_purchase_and_sell_systems_separately() -> No
 
     assert [market.terminal_name for market in result.buy_from] == ["Stanton Seller"]
     assert [market.terminal_name for market in result.sell_to] == ["Pyro Buyer"]
+
+
+def test_calculate_trade_route_legs_uses_best_profit_and_limits_quantity() -> None:
+    source = UEXSource.__new__(UEXSource)
+    legs = source._calculate_trade_route_legs(
+        [
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "Stanton Seller",
+                "price_sell_avg": 100,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 50,
+                "outpost_name": "Mining Outpost",
+                "planet_name": "Crusader",
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "Pyro Buyer",
+                "price_buy_avg": 160,
+                "status_buy": 1,
+                "scu_buy_avg": 30,
+                "city_name": "Checkmate",
+                "planet_name": "Monox",
+                "star_system_name": "Pyro",
+            },
+            {
+                "commodity_name": "Diamond",
+                "terminal_name": "Cheap Seller",
+                "price_sell_avg": 50,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 100,
+                "outpost_name": "Elsewhere",
+                "planet_name": "ArcCorp",
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Diamond",
+                "terminal_name": "Weak Buyer",
+                "price_buy_avg": 55,
+                "status_buy": 1,
+                "scu_buy_avg": 100,
+                "city_name": "Area 18",
+                "planet_name": "ArcCorp",
+                "star_system_name": "Stanton",
+            },
+        ],
+        cargo_capacity_scu=40,
+        investment=10_000,
+        max_stops=2,
+    )
+
+    assert legs[0].commodity_name == "Gold"
+    assert legs[0].quantity_scu == 30
+    assert legs[0].investment_used == 3000
+    assert legs[0].profit == 1800
+    assert legs[0].buy_system == "Stanton"
+    assert legs[0].sell_system == "Pyro"
+
+
+def test_calculate_trade_route_legs_filters_purchase_and_sell_systems() -> None:
+    source = UEXSource.__new__(UEXSource)
+    legs = source._calculate_trade_route_legs(
+        [
+            {
+                "commodity_name": "Agricium",
+                "terminal_name": "Stanton Seller",
+                "price_sell_avg": 1000,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Agricium",
+                "terminal_name": "Pyro Seller",
+                "price_sell_avg": 800,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Pyro",
+            },
+            {
+                "commodity_name": "Agricium",
+                "terminal_name": "Stanton Buyer",
+                "price_buy_avg": 1200,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Agricium",
+                "terminal_name": "Pyro Buyer",
+                "price_buy_avg": 1600,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Pyro",
+            },
+        ],
+        cargo_capacity_scu=20,
+        investment=20_000,
+        max_stops=5,
+        purchase_system="Stanton",
+        sell_system="Pyro",
+    )
+
+    assert len(legs) == 1
+    assert legs[0].buy_terminal == "Stanton Seller"
+    assert legs[0].sell_terminal == "Pyro Buyer"
+
+
+def test_enrich_price_rows_adds_terminal_location_details() -> None:
+    source = UEXSource.__new__(UEXSource)
+
+    rows = source._enrich_price_rows(
+        [{"id_terminal": 12, "terminal_name": "TDD Area 18", "commodity_name": "Gold"}],
+        {
+            "12": {
+                "id": 12,
+                "star_system_name": "Stanton",
+                "planet_name": "ArcCorp",
+                "city_name": "Area 18",
+            }
+        },
+    )
+
+    assert rows[0]["terminal_name"] == "TDD Area 18"
+    assert rows[0]["star_system_name"] == "Stanton"
+    assert rows[0]["planet_name"] == "ArcCorp"
+    assert rows[0]["city_name"] == "Area 18"

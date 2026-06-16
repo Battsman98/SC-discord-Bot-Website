@@ -2,7 +2,7 @@ import aiohttp
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import CommodityResult, GameInfoSource, LookupResult, ShipResult
+from src.sources.base import CommodityResult, GameInfoSource, LookupResult, ShipResult, TradeRouteResult
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 from src.sources.uex import UEXSource
 
@@ -74,6 +74,24 @@ class SourceRegistry:
                     return matches
 
         return matches
+
+    async def lookup_trade_routes(
+        self,
+        ship: str,
+        cargo_capacity_scu: int | float,
+        investment: int | float,
+        max_stops: int = 5,
+        purchase_system: str | None = None,
+        sell_system: str | None = None,
+    ) -> TradeRouteResult | None:
+        for source in self._sources:
+            lookup = getattr(source, "lookup_trade_routes", None)
+            if lookup is None:
+                continue
+            result = await lookup(ship, cargo_capacity_scu, investment, max_stops, purchase_system, sell_system)
+            if result is not None:
+                return result
+        return None
 
     async def close(self) -> None:
         for source in self._sources:

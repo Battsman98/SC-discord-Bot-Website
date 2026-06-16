@@ -104,7 +104,7 @@ Examples:
 
 ## `/trade routing`
 
-Creates a Star Citizen trade route planner link.
+Finds Star Citizen circular trade route candidates using UEX data.
 
 Response visibility: private to the user.
 
@@ -116,19 +116,24 @@ Options:
 | `ship` | No | Ship name for route planning. Defaults to `Ironclad Assault`. |
 | `investment` | No | aUEC investment for route planning. Defaults to `1,000,000`. |
 | `max_stops` | No | Maximum route stops, from 1 to 5. Defaults to `5`. |
+| `purchase_system` | No | Filters purchase locations only. |
+| `sell_system` | No | Filters sell locations only. |
 
 Examples:
 
 ```text
 /trade routing
 /trade routing route_type:Circular Route ship:Ironclad Assault investment:1000000 max_stops:5
+/trade routing ship:Caterpillar investment:2000000 purchase_system:Stanton sell_system:Pyro
 ```
 
 Route behavior:
 
-- Generates a prefilled SC Trade Tools route planner link.
-- Uses `https://sc-trade.tools/trade-routes`.
-- Direct in-Discord circular route results require a SC Trade Tools API token in `SC_TRADE_TOOLS_TOKEN`.
+- Uses UEX average terminal prices, stock, and demand.
+- Uses the selected ship's cargo capacity from the ship lookup data.
+- Limits purchasable SCU by cargo capacity, investment, purchase stock, and sell demand.
+- Shows the highest estimated profit route candidates in Discord.
+- Does not require a SC Trade Tools API token.
 
 ## `/exec`
 

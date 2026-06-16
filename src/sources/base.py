@@ -78,6 +78,33 @@ class CommodityResult:
     source_name: str
 
 
+@dataclass(frozen=True)
+class TradeRouteLeg:
+    commodity_name: str
+    buy_price: int | float
+    sell_price: int | float
+    quantity_scu: int | float
+    investment_used: int | float
+    profit: int | float
+    buy_system: str | None
+    buy_planet: str | None
+    buy_location: str | None
+    buy_terminal: str
+    sell_system: str | None
+    sell_planet: str | None
+    sell_location: str | None
+    sell_terminal: str
+
+
+@dataclass(frozen=True)
+class TradeRouteResult:
+    ship: str
+    cargo_capacity_scu: int | float
+    investment: int | float
+    legs: list[TradeRouteLeg]
+    source_name: str
+
+
 class GameInfoSource(Protocol):
     name: str
 
@@ -100,6 +127,17 @@ class GameInfoSource(Protocol):
         ...
 
     async def autocomplete_commodities(self, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def lookup_trade_routes(
+        self,
+        ship: str,
+        cargo_capacity_scu: int | float,
+        investment: int | float,
+        max_stops: int = 5,
+        purchase_system: str | None = None,
+        sell_system: str | None = None,
+    ) -> TradeRouteResult | None:
         ...
 
     async def close(self) -> None:
