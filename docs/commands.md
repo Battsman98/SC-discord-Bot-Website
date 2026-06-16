@@ -102,6 +102,45 @@ Examples:
 /commodity Gold purchase_system:Stanton sell_system:Pyro quantity_scu:100
 ```
 
+## `/mining`
+
+Finds where to mine Star Citizen materials using UEX mining data.
+
+Response visibility: private to the user.
+
+Autocomplete:
+
+- `material` supports mineable material dropdown suggestions.
+- `system` supports `Stanton`, `Pyro`, and `Nyx`.
+- `planet` supports planet, moon, lagrange point, and point-of-interest suggestions.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `material` | Yes | Mineable material name or code, such as `Gold`, `Agricium`, `GOLD`, or `HADA`. |
+| `system` | No | Filters mining locations to one star system. |
+| `planet` | No | Filters listed locations by planet, moon, lagrange point, or point of interest. |
+
+Current output:
+
+- Material code and kind
+- Refined/raw sell values when available
+- Mining flags such as harvestable, QT sensitive, time sensitive, or explosive
+- Star systems
+- Lagrange points
+- Planets
+- Moons
+- Points of interest
+
+Examples:
+
+```text
+/mining material:Gold
+/mining material:Agricium system:Stanton
+/mining material:Hadanite planet:Daymar
+```
+
 ## `/blueprint`
 
 Searches Star Citizen crafting blueprints using SC Craft Tools data.

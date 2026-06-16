@@ -79,6 +79,26 @@ class CommodityResult:
 
 
 @dataclass(frozen=True)
+class MiningLocationResult:
+    material_name: str
+    code: str | None
+    kind: str | None
+    refined_sell_price: int | float | None
+    raw_sell_price: int | float | None
+    is_harvestable: bool
+    is_volatile_qt: bool
+    is_volatile_time: bool
+    is_explosive: bool
+    systems: list[str]
+    lagrange_points: list[str]
+    planets: list[str]
+    moons: list[str]
+    points_of_interest: list[str]
+    source_url: str
+    source_name: str
+
+
+@dataclass(frozen=True)
 class BlueprintIngredient:
     name: str
     quantity: int | float | None
@@ -185,6 +205,25 @@ class GameInfoSource(Protocol):
         ...
 
     async def autocomplete_commodities(self, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def lookup_mining_material(
+        self,
+        material: str,
+        system: str | None = None,
+        planet: str | None = None,
+    ) -> MiningLocationResult | None:
+        ...
+
+    async def autocomplete_mining_materials(self, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def autocomplete_mining_locations(
+        self,
+        query: str,
+        system: str | None = None,
+        limit: int = 25,
+    ) -> list[str]:
         ...
 
     async def lookup_blueprints(

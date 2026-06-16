@@ -104,6 +104,94 @@ def test_find_commodity_accepts_display_name_with_code() -> None:
     assert match == {"name": "Gold", "code": "GOLD"}
 
 
+def test_autocomplete_mining_materials_uses_raw_materials() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._commodities = [
+        {
+            "name": "Gold",
+            "code": "GOLD",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 0,
+            "is_harvestable": 0,
+            "is_inert": 0,
+        },
+        {
+            "name": "Gold (Ore)",
+            "code": "GOLD",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_harvestable": 0,
+            "is_inert": 0,
+        },
+        {
+            "name": "Hadanite",
+            "code": "HADA",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_harvestable": 1,
+            "is_inert": 0,
+        },
+        {
+            "name": "Golden Medmon",
+            "code": "GOLM",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 0,
+            "is_mineral": 0,
+            "is_harvestable": 1,
+            "is_inert": 0,
+        },
+    ]
+
+    matches = asyncio.run(source.autocomplete_mining_materials("go", limit=5))
+
+    assert matches == ["Gold (Ore) (GOLD)"]
+
+
+def test_parse_mining_location_result_groups_locations() -> None:
+    source = UEXSource.__new__(UEXSource)
+    result = source._parse_mining_location_result(
+        {
+            "name": "Gold (Ore)",
+            "code": "GOLD",
+            "kind": "Metal",
+            "price_sell": 31000,
+            "is_harvestable": 0,
+            "is_volatile_qt": 0,
+            "is_volatile_time": 0,
+            "is_explosive": 0,
+        },
+        """
+        <html><body>
+        <h2>Gold (Ore)</h2>
+        <a>Routes</a>
+        <h3>Star Systems</h3>
+        <a>Stanton</a>
+        <h3>Lagrange Points</h3>
+        <p>CRU-L4</p>
+        <h3>Planets</h3>
+        <p>Terminus</p>
+        <h3>Moons</h3>
+        <p>Daymar</p>
+        <h3>Points of Interest</h3>
+        <p>Pyro Clusters</p>
+        <p>* Location data sourced from Star Citizen.</p>
+        </body></html>
+        """,
+        "https://uexcorp.space/mining/locations/commodity/gold-ore/",
+    )
+
+    assert result.material_name == "Gold"
+    assert result.systems == ["Stanton"]
+    assert result.lagrange_points == ["CRU-L4"]
+    assert result.planets == ["Terminus"]
+    assert result.moons == ["Daymar"]
+    assert result.points_of_interest == ["Pyro Clusters"]
+
+
 def test_parse_commodity_filters_by_system_before_limiting() -> None:
     source = UEXSource.__new__(UEXSource)
     result = source._parse_commodity(

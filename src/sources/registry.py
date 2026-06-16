@@ -8,6 +8,7 @@ from src.sources.base import (
     GameInfoSource,
     ItemLocatorResult,
     LookupResult,
+    MiningLocationResult,
     ShipResult,
     TradeRouteResult,
 )
@@ -75,6 +76,62 @@ class SourceRegistry:
             if autocomplete is None:
                 continue
             for name in await autocomplete(query, limit):
+                if name in seen:
+                    continue
+                seen.add(name)
+                matches.append(name)
+                if len(matches) >= limit:
+                    return matches
+
+        return matches
+
+    async def lookup_mining_material(
+        self,
+        material: str,
+        system: str | None = None,
+        planet: str | None = None,
+    ) -> MiningLocationResult | None:
+        for source in self._sources:
+            lookup = getattr(source, "lookup_mining_material", None)
+            if lookup is None:
+                continue
+            result = await lookup(material, system, planet)
+            if result is not None:
+                return result
+        return None
+
+    async def autocomplete_mining_materials(self, query: str, limit: int = 25) -> list[str]:
+        seen: set[str] = set()
+        matches: list[str] = []
+
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_mining_materials", None)
+            if autocomplete is None:
+                continue
+            for name in await autocomplete(query, limit):
+                if name in seen:
+                    continue
+                seen.add(name)
+                matches.append(name)
+                if len(matches) >= limit:
+                    return matches
+
+        return matches
+
+    async def autocomplete_mining_locations(
+        self,
+        query: str,
+        system: str | None = None,
+        limit: int = 25,
+    ) -> list[str]:
+        seen: set[str] = set()
+        matches: list[str] = []
+
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_mining_locations", None)
+            if autocomplete is None:
+                continue
+            for name in await autocomplete(query, system, limit):
                 if name in seen:
                     continue
                 seen.add(name)

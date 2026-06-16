@@ -16,6 +16,7 @@ from src.sources.base import (
     CommodityResult,
     ItemLocatorResult,
     ItemPurchaseLocation,
+    MiningLocationResult,
     ShipResult,
     TradeRouteLeg,
     TradeRouteResult,
@@ -65,6 +66,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(lookup_command)
         self.tree.add_command(ship_command)
         self.tree.add_command(commodity_command)
+        self.tree.add_command(mining_command)
         self.tree.add_command(blueprint_command)
         self.tree.add_command(item_group)
         self.tree.add_command(exec_command)
@@ -366,6 +368,74 @@ async def commodity_system_autocomplete(
     if not matches and normalized:
         matches = [system for system in systems if normalized in system.lower()]
     return [app_commands.Choice(name=system, value=system) for system in matches[:25]]
+
+
+@app_commands.command(name="mining", description="Find where to mine Star Citizen materials.")
+@app_commands.describe(
+    material="Mineable material name or code.",
+    system="Optional star system filter.",
+    planet="Optional planet, moon, lagrange point, or location filter.",
+)
+async def mining_command(
+    interaction: discord.Interaction,
+    material: str,
+    system: str | None = None,
+    planet: str | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    result = await bot.sources.lookup_mining_material(material, system, planet)
+    if result is None:
+        await interaction.followup.send(f"No mining material found for `{material}`.", ephemeral=True)
+        return
+
+    await interaction.followup.send(embed=build_mining_embed(result, system, planet), ephemeral=True)
+
+
+@mining_command.autocomplete("material")
+async def mining_material_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    names = await bot.sources.autocomplete_mining_materials(current)
+    return [
+        app_commands.Choice(name=name[:100], value=name[:100])
+        for name in names[:25]
+    ]
+
+
+@mining_command.autocomplete("system")
+async def mining_system_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    return await commodity_system_autocomplete(interaction, current)
+
+
+@mining_command.autocomplete("planet")
+async def mining_planet_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    namespace = interaction.namespace
+    system = namespace.system if isinstance(getattr(namespace, "system", None), str) else None
+    names = await bot.sources.autocomplete_mining_locations(current, system)
+    return [
+        app_commands.Choice(name=name[:100], value=name[:100])
+        for name in names[:25]
+    ]
 
 
 @app_commands.command(name="blueprint", description="Search Star Citizen crafting blueprints.")
@@ -1388,6 +1458,38 @@ def build_commodity_embed(
     return embed
 
 
+def build_mining_embed(
+    result: MiningLocationResult,
+    system: str | None = None,
+    planet: str | None = None,
+) -> discord.Embed:
+    description = [
+        _line("Code", result.code),
+        _line("Kind", result.kind),
+        _line("System Filter", system),
+        _line("Location Filter", planet),
+        _line("Refined Sell", _format_currency(result.refined_sell_price, "aUEC") if result.refined_sell_price else None),
+        _line("Raw Sell", _format_currency(result.raw_sell_price, "aUEC") if result.raw_sell_price else None),
+    ]
+    flags = _format_mining_flags(result)
+    if flags:
+        description.append(_line("Flags", flags))
+
+    embed = discord.Embed(
+        title=f"{result.material_name} Mining",
+        description="\n".join(line for line in description if line),
+        url=result.source_url,
+        color=discord.Color.dark_gold(),
+    )
+    embed.add_field(name="Star Systems", value=_format_location_group(result.systems), inline=False)
+    embed.add_field(name="Lagrange Points", value=_format_location_group(result.lagrange_points), inline=False)
+    embed.add_field(name="Planets", value=_format_location_group(result.planets), inline=False)
+    embed.add_field(name="Moons", value=_format_location_group(result.moons), inline=False)
+    embed.add_field(name="Points of Interest", value=_format_location_group(result.points_of_interest), inline=False)
+    embed.set_footer(text=f"Source: {result.source_name} mining locations")
+    return embed
+
+
 def build_blueprint_embed(
     result: BlueprintResult,
     name: str | None = None,
@@ -1791,6 +1893,33 @@ def _format_markets(markets: list[CommodityMarket]) -> str:
             break
         lines.append(line)
     return "\n".join(lines)
+
+
+def _format_location_group(locations: list[str]) -> str:
+    if not locations:
+        return "No matching locations found."
+
+    lines = []
+    for location in locations:
+        candidate = "\n".join([*lines, location])
+        if len(candidate) > 1000:
+            lines.append("More locations available in UEX.")
+            break
+        lines.append(location)
+    return "\n".join(lines)
+
+
+def _format_mining_flags(result: MiningLocationResult) -> str | None:
+    flags = []
+    if result.is_harvestable:
+        flags.append("Harvestable")
+    if result.is_volatile_qt:
+        flags.append("QT sensitive")
+    if result.is_volatile_time:
+        flags.append("Time sensitive")
+    if result.is_explosive:
+        flags.append("Explosive")
+    return ", ".join(flags) if flags else None
 
 
 def _format_commodity_estimate(result: CommodityResult, quantity_scu: float) -> str:

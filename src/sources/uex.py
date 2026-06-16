@@ -1,6 +1,7 @@
 from urllib.parse import quote
 
 import aiohttp
+from bs4 import BeautifulSoup
 
 from src.cache import SQLiteCache
 from src.config import Settings
@@ -9,6 +10,7 @@ from src.sources.base import (
     CommodityResult,
     ItemLocatorResult,
     ItemPurchaseLocation,
+    MiningLocationResult,
     TradeRouteLeg,
     TradeRouteResult,
 )
@@ -29,6 +31,7 @@ class UEXSource:
         self._all_item_prices: list[dict] | None = None
         self._buyable_items: list[dict] | None = None
         self._terminals_by_id: dict[str, dict] | None = None
+        self._location_filter_names: list[str] | None = None
 
     async def lookup(self, query: str):
         return None
@@ -89,6 +92,81 @@ class UEXSource:
                 or normalized_query in self._normalize(row.get("code"))
             )
             and self._display_name(row) not in starts
+        ]
+        return (starts + contains)[:limit]
+
+    async def lookup_mining_material(
+        self,
+        material: str,
+        system: str | None = None,
+        planet: str | None = None,
+    ) -> MiningLocationResult | None:
+        commodity = await self._find_mining_material(material)
+        if commodity is None:
+            return None
+
+        system_code = self._mining_system_code(system)
+        slug = self._mining_material_slug(commodity)
+        url = f"https://uexcorp.space/mining/locations/commodity/{slug}/"
+        if system_code:
+            url = f"{url}system/{system_code}/"
+
+        cache_key = f"uex:mining-location:v1:{slug}:system-{system_code or 'all'}"
+        cached = await self._cache.get(cache_key)
+        if cached:
+            result = self._mining_result_from_cache(cached)
+        else:
+            html = await self._fetch_text(url)
+            if not html:
+                return None
+            result = self._parse_mining_location_result(commodity, html, url)
+            await self._cache.set(cache_key, self._mining_result_to_cache(result), self._settings.cache_ttl_seconds)
+
+        return self._filter_mining_result(result, planet)
+
+    async def autocomplete_mining_materials(self, query: str, limit: int = 25) -> list[str]:
+        materials = await self._get_mining_materials()
+        normalized_query = self._normalize(self._strip_code_suffix(query))
+        names = [self._display_name(row) for row in materials]
+
+        if not normalized_query:
+            return names[:limit]
+
+        starts = [
+            self._display_name(row)
+            for row in materials
+            if self._normalize(self._mining_material_base_name(row)).startswith(normalized_query)
+            or self._normalize(row.get("code")).startswith(normalized_query)
+        ]
+        contains = [
+            self._display_name(row)
+            for row in materials
+            if (
+                normalized_query in self._normalize(self._mining_material_base_name(row))
+                or normalized_query in self._normalize(row.get("code"))
+            )
+            and self._display_name(row) not in starts
+        ]
+        return (starts + contains)[:limit]
+
+    async def autocomplete_mining_locations(
+        self,
+        query: str,
+        system: str | None = None,
+        limit: int = 25,
+    ) -> list[str]:
+        del system
+        names = await self._get_location_filter_names()
+        normalized_query = self._normalize(query)
+        if not normalized_query:
+            return names[:limit]
+
+        starts = [name for name in names if self._normalize(name).startswith(normalized_query)]
+        contains = [
+            name
+            for name in names
+            if normalized_query in self._normalize(name)
+            and name not in starts
         ]
         return (starts + contains)[:limit]
 
@@ -268,6 +346,55 @@ class UEXSource:
         await self._cache.set("uex:commodities:v1", self._commodities, 86400)
         return self._commodities
 
+    async def _get_mining_materials(self) -> list[dict]:
+        commodities = await self._get_commodities()
+        materials = [row for row in commodities if self._is_mining_material(row)]
+        return sorted(materials, key=lambda row: self._mining_material_base_name(row).lower())
+
+    async def _find_mining_material(self, query: str) -> dict | None:
+        normalized_query = self._normalize(self._strip_code_suffix(query).replace("(ore)", ""))
+        if not normalized_query:
+            return None
+
+        materials = await self._get_mining_materials()
+        for material in materials:
+            if self._normalize(self._mining_material_base_name(material)) == normalized_query:
+                return material
+        for material in materials:
+            if self._normalize(material.get("code")) == normalized_query:
+                return material
+        for material in materials:
+            if normalized_query in self._normalize(self._mining_material_base_name(material)):
+                return material
+        for material in materials:
+            if normalized_query in self._normalize(material.get("code")):
+                return material
+        return None
+
+    async def _get_location_filter_names(self) -> list[str]:
+        if self._location_filter_names is not None:
+            return self._location_filter_names
+
+        cached = await self._cache.get("uex:mining-location-filters:v1")
+        if isinstance(cached, list) and all(isinstance(name, str) for name in cached):
+            self._location_filter_names = cached
+            return self._location_filter_names
+
+        names: set[str] = set()
+        for endpoint in ["planets", "moons", "orbits", "poi"]:
+            payload = await self._fetch_json(f"{self.base_url}/{endpoint}")
+            rows = payload.get("data") if isinstance(payload, dict) else []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                name = self._string_or_none(row.get("name") or row.get("nickname"))
+                if name:
+                    names.add(name)
+
+        self._location_filter_names = sorted(names, key=str.lower)
+        await self._cache.set("uex:mining-location-filters:v1", self._location_filter_names, 86400)
+        return self._location_filter_names
+
     async def _fetch_prices(self, commodity_name: str) -> list[dict]:
         url = f"{self.base_url}/commodities_prices?commodity_name={quote(commodity_name)}"
         payload = await self._fetch_json(url)
@@ -419,6 +546,14 @@ class UEXSource:
         except (aiohttp.ClientError, ValueError):
             return None
 
+    async def _fetch_text(self, url: str) -> str | None:
+        try:
+            async with self._session.get(url, headers={"Accept": "text/html"}) as response:
+                response.raise_for_status()
+                return await response.text()
+        except aiohttp.ClientError:
+            return None
+
     def _parse_commodity(
         self,
         commodity: dict,
@@ -473,6 +608,118 @@ class UEXSource:
             demand=row.get(demand_key) or row.get(demand_key.replace("_avg", "")) or None,
             game_version=self._string_or_none(row.get("game_version")),
         )
+
+    def _parse_mining_location_result(self, commodity: dict, html: str, source_url: str) -> MiningLocationResult:
+        lines = [
+            line.strip()
+            for line in BeautifulSoup(html, "html.parser").get_text("\n", strip=True).split("\n")
+            if line.strip()
+        ]
+        sections = self._parse_mining_sections(lines)
+        return MiningLocationResult(
+            material_name=self._mining_material_base_name(commodity),
+            code=self._string_or_none(commodity.get("code")),
+            kind=self._string_or_none(commodity.get("kind")),
+            refined_sell_price=commodity.get("price_sell") or None,
+            raw_sell_price=commodity.get("price_buy") or commodity.get("price_sell") or None,
+            is_harvestable=bool(commodity.get("is_harvestable")),
+            is_volatile_qt=bool(commodity.get("is_volatile_qt")),
+            is_volatile_time=bool(commodity.get("is_volatile_time")),
+            is_explosive=bool(commodity.get("is_explosive")),
+            systems=sections["Star Systems"],
+            lagrange_points=sections["Lagrange Points"],
+            planets=sections["Planets"],
+            moons=sections["Moons"],
+            points_of_interest=sections["Points of Interest"],
+            source_url=source_url,
+            source_name=self.name,
+        )
+
+    def _parse_mining_sections(self, lines: list[str]) -> dict[str, list[str]]:
+        section_names = ["Star Systems", "Lagrange Points", "Planets", "Moons", "Points of Interest"]
+        sections: dict[str, list[str]] = {name: [] for name in section_names}
+        active_section: str | None = None
+        seen_routes = False
+
+        for index, line in enumerate(lines):
+            if line == "Routes" and index + 1 < len(lines) and lines[index + 1] == "Star Systems":
+                seen_routes = True
+                active_section = None
+                continue
+            if not seen_routes:
+                continue
+            if line in section_names:
+                active_section = line
+                continue
+            if line.startswith("* Location data") or line in {"Pricing", "Components", "About"}:
+                active_section = None
+                continue
+            if active_section is None or line in {"—", "/ SCU"}:
+                continue
+            if line not in sections[active_section]:
+                sections[active_section].append(line)
+
+        return sections
+
+    def _filter_mining_result(self, result: MiningLocationResult, planet: str | None) -> MiningLocationResult:
+        normalized_planet = self._normalize(planet)
+        if not normalized_planet:
+            return result
+
+        return MiningLocationResult(
+            material_name=result.material_name,
+            code=result.code,
+            kind=result.kind,
+            refined_sell_price=result.refined_sell_price,
+            raw_sell_price=result.raw_sell_price,
+            is_harvestable=result.is_harvestable,
+            is_volatile_qt=result.is_volatile_qt,
+            is_volatile_time=result.is_volatile_time,
+            is_explosive=result.is_explosive,
+            systems=result.systems,
+            lagrange_points=self._filter_location_names(result.lagrange_points, normalized_planet),
+            planets=self._filter_location_names(result.planets, normalized_planet),
+            moons=self._filter_location_names(result.moons, normalized_planet),
+            points_of_interest=self._filter_location_names(result.points_of_interest, normalized_planet),
+            source_url=result.source_url,
+            source_name=result.source_name,
+        )
+
+    def _filter_location_names(self, names: list[str], normalized_filter: str) -> list[str]:
+        return [name for name in names if normalized_filter in self._normalize(name)]
+
+    def _is_mining_material(self, row: dict) -> bool:
+        name = str(row.get("name") or "")
+        return bool(
+            row.get("is_available")
+            and row.get("is_visible")
+            and (
+                row.get("is_raw")
+                or row.get("is_mineral")
+                or name.endswith("(Ore)")
+            )
+            and not row.get("is_inert")
+        )
+
+    def _mining_material_base_name(self, row: dict) -> str:
+        name = str(row.get("name") or "Unknown material")
+        return name.replace(" (Ore)", "").strip()
+
+    def _mining_material_slug(self, row: dict) -> str:
+        name = self._mining_material_base_name(row).lower()
+        slug = "".join(character if character.isalnum() else "-" for character in name)
+        slug = "-".join(part for part in slug.split("-") if part)
+        return f"{slug}-ore" if row.get("is_refinable") or str(row.get("name") or "").endswith("(Ore)") else slug
+
+    def _mining_system_code(self, system: str | None) -> str | None:
+        normalized_system = self._normalize(system)
+        if not normalized_system:
+            return None
+        return {
+            "stanton": "ST",
+            "pyro": "PY",
+            "nyx": "NY",
+        }.get(normalized_system)
 
     def _item_category_is_supported(self, row: dict) -> bool:
         if not self._positive(row.get("is_game_related")):
@@ -930,6 +1177,12 @@ class UEXSource:
         cached["buy_from"] = [CommodityMarket(**market) for market in cached.get("buy_from", [])]
         cached["sell_to"] = [CommodityMarket(**market) for market in cached.get("sell_to", [])]
         return CommodityResult(**cached)
+
+    def _mining_result_to_cache(self, result: MiningLocationResult) -> dict:
+        return result.__dict__.copy()
+
+    def _mining_result_from_cache(self, data: dict) -> MiningLocationResult:
+        return MiningLocationResult(**data)
 
     async def close(self) -> None:
         return None
