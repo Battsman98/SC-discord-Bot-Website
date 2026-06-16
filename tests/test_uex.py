@@ -209,13 +209,13 @@ def test_parse_commodity_can_filter_purchase_and_sell_systems_separately() -> No
     assert [market.terminal_name for market in result.sell_to] == ["Pyro Buyer"]
 
 
-def test_calculate_trade_route_legs_uses_best_profit_and_limits_quantity() -> None:
+def test_calculate_trade_route_legs_builds_best_closed_loop() -> None:
     source = UEXSource.__new__(UEXSource)
     legs = source._calculate_trade_route_legs(
         [
             {
                 "commodity_name": "Gold",
-                "terminal_name": "Stanton Seller",
+                "terminal_name": "A",
                 "price_sell_avg": 100,
                 "status_sell": 1,
                 "scu_sell_stock_avg": 50,
@@ -225,7 +225,7 @@ def test_calculate_trade_route_legs_uses_best_profit_and_limits_quantity() -> No
             },
             {
                 "commodity_name": "Gold",
-                "terminal_name": "Pyro Buyer",
+                "terminal_name": "B",
                 "price_buy_avg": 160,
                 "status_buy": 1,
                 "scu_buy_avg": 30,
@@ -235,7 +235,7 @@ def test_calculate_trade_route_legs_uses_best_profit_and_limits_quantity() -> No
             },
             {
                 "commodity_name": "Diamond",
-                "terminal_name": "Cheap Seller",
+                "terminal_name": "B",
                 "price_sell_avg": 50,
                 "status_sell": 1,
                 "scu_sell_stock_avg": 100,
@@ -245,8 +245,8 @@ def test_calculate_trade_route_legs_uses_best_profit_and_limits_quantity() -> No
             },
             {
                 "commodity_name": "Diamond",
-                "terminal_name": "Weak Buyer",
-                "price_buy_avg": 55,
+                "terminal_name": "A",
+                "price_buy_avg": 80,
                 "status_buy": 1,
                 "scu_buy_avg": 100,
                 "city_name": "Area 18",
@@ -259,15 +259,16 @@ def test_calculate_trade_route_legs_uses_best_profit_and_limits_quantity() -> No
         max_stops=2,
     )
 
+    assert len(legs) == 2
     assert legs[0].commodity_name == "Gold"
     assert legs[0].quantity_scu == 30
     assert legs[0].investment_used == 3000
     assert legs[0].profit == 1800
-    assert legs[0].buy_system == "Stanton"
-    assert legs[0].sell_system == "Pyro"
+    assert legs[0].sell_terminal == legs[1].buy_terminal
+    assert legs[1].sell_terminal == legs[0].buy_terminal
 
 
-def test_calculate_trade_route_legs_filters_purchase_and_sell_systems() -> None:
+def test_calculate_trade_route_legs_returns_empty_when_filters_prevent_loop() -> None:
     source = UEXSource.__new__(UEXSource)
     legs = source._calculate_trade_route_legs(
         [
@@ -311,9 +312,7 @@ def test_calculate_trade_route_legs_filters_purchase_and_sell_systems() -> None:
         sell_system="Pyro",
     )
 
-    assert len(legs) == 1
-    assert legs[0].buy_terminal == "Stanton Seller"
-    assert legs[0].sell_terminal == "Pyro Buyer"
+    assert legs == []
 
 
 def test_enrich_price_rows_adds_terminal_location_details() -> None:

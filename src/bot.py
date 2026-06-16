@@ -361,7 +361,7 @@ trade_group = app_commands.Group(name="trade", description="Trade planning tools
     route_type="Optional route type. Defaults to Circular Route.",
     ship="Ship for route planning.",
     investment="aUEC investment for route planning.",
-    max_stops="Maximum route stops, from 1 to 5.",
+    max_stops="Maximum route stops, from 2 to 5.",
     purchase_system="Optional system filter for purchase locations.",
     sell_system="Optional system filter for sell locations.",
 )
@@ -387,8 +387,8 @@ async def trade_routing_command(
     if investment <= 0:
         await interaction.response.send_message("Investment must be greater than 0 aUEC.", ephemeral=True)
         return
-    if max_stops < 1 or max_stops > 5:
-        await interaction.response.send_message("Max stops must be between 1 and 5.", ephemeral=True)
+    if max_stops < 2 or max_stops > 5:
+        await interaction.response.send_message("Circular routes need max stops between 2 and 5.", ephemeral=True)
         return
 
     await interaction.response.defer(thinking=True, ephemeral=True)
@@ -411,7 +411,7 @@ async def trade_routing_command(
     route_type_name = route_type.name if route_type else "Circular Route"
     if result is None or not result.legs:
         await interaction.followup.send(
-            "No profitable UEX route candidates found for those filters right now.",
+            "No profitable UEX circular route found for those filters right now.",
             ephemeral=True,
         )
         return
@@ -866,8 +866,10 @@ def build_trade_route_embed(
         _line("Cargo", f"{_format_number(result.cargo_capacity_scu)} SCU"),
         _line("Investment", _format_currency(result.investment, "aUEC")),
         _line("Max Stops", str(max_stops)),
+        _line("Estimated Loop Profit", _format_currency(_trade_route_total_profit(result), "aUEC")),
         _line("Purchase System", purchase_system),
         _line("Sell System", sell_system),
+        "Loop: each sell stop is the next buy stop, and the final sell stop returns to the start.",
     ]
     embed = discord.Embed(
         title=route_type,
@@ -877,13 +879,17 @@ def build_trade_route_embed(
 
     for index, leg in enumerate(result.legs, start=1):
         embed.add_field(
-            name=f"{index}. {leg.commodity_name} - {_format_currency(leg.profit, 'aUEC')} profit",
+            name=f"Leg {index}: {leg.commodity_name} - {_format_currency(leg.profit, 'aUEC')} profit",
             value=_format_trade_route_leg(leg),
             inline=False,
         )
 
     embed.set_footer(text=f"Source: {result.source_name} average prices, stock, and demand")
     return embed
+
+
+def _trade_route_total_profit(result: TradeRouteResult) -> float:
+    return sum(float(leg.profit) for leg in result.legs)
 
 
 def _format_trade_route_leg(leg: TradeRouteLeg) -> str:

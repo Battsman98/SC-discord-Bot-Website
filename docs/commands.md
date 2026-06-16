@@ -115,7 +115,7 @@ Options:
 | `route_type` | No | Route type. Defaults to `Circular Route`. |
 | `ship` | No | Ship name for route planning. Defaults to `Ironclad Assault`. |
 | `investment` | No | aUEC investment for route planning. Defaults to `1,000,000`. |
-| `max_stops` | No | Maximum route stops, from 1 to 5. Defaults to `5`. |
+| `max_stops` | No | Maximum route stops, from 2 to 5. Defaults to `5`. |
 | `purchase_system` | No | Filters purchase locations only. |
 | `sell_system` | No | Filters sell locations only. |
 
@@ -132,7 +132,10 @@ Route behavior:
 - Uses UEX average terminal prices, stock, and demand.
 - Uses the selected ship's cargo capacity from the ship lookup data.
 - Limits purchasable SCU by cargo capacity, investment, purchase stock, and sell demand.
-- Shows the highest estimated profit route candidates in Discord.
+- Builds a closed loop where each sell location is the next buy location.
+- The final sell location returns to the starting buy location.
+- Shows the highest estimated profit circular route found in Discord.
+- `purchase_system` and `sell_system` can make a closed loop impossible when they do not overlap.
 - Does not require a SC Trade Tools API token.
 
 ## `/exec`

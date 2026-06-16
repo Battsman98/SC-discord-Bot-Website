@@ -354,19 +354,86 @@ class UEXSource:
                         )
                     )
 
-        candidates.sort(key=lambda leg: float(leg.profit), reverse=True)
-        deduped: list[TradeRouteLeg] = []
-        seen: set[tuple[str, str, str]] = set()
-        for leg in candidates:
-            key = (leg.commodity_name, leg.buy_terminal, leg.sell_terminal)
-            if key in seen:
-                continue
-            seen.add(key)
-            deduped.append(leg)
-            if len(deduped) >= max_stops:
-                break
+        return self._best_circular_route(candidates, max_stops)
 
-        return deduped
+    def _best_circular_route(self, candidates: list[TradeRouteLeg], max_stops: int) -> list[TradeRouteLeg]:
+        max_stops = max(2, max_stops)
+        candidates.sort(key=lambda leg: float(leg.profit), reverse=True)
+
+        best_by_pair: dict[tuple[str, str], TradeRouteLeg] = {}
+        for leg in candidates:
+            key = (self._terminal_key(leg.buy_terminal), self._terminal_key(leg.sell_terminal))
+            current = best_by_pair.get(key)
+            if current is None or float(leg.profit) > float(current.profit):
+                best_by_pair[key] = leg
+
+        outgoing: dict[str, list[TradeRouteLeg]] = {}
+        for leg in best_by_pair.values():
+            outgoing.setdefault(self._terminal_key(leg.buy_terminal), []).append(leg)
+
+        for legs in outgoing.values():
+            legs.sort(key=lambda leg: float(leg.profit), reverse=True)
+            del legs[25:]
+
+        best_route: list[TradeRouteLeg] = []
+        best_profit = 0.0
+        start_candidates = sorted(best_by_pair.values(), key=lambda leg: float(leg.profit), reverse=True)[:1000]
+
+        def route_profit(route: list[TradeRouteLeg]) -> float:
+            return sum(float(leg.profit) for leg in route)
+
+        def search(route: list[TradeRouteLeg], start_terminal: str, visited_terminals: set[str]) -> None:
+            nonlocal best_route, best_profit
+
+            current_terminal = self._terminal_key(route[-1].sell_terminal)
+            if len(route) >= 2 and current_terminal == start_terminal:
+                profit = route_profit(route)
+                if profit > best_profit:
+                    best_profit = profit
+                    best_route = route.copy()
+                return
+
+            if len(route) >= max_stops:
+                return
+
+            used_edges = {
+                (self._terminal_key(leg.buy_terminal), self._terminal_key(leg.sell_terminal), leg.commodity_name)
+                for leg in route
+            }
+            for next_leg in outgoing.get(current_terminal, []):
+                next_terminal = self._terminal_key(next_leg.sell_terminal)
+                edge_key = (
+                    self._terminal_key(next_leg.buy_terminal),
+                    self._terminal_key(next_leg.sell_terminal),
+                    next_leg.commodity_name,
+                )
+                if edge_key in used_edges:
+                    continue
+                if next_terminal in visited_terminals and next_terminal != start_terminal:
+                    continue
+
+                added_terminal = None
+                if next_terminal != start_terminal:
+                    visited_terminals.add(next_terminal)
+                    added_terminal = next_terminal
+                route.append(next_leg)
+                search(route, start_terminal, visited_terminals)
+                route.pop()
+                if added_terminal is not None:
+                    visited_terminals.remove(added_terminal)
+
+        for start_leg in start_candidates:
+            start_terminal = self._terminal_key(start_leg.buy_terminal)
+            first_sell_terminal = self._terminal_key(start_leg.sell_terminal)
+            visited = {start_terminal}
+            if first_sell_terminal != start_terminal:
+                visited.add(first_sell_terminal)
+            search([start_leg], start_terminal, visited)
+
+        return best_route
+
+    def _terminal_key(self, terminal_name: str) -> str:
+        return self._normalize(terminal_name)
 
     def _filter_prices_by_system(self, prices: list[dict], normalized_system: str) -> list[dict]:
         if not normalized_system:
