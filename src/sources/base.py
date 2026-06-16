@@ -103,6 +103,7 @@ class TradeRouteResult:
     investment: int | float
     legs: list[TradeRouteLeg]
     source_name: str
+    requires_empty_return_to_start: bool = False
 
 
 class GameInfoSource(Protocol):

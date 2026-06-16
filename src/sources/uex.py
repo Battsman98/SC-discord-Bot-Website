@@ -96,6 +96,8 @@ class UEXSource:
         prices = await self._fetch_all_prices()
         terminals_by_id = await self._fetch_terminals_by_id()
         enriched_prices = self._enrich_price_rows(prices, terminals_by_id)
+        normalized_start = self._normalize(self._trade_location_value(starting_point))
+        start_keys = self._trade_start_keys(enriched_prices, normalized_start)
         legs = self._calculate_trade_route_legs(
             enriched_prices,
             float(cargo_capacity_scu),
@@ -110,6 +112,8 @@ class UEXSource:
             investment=investment,
             legs=legs,
             source_name=self.name,
+            requires_empty_return_to_start=bool(legs)
+            and self._terminal_key(legs[-1].sell_terminal) not in start_keys,
         )
 
     async def autocomplete_trade_locations(self, query: str, limit: int = 25) -> list[str]:
@@ -476,6 +480,61 @@ class UEXSource:
                 visited.add(first_sell_terminal)
             search([start_leg], start_terminal, visited)
 
+        if best_route:
+            return best_route
+
+        return self._best_route_with_empty_return(start_candidates, outgoing, max_stops)
+
+    def _best_route_with_empty_return(
+        self,
+        start_candidates: list[TradeRouteLeg],
+        outgoing: dict[str, list[TradeRouteLeg]],
+        max_stops: int,
+    ) -> list[TradeRouteLeg]:
+        best_route: list[TradeRouteLeg] = []
+        best_profit = 0.0
+
+        def route_profit(route: list[TradeRouteLeg]) -> float:
+            return sum(float(leg.profit) for leg in route)
+
+        def search(route: list[TradeRouteLeg], visited_terminals: set[str]) -> None:
+            nonlocal best_route, best_profit
+
+            profit = route_profit(route)
+            if profit > best_profit:
+                best_profit = profit
+                best_route = route.copy()
+
+            if len(route) >= max_stops:
+                return
+
+            used_edges = {
+                (self._terminal_key(leg.buy_terminal), self._terminal_key(leg.sell_terminal), leg.commodity_name)
+                for leg in route
+            }
+            current_terminal = self._terminal_key(route[-1].sell_terminal)
+            for next_leg in outgoing.get(current_terminal, []):
+                next_terminal = self._terminal_key(next_leg.sell_terminal)
+                edge_key = (
+                    self._terminal_key(next_leg.buy_terminal),
+                    self._terminal_key(next_leg.sell_terminal),
+                    next_leg.commodity_name,
+                )
+                if edge_key in used_edges or next_terminal in visited_terminals:
+                    continue
+
+                visited_terminals.add(next_terminal)
+                route.append(next_leg)
+                search(route, visited_terminals)
+                route.pop()
+                visited_terminals.remove(next_terminal)
+
+        for start_leg in start_candidates:
+            start_terminal = self._terminal_key(start_leg.buy_terminal)
+            first_sell_terminal = self._terminal_key(start_leg.sell_terminal)
+            visited = {start_terminal, first_sell_terminal}
+            search([start_leg], visited)
+
         return best_route
 
     def _terminal_key(self, terminal_name: str) -> str:
@@ -497,7 +556,12 @@ class UEXSource:
                 self._normalize(self._trade_location_display(row)),
                 self._normalize(self._trade_location_value(self._trade_location_display(row))),
             }
-            if normalized_start in aliases:
+            if any(
+                normalized_start == alias
+                or normalized_start in alias
+                or (len(alias) >= 5 and alias in normalized_start)
+                for alias in aliases
+            ):
                 start_keys.add(self._terminal_key(terminal_name))
         return {key for key in start_keys if key}
 

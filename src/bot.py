@@ -876,6 +876,11 @@ def build_trade_route_embed(
     max_stops: int,
     stay_system: str | None = None,
 ) -> discord.Embed:
+    loop_line = (
+        "Loop: each sell stop is the next buy stop, and the final sell stop returns to the start."
+        if not result.requires_empty_return_to_start
+        else "Loop: trade legs are chained, then return empty to the starting point because UEX does not list it as a buyer."
+    )
     description = [
         _line("Ship", result.ship),
         _line("Starting Point", starting_point),
@@ -884,7 +889,7 @@ def build_trade_route_embed(
         _line("Max Stops", str(max_stops)),
         _line("Estimated Loop Profit", _format_currency(_trade_route_total_profit(result), "aUEC")),
         _line("Stay In System", stay_system),
-        "Loop: each sell stop is the next buy stop, and the final sell stop returns to the start.",
+        loop_line,
     ]
     embed = discord.Embed(
         title=route_type,
@@ -896,6 +901,19 @@ def build_trade_route_embed(
         embed.add_field(
             name=f"Leg {index}: {leg.commodity_name} - {_format_currency(leg.profit, 'aUEC')} profit",
             value=_format_trade_route_leg(leg),
+            inline=False,
+        )
+
+    if result.requires_empty_return_to_start and result.legs:
+        final_location = _format_route_location(
+            result.legs[-1].sell_system,
+            result.legs[-1].sell_planet,
+            result.legs[-1].sell_location,
+            result.legs[-1].sell_terminal,
+        )
+        embed.add_field(
+            name="Return",
+            value=f"Fly empty from {final_location} back to {starting_point}.",
             inline=False,
         )
 

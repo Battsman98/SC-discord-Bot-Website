@@ -458,6 +458,60 @@ def test_calculate_trade_route_legs_matches_location_alias_as_start() -> None:
     assert legs[-1].sell_terminal == "ArcCorp 045"
 
 
+def test_calculate_trade_route_legs_falls_back_to_empty_return_route() -> None:
+    source = UEXSource.__new__(UEXSource)
+    legs = source._calculate_trade_route_legs(
+        [
+            {
+                "commodity_name": "Scrap",
+                "terminal_name": "Brio's Breaker",
+                "outpost_name": "Brio's Breaker Yard",
+                "price_sell_avg": 10,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Scrap",
+                "terminal_name": "Area 18",
+                "city_name": "Area 18",
+                "price_buy_avg": 100,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Processed Food",
+                "terminal_name": "Area 18",
+                "city_name": "Area 18",
+                "price_sell_avg": 20,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Processed Food",
+                "terminal_name": "Lorville",
+                "city_name": "Lorville",
+                "price_buy_avg": 50,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+        ],
+        cargo_capacity_scu=10,
+        investment=10_000,
+        max_stops=5,
+        starting_point="Brio's Break",
+        stay_system="Stanton",
+    )
+
+    assert len(legs) == 2
+    assert legs[0].buy_terminal == "Brio's Breaker"
+    assert legs[-1].sell_terminal == "Lorville"
+    assert sum(float(leg.profit) for leg in legs) == 1200
+
+
 def test_enrich_price_rows_adds_terminal_location_details() -> None:
     source = UEXSource.__new__(UEXSource)
 
