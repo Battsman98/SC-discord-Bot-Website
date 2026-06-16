@@ -28,6 +28,16 @@ See `docs/commands.md` for the full command reference.
 
 Set `COMMANDS_CHANNEL_ID` in `.env` to have the bot auto-post/update the command reference in a Discord channel on startup.
 
+Set `COMMAND_CHANNEL_IDS` in `.env` to restrict commands to specific Discord channels. Use command names without the leading slash:
+
+```env
+COMMAND_CHANNEL_IDS=ship:111111111111111111,commodity:222222222222222222,trade routing:333333333333333333,item locator:444444444444444444
+```
+
+Commands not listed in `COMMAND_CHANNEL_IDS` can be used in any channel.
+
+Set `AUDIT_LOG_CHANNEL_ID` in `.env` to post a remote audit view of command usage, blocked command attempts, and manual changes such as Executive Hangar corrections, CZ timer updates, and community mining location additions.
+
 Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive Hangar status message updated every 60 seconds.
 
 Set comma-separated `EXEC_ADMIN_ROLE_IDS` in `.env` to restrict `/execset` and `/execclear` to specific Discord roles. If no role IDs are configured, users with Manage Server can use those commands.

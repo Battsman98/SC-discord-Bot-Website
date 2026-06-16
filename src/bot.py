@@ -46,6 +46,44 @@ CZ_TIMER_DEFINITIONS = {
 }
 
 
+class GameAssistCommandTree(app_commands.CommandTree):
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        bot = self.client
+        if not isinstance(bot, GameAssistBot):
+            return True
+
+        command_name = _interaction_command_name(interaction)
+        allowed_channel_id = bot.settings.command_channel_ids.get(command_name)
+        if allowed_channel_id and interaction.channel_id != allowed_channel_id:
+            await bot.log_audit_event(
+                "Command Blocked",
+                {
+                    "Command": f"/{command_name}",
+                    "User": _audit_user(interaction.user),
+                    "Used In": _audit_channel(interaction.channel_id),
+                    "Allowed Channel": f"<#{allowed_channel_id}>",
+                    "Options": _format_interaction_options(interaction) or "None",
+                },
+                color=discord.Color.red(),
+            )
+            await interaction.response.send_message(
+                f"`/{command_name}` can only be used in <#{allowed_channel_id}>.",
+                ephemeral=True,
+            )
+            return False
+
+        await bot.log_audit_event(
+            "Command Used",
+            {
+                "Command": f"/{command_name}",
+                "User": _audit_user(interaction.user),
+                "Channel": _audit_channel(interaction.channel_id),
+                "Options": _format_interaction_options(interaction) or "None",
+            },
+        )
+        return True
+
+
 class GameAssistBot(commands.Bot):
     def __init__(self, settings: Settings, cache: SQLiteCache, sources: SourceRegistry) -> None:
         intents = discord.Intents.default()
@@ -55,6 +93,7 @@ class GameAssistBot(commands.Bot):
             command_prefix=settings.command_prefix,
             intents=intents,
             help_command=None,
+            tree_cls=GameAssistCommandTree,
         )
         self.settings = settings
         self.cache = cache
@@ -264,6 +303,96 @@ class GameAssistBot(commands.Bot):
         await self.sources.close()
         await self.cache.close()
         await super().close()
+
+    async def log_audit_event(
+        self,
+        title: str,
+        fields: dict[str, object],
+        color: discord.Color = discord.Color.blurple(),
+    ) -> None:
+        if not self.settings.audit_log_channel_id:
+            return
+
+        try:
+            channel = await self.fetch_channel(self.settings.audit_log_channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.warning("Could not access AUDIT_LOG_CHANNEL_ID %s", self.settings.audit_log_channel_id)
+            return
+
+        if not isinstance(channel, discord.abc.Messageable):
+            logging.warning("AUDIT_LOG_CHANNEL_ID does not point to a messageable channel")
+            return
+
+        embed = discord.Embed(title=title, color=color, timestamp=discord.utils.utcnow())
+        for name, value in fields.items():
+            embed.add_field(name=name, value=_truncate_audit_value(value), inline=False)
+
+        try:
+            await channel.send(embed=embed)
+        except discord.HTTPException:
+            logging.warning("Could not send audit log event: %s", title)
+
+
+
+def _interaction_command_name(interaction: discord.Interaction) -> str:
+    data = interaction.data if isinstance(interaction.data, dict) else {}
+    names = [str(data.get("name") or "unknown")]
+    options = data.get("options")
+
+    while isinstance(options, list) and options:
+        option = options[0]
+        if not isinstance(option, dict) or option.get("type") not in (1, 2):
+            break
+        names.append(str(option.get("name") or "unknown"))
+        options = option.get("options")
+
+    return _normalize_command_name(" ".join(names))
+
+
+def _normalize_command_name(value: str) -> str:
+    return " ".join(value.lower().strip().removeprefix("/").replace("_", " ").split())
+
+
+def _format_interaction_options(interaction: discord.Interaction) -> str:
+    data = interaction.data if isinstance(interaction.data, dict) else {}
+    options = _flatten_interaction_options(data.get("options"))
+    if not options:
+        return ""
+
+    text = "\n".join(f"{name}: {value}" for name, value in options)
+    return text if len(text) <= 900 else f"{text[:897].rstrip()}..."
+
+
+def _flatten_interaction_options(options: object, prefix: str = "") -> list[tuple[str, object]]:
+    if not isinstance(options, list):
+        return []
+
+    flattened: list[tuple[str, object]] = []
+    for option in options:
+        if not isinstance(option, dict):
+            continue
+        name = str(option.get("name") or "unknown")
+        full_name = f"{prefix}.{name}" if prefix else name
+        nested_options = option.get("options")
+        if isinstance(nested_options, list):
+            flattened.extend(_flatten_interaction_options(nested_options, full_name))
+            continue
+        if "value" in option:
+            flattened.append((full_name, option["value"]))
+    return flattened
+
+
+def _audit_user(user: discord.abc.User) -> str:
+    return f"{user} (`{user.id}`)"
+
+
+def _audit_channel(channel_id: int | None) -> str:
+    return f"<#{channel_id}>" if channel_id else "Unknown"
+
+
+def _truncate_audit_value(value: object) -> str:
+    text = str(value)
+    return text if len(text) <= 1024 else f"{text[:1021].rstrip()}..."
 
 
 @app_commands.command(name="status", description="Check whether the assistance bot is online.")
@@ -497,6 +626,18 @@ async def miningadd_command(
         "reported_by": str(interaction.user),
     }
     await add_community_mining_location(bot.cache, entry)
+    await bot.log_audit_event(
+        "Mining Location Added",
+        {
+            "User": _audit_user(interaction.user),
+            "Channel": _audit_channel(interaction.channel_id),
+            "Material": result.material_name,
+            "System": system.strip(),
+            "Location Type": location_type.name,
+            "Location": location.strip(),
+        },
+        color=discord.Color.green(),
+    )
     await interaction.followup.send(
         f"Added `{location.strip()}` to `{result.material_name}` mining locations in `{system.strip()}`.",
         ephemeral=True,
@@ -1233,6 +1374,16 @@ async def execset_command(
         315360000,
     )
     await bot.sync_exec_status_message()
+    await bot.log_audit_event(
+        "Executive Timer Corrected",
+        {
+            "User": _audit_user(interaction.user),
+            "Channel": _audit_channel(interaction.channel_id),
+            "Phase": phase.name,
+            "Remaining Minutes": remaining_minutes,
+        },
+        color=discord.Color.gold(),
+    )
     await interaction.response.send_message("Executive Hangar timer override saved and status message updated.", ephemeral=True)
 
 
@@ -1249,6 +1400,14 @@ async def execclear_command(interaction: discord.Interaction) -> None:
 
     await bot.cache.delete(EXEC_OVERRIDE_CACHE_KEY)
     await bot.sync_exec_status_message()
+    await bot.log_audit_event(
+        "Executive Timer Override Cleared",
+        {
+            "User": _audit_user(interaction.user),
+            "Channel": _audit_channel(interaction.channel_id),
+        },
+        color=discord.Color.gold(),
+    )
     await interaction.response.send_message("Executive Hangar timer override cleared. Using community timer source again.", ephemeral=True)
 
 
@@ -1436,6 +1595,16 @@ async def handle_cz_timer_button(
     await set_cz_dashboard_timers(bot.cache, timers)
     embed = build_cz_dashboard_embed(timers)
     await interaction.response.edit_message(embed=embed, view=CZTimerDashboardView())
+    await bot.log_audit_event(
+        "CZ Timer Updated",
+        {
+            "User": _audit_user(interaction.user),
+            "Channel": _audit_channel(interaction.channel_id),
+            "Action": action,
+            "Timer": CZ_TIMER_DEFINITIONS[timer_key][0] if timer_key in CZ_TIMER_DEFINITIONS else "All",
+        },
+        color=discord.Color.orange(),
+    )
     await interaction.followup.send(message, ephemeral=True)
 
 
