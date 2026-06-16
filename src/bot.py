@@ -1475,6 +1475,7 @@ def build_mining_embed(
         _line("Kind", result.kind),
         _line("System Filter", system),
         _line("Location Filter", planet),
+        _line("Location Basis", result.location_basis),
         _line("Refined Sell", _format_currency(result.refined_sell_price, "aUEC") if result.refined_sell_price else None),
         _line("Raw Sell", _format_currency(result.raw_sell_price, "aUEC") if result.raw_sell_price else None),
     ]

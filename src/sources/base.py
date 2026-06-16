@@ -96,6 +96,7 @@ class MiningLocationResult:
     points_of_interest: list[str]
     source_url: str
     source_name: str
+    location_basis: str | None = None
 
 
 @dataclass(frozen=True)

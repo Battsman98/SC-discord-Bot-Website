@@ -104,7 +104,7 @@ Examples:
 
 ## `/mining`
 
-Finds where to mine Star Citizen materials using UEX mining data.
+Finds where to mine Star Citizen materials using UEX mining data, with automatic shared-deposit fallback data when direct locations are limited.
 
 Response visibility: private to the user.
 
@@ -132,6 +132,11 @@ Current output:
 - Planets
 - Moons
 - Points of interest
+
+Location logic:
+
+- Uses direct UEX mining locations when available.
+- If direct locations are empty for the selected filters, uses shared rock/deposit composition data to surface locations from materials that can appear in the same deposit.
 
 Examples:
 

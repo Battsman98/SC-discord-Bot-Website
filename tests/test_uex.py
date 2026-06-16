@@ -192,6 +192,63 @@ def test_parse_mining_location_result_groups_locations() -> None:
     assert result.points_of_interest == ["Pyro Clusters"]
 
 
+def test_parse_mining_mom_associations_links_shared_deposit_materials() -> None:
+    source = UEXSource.__new__(UEXSource)
+    script = '''
+    "00000000-0000-0000-0000-000000000001":{id:"00000000-0000-0000-0000-000000000001",elementClusterFactor:.1,mineableResource:"Borase",resourceType:"commodity-borase"},
+    "00000000-0000-0000-0000-000000000002":{id:"00000000-0000-0000-0000-000000000002",elementClusterFactor:.1,mineableResource:"Bexalite",resourceType:"commodity-bexalite"},
+    "00000000-0000-0000-0000-000000000003":{id:"00000000-0000-0000-0000-000000000003",elementClusterFactor:.1,mineableResource:"Gold",resourceType:"commodity-gold"},
+    compositionArray:{MineableCompositionPart:[
+        {mineableElement:"00000000-0000-0000-0000-000000000001",probability:.1},
+        {mineableElement:"00000000-0000-0000-0000-000000000002",probability:.1},
+        {mineableElement:"00000000-0000-0000-0000-000000000003",probability:.1}
+    ]},depositName:"@hud_mining_rock_name_1",minimumDistinctElements:2
+    '''
+
+    associations = source._parse_mining_mom_associations(script)
+
+    assert associations["borase"] == ["Bexalite", "Gold"]
+    assert associations["bexalite"] == ["Borase", "Gold"]
+
+
+def test_mining_material_slug_preserves_raw_suffix() -> None:
+    source = UEXSource.__new__(UEXSource)
+
+    assert source._mining_material_slug({"name": "Bexalite (Raw)", "is_refinable": 1}) == "bexalite-raw"
+    assert source._mining_material_slug({"name": "Gold (Ore)", "is_refinable": 1}) == "gold-ore"
+
+
+def test_merge_mining_location_results_keeps_primary_material() -> None:
+    source = UEXSource.__new__(UEXSource)
+    primary = source._parse_mining_location_result(
+        {"name": "Borase (Ore)", "code": "BORA"},
+        "<html><body><a>Routes</a><h3>Star Systems</h3></body></html>",
+        "https://uexcorp.space/mining/locations/commodity/borase-ore/",
+    )
+    secondary = source._parse_mining_location_result(
+        {"name": "Bexalite (Raw)", "code": "BEXA"},
+        """
+        <html><body>
+        <a>Routes</a>
+        <h3>Star Systems</h3><p>Stanton</p>
+        <h3>Lagrange Points</h3><p>CRU-L1</p>
+        <h3>Planets</h3><p>Crusader</p>
+        <h3>Moons</h3><p>Daymar</p>
+        </body></html>
+        """,
+        "https://uexcorp.space/mining/locations/commodity/bexalite/",
+    )
+
+    merged = source._merge_mining_location_results(primary, secondary)
+
+    assert merged.material_name == "Borase"
+    assert merged.code == "BORA"
+    assert merged.systems == ["Stanton"]
+    assert merged.lagrange_points == ["CRU-L1"]
+    assert merged.planets == ["Crusader"]
+    assert merged.moons == ["Daymar"]
+
+
 def test_parse_commodity_filters_by_system_before_limiting() -> None:
     source = UEXSource.__new__(UEXSource)
     result = source._parse_commodity(
