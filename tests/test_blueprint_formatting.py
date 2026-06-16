@@ -2,15 +2,68 @@ from src.bot import (
     _blueprint_mission_page_count,
     _blueprint_result_label,
     _format_blueprint_missions,
+    _format_mining_location_page,
     _format_rock_signatures,
+    build_mining_embed,
 )
-from src.sources.base import BlueprintMission, BlueprintResult
+from src.sources.base import BlueprintMission, BlueprintResult, MiningLocationResult, MiningSystemLocations
 
 
 def test_format_rock_signatures_shows_clusters_to_six() -> None:
     text = _format_rock_signatures([3185])
 
     assert text == "3,185: 1x 3,185 | 2x 6,370 | 3x 9,555 | 4x 12,740 | 5x 15,925 | 6x 19,110"
+
+
+def test_build_mining_embed_groups_locations_and_omits_kind() -> None:
+    result = MiningLocationResult(
+        material_name="Borase",
+        code="BORA",
+        kind="Metal",
+        refined_sell_price=None,
+        raw_sell_price=None,
+        is_harvestable=False,
+        is_volatile_qt=False,
+        is_volatile_time=False,
+        is_explosive=False,
+        systems=["Pyro", "Stanton"],
+        lagrange_points=[],
+        planets=[],
+        moons=[],
+        points_of_interest=[],
+        source_url="https://uexcorp.space/mining/locations/commodity/borase-ore/",
+        source_name="UEX",
+        rock_signatures=[3570],
+        location_groups=[
+            MiningSystemLocations(
+                system="Stanton",
+                lagrange_points=["HUR-L1"],
+                planets=[],
+                moons=[],
+                points_of_interest=[],
+            ),
+            MiningSystemLocations(
+                system="Pyro",
+                lagrange_points=[],
+                planets=["Bloom"],
+                moons=["Fuego"],
+                points_of_interest=["Pyro Clusters"],
+            ),
+        ],
+    )
+
+    embed = build_mining_embed(result)
+    locations = _format_mining_location_page(result)
+
+    assert "Code: BORA" in embed.description
+    assert "Rock Signatures: 3,570:" in embed.description
+    assert "Kind" not in embed.description
+    assert "**Stanton**" in locations
+    assert "Lagrange Points: HUR-L1" in locations
+    assert "**Pyro**" in locations
+    assert "Planets: Bloom" in locations
+    assert len(embed.fields) == 1
+    assert embed.fields[0].name == "Mining Locations"
 
 
 def test_format_blueprint_missions_uses_simple_ordered_fields() -> None:

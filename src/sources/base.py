@@ -79,6 +79,15 @@ class CommodityResult:
 
 
 @dataclass(frozen=True)
+class MiningSystemLocations:
+    system: str
+    lagrange_points: list[str]
+    planets: list[str]
+    moons: list[str]
+    points_of_interest: list[str]
+
+
+@dataclass(frozen=True)
 class MiningLocationResult:
     material_name: str
     code: str | None
@@ -98,6 +107,7 @@ class MiningLocationResult:
     source_name: str
     location_basis: str | None = None
     rock_signatures: list[int] | None = None
+    location_groups: list[MiningSystemLocations] | None = None
 
 
 @dataclass(frozen=True)

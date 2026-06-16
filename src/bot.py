@@ -35,6 +35,7 @@ EXEC_OVERRIDE_CACHE_KEY = "exec:cycle-start-override"
 CZ_TIMERS_CACHE_KEY = "cz:dashboard:timers"
 BLUEPRINT_PAGE_SIZE = 25
 BLUEPRINT_MISSION_LINES_PER_PAGE = 25
+MINING_LOCATION_LINES_PER_PAGE = 25
 CZ_TIMER_DEFINITIONS = {
     "blue_keycard": ("Blue Keycards", 15 * 60),
     "compboard": ("Compboards / Tablets", 30 * 60),
@@ -400,7 +401,8 @@ async def mining_command(
         await interaction.followup.send(f"No mining material found for `{material}`.", ephemeral=True)
         return
 
-    await interaction.followup.send(embed=build_mining_embed(result, system, planet), ephemeral=True)
+    view = MiningLocationView(result, system, planet) if _mining_location_page_count(result) > 1 else None
+    await interaction.followup.send(embed=build_mining_embed(result, system, planet), view=view, ephemeral=True)
 
 
 @mining_command.autocomplete("material")
@@ -443,6 +445,47 @@ async def mining_planet_autocomplete(
         app_commands.Choice(name=name[:100], value=name[:100])
         for name in names[:25]
     ]
+
+
+class MiningLocationView(discord.ui.View):
+    def __init__(
+        self,
+        result: MiningLocationResult,
+        system: str | None = None,
+        planet: str | None = None,
+        page: int = 1,
+    ) -> None:
+        super().__init__(timeout=300)
+        self.result = result
+        self.system = system
+        self.planet = planet
+        self.page = page
+        self._sync_buttons()
+
+    def _sync_buttons(self) -> None:
+        page_count = _mining_location_page_count(self.result)
+        self.previous_page.disabled = self.page <= 1
+        self.next_page.disabled = self.page >= page_count
+
+    @discord.ui.button(label="Previous Page", style=discord.ButtonStyle.secondary, row=0)
+    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        self.page = max(1, self.page - 1)
+        self._sync_buttons()
+        await interaction.response.edit_message(
+            embed=build_mining_embed(self.result, self.system, self.planet, page=self.page),
+            view=self,
+        )
+
+    @discord.ui.button(label="Next Page", style=discord.ButtonStyle.secondary, row=0)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        self.page = min(_mining_location_page_count(self.result), self.page + 1)
+        self._sync_buttons()
+        await interaction.response.edit_message(
+            embed=build_mining_embed(self.result, self.system, self.planet, page=self.page),
+            view=self,
+        )
 
 
 @app_commands.command(name="blueprint", description="Search Star Citizen crafting blueprints.")
@@ -1469,10 +1512,11 @@ def build_mining_embed(
     result: MiningLocationResult,
     system: str | None = None,
     planet: str | None = None,
+    page: int = 1,
 ) -> discord.Embed:
     description = [
         _line("Code", result.code),
-        _line("Kind", result.kind),
+        _line("Rock Signatures", _format_rock_signatures(result.rock_signatures)),
         _line("System Filter", system),
         _line("Location Filter", planet),
         _line("Location Basis", result.location_basis),
@@ -1489,12 +1533,11 @@ def build_mining_embed(
         url=result.source_url,
         color=discord.Color.dark_gold(),
     )
-    embed.add_field(name="Star Systems", value=_format_location_group(result.systems), inline=False)
-    embed.add_field(name="Lagrange Points", value=_format_location_group(result.lagrange_points), inline=False)
-    embed.add_field(name="Planets", value=_format_location_group(result.planets), inline=False)
-    embed.add_field(name="Moons", value=_format_location_group(result.moons), inline=False)
-    embed.add_field(name="Points of Interest", value=_format_location_group(result.points_of_interest), inline=False)
-    embed.add_field(name="Rock Signatures", value=_format_rock_signatures(result.rock_signatures), inline=False)
+    page_count = _mining_location_page_count(result)
+    field_name = "Mining Locations"
+    if page_count > 1:
+        field_name = f"{field_name} (Page {page}/{page_count})"
+    embed.add_field(name=field_name, value=_format_mining_location_page(result, page), inline=False)
     embed.set_footer(text=f"Source: {result.source_name} mining locations")
     return embed
 
@@ -1943,6 +1986,67 @@ def _format_location_group(locations: list[str]) -> str:
             break
         lines.append(location)
     return "\n".join(lines)
+
+
+def _mining_location_lines(result: MiningLocationResult) -> list[str]:
+    groups = result.location_groups or []
+    if not groups and result.systems:
+        groups = [
+            type(
+                "MiningLocationGroup",
+                (),
+                {
+                    "system": "All Systems",
+                    "lagrange_points": result.lagrange_points,
+                    "planets": result.planets,
+                    "moons": result.moons,
+                    "points_of_interest": result.points_of_interest,
+                },
+            )()
+        ]
+
+    lines: list[str] = []
+    for group in groups:
+        detail_lines = [
+            _mining_location_detail_line("Lagrange Points", group.lagrange_points),
+            _mining_location_detail_line("Planets", group.planets),
+            _mining_location_detail_line("Moons", group.moons),
+            _mining_location_detail_line("Points of Interest", group.points_of_interest),
+        ]
+        detail_lines = [line for line in detail_lines if line]
+        if not detail_lines:
+            continue
+        if lines:
+            lines.append("")
+        lines.append(f"**{group.system}**")
+        lines.extend(detail_lines)
+
+    return lines or ["No matching locations found."]
+
+
+def _mining_location_detail_line(label: str, locations: list[str]) -> str | None:
+    if not locations:
+        return None
+    return f"{label}: {', '.join(locations)}"
+
+
+def _mining_location_pages(result: MiningLocationResult) -> list[list[str]]:
+    lines = _mining_location_lines(result)
+    pages = [
+        lines[index : index + MINING_LOCATION_LINES_PER_PAGE]
+        for index in range(0, len(lines), MINING_LOCATION_LINES_PER_PAGE)
+    ]
+    return pages or [["No matching locations found."]]
+
+
+def _mining_location_page_count(result: MiningLocationResult) -> int:
+    return len(_mining_location_pages(result))
+
+
+def _format_mining_location_page(result: MiningLocationResult, page: int = 1) -> str:
+    pages = _mining_location_pages(result)
+    page = max(1, min(page, len(pages)))
+    return _limit_lines(pages[page - 1], 1000)
 
 
 def _format_mining_flags(result: MiningLocationResult) -> str | None:

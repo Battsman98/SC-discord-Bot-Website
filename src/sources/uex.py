@@ -12,6 +12,7 @@ from src.sources.base import (
     ItemLocatorResult,
     ItemPurchaseLocation,
     MiningLocationResult,
+    MiningSystemLocations,
     TradeRouteLeg,
     TradeRouteResult,
 )
@@ -113,6 +114,7 @@ class UEXSource:
         if result is None:
             return None
         result = await self._with_mining_signatures(result, commodity)
+        result = await self._with_mining_location_groups(result, commodity, system_code)
 
         filtered_result = self._filter_mining_result(result, planet)
         if self._has_mining_locations(filtered_result):
@@ -647,6 +649,49 @@ class UEXSource:
             source_name=result.source_name,
             location_basis=result.location_basis,
             rock_signatures=signatures,
+            location_groups=result.location_groups or [],
+        )
+
+    async def _with_mining_location_groups(
+        self,
+        result: MiningLocationResult,
+        commodity: dict,
+        system_code: str | None,
+    ) -> MiningLocationResult:
+        if system_code:
+            groups = [self._mining_system_group(result, self._mining_system_name(system_code))]
+        else:
+            groups = []
+            for system in sorted(result.systems, key=self._mining_system_sort_key):
+                code = self._mining_system_code(system)
+                if code is None:
+                    groups.append(self._mining_system_group(result, system))
+                    continue
+                system_result = await self._fetch_mining_location_result(commodity, code)
+                if system_result is None:
+                    continue
+                groups.append(self._mining_system_group(system_result, system))
+
+        return MiningLocationResult(
+            material_name=result.material_name,
+            code=result.code,
+            kind=result.kind,
+            refined_sell_price=result.refined_sell_price,
+            raw_sell_price=result.raw_sell_price,
+            is_harvestable=result.is_harvestable,
+            is_volatile_qt=result.is_volatile_qt,
+            is_volatile_time=result.is_volatile_time,
+            is_explosive=result.is_explosive,
+            systems=result.systems,
+            lagrange_points=result.lagrange_points,
+            planets=result.planets,
+            moons=result.moons,
+            points_of_interest=result.points_of_interest,
+            source_url=result.source_url,
+            source_name=result.source_name,
+            location_basis=result.location_basis,
+            rock_signatures=result.rock_signatures or [],
+            location_groups=groups,
         )
 
     async def _get_mining_signatures(self, material_name: str) -> list[int]:
@@ -759,6 +804,7 @@ class UEXSource:
             source_name="UEX + Star Citizen Mining Mom",
             location_basis=basis,
             rock_signatures=merged.rock_signatures or [],
+            location_groups=merged.location_groups or [],
         )
 
     async def _get_associated_mining_material_names(self, material_name: str) -> list[str]:
@@ -862,6 +908,7 @@ class UEXSource:
             source_url=source_url,
             source_name=self.name,
             rock_signatures=[],
+            location_groups=[],
         )
 
     def _parse_mining_sections(self, lines: list[str]) -> dict[str, list[str]]:
@@ -914,6 +961,16 @@ class UEXSource:
             source_name=result.source_name,
             location_basis=result.location_basis,
             rock_signatures=result.rock_signatures or [],
+            location_groups=[
+                MiningSystemLocations(
+                    system=group.system,
+                    lagrange_points=self._filter_location_names(group.lagrange_points, normalized_planet),
+                    planets=self._filter_location_names(group.planets, normalized_planet),
+                    moons=self._filter_location_names(group.moons, normalized_planet),
+                    points_of_interest=self._filter_location_names(group.points_of_interest, normalized_planet),
+                )
+                for group in result.location_groups or []
+            ],
         )
 
     def _has_mining_locations(self, result: MiningLocationResult) -> bool:
@@ -951,6 +1008,7 @@ class UEXSource:
             source_name=primary.source_name,
             location_basis=primary.location_basis,
             rock_signatures=primary.rock_signatures or [],
+            location_groups=primary.location_groups or [],
         )
 
     def _merge_location_names(self, first: list[str], second: list[str]) -> list[str]:
@@ -958,6 +1016,31 @@ class UEXSource:
         for name in [*first, *second]:
             names.setdefault(self._normalize(name), name)
         return sorted(names.values(), key=str.lower)
+
+    def _mining_system_group(self, result: MiningLocationResult, system: str) -> MiningSystemLocations:
+        return MiningSystemLocations(
+            system=system,
+            lagrange_points=result.lagrange_points,
+            planets=result.planets,
+            moons=result.moons,
+            points_of_interest=result.points_of_interest,
+        )
+
+    def _mining_system_name(self, system_code: str) -> str:
+        return {
+            "ST": "Stanton",
+            "PY": "Pyro",
+            "NY": "Nyx",
+        }.get(system_code, system_code)
+
+    def _mining_system_sort_key(self, system: str) -> tuple[int, str]:
+        order = {
+            "stanton": 0,
+            "pyro": 1,
+            "nyx": 2,
+        }
+        normalized = self._normalize(system)
+        return order.get(normalized, 99), normalized
 
     def _filter_location_names(self, names: list[str], normalized_filter: str) -> list[str]:
         return [name for name in names if normalized_filter in self._normalize(name)]
@@ -1465,12 +1548,22 @@ class UEXSource:
         return CommodityResult(**cached)
 
     def _mining_result_to_cache(self, result: MiningLocationResult) -> dict:
-        return result.__dict__.copy()
+        data = result.__dict__.copy()
+        data["location_groups"] = [
+            group.__dict__.copy()
+            for group in result.location_groups or []
+        ]
+        return data
 
     def _mining_result_from_cache(self, data: dict) -> MiningLocationResult:
         cached = data.copy()
         cached.setdefault("location_basis", None)
         cached.setdefault("rock_signatures", [])
+        cached["location_groups"] = [
+            MiningSystemLocations(**group)
+            for group in cached.get("location_groups", [])
+            if isinstance(group, dict)
+        ]
         return MiningLocationResult(**cached)
 
     async def close(self) -> None:

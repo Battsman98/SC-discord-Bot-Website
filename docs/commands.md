@@ -124,15 +124,12 @@ Options:
 
 Current output:
 
-- Material code and kind
+- Material code
 - Refined/raw sell values when available
 - Mining flags such as harvestable, QT sensitive, time sensitive, or explosive
-- Star systems
-- Lagrange points
-- Planets
-- Moons
-- Points of interest
 - Mineable rock signatures for 1x through 6x rock clusters when available
+- Mining locations grouped by star system, with lagrange points, planets, moons, and points of interest listed under each system
+- Location pages with Previous/Next buttons when the grouped location output is more than 25 lines
 
 Location logic:
 
