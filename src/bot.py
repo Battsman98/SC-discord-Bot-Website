@@ -358,12 +358,12 @@ trade_group = app_commands.Group(name="trade", description="Trade planning tools
 
 @trade_group.command(name="routing", description="Find Star Citizen trade route candidates from UEX.")
 @app_commands.describe(
+    starting_point="Required starting trade terminal for the circular route.",
     route_type="Optional route type. Defaults to Circular Route.",
     ship="Ship for route planning.",
     investment="aUEC investment for route planning.",
     max_stops="Maximum route stops, from 2 to 5.",
-    purchase_system="Optional system filter for purchase locations.",
-    sell_system="Optional system filter for sell locations.",
+    stay_system="Optional star system to keep the full loop inside.",
 )
 @app_commands.choices(
     route_type=[
@@ -372,12 +372,12 @@ trade_group = app_commands.Group(name="trade", description="Trade planning tools
 )
 async def trade_routing_command(
     interaction: discord.Interaction,
+    starting_point: str,
     route_type: app_commands.Choice[str] | None = None,
     ship: str = "Ironclad Assault",
     investment: int = 1_000_000,
     max_stops: int = 5,
-    purchase_system: str | None = None,
-    sell_system: str | None = None,
+    stay_system: str | None = None,
 ) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
@@ -403,21 +403,37 @@ async def trade_routing_command(
     result = await bot.sources.lookup_trade_routes(
         ship_result.name,
         ship_result.cargo_capacity,
+        starting_point,
         investment,
         max_stops,
-        purchase_system,
-        sell_system,
+        stay_system,
     )
     route_type_name = route_type.name if route_type else "Circular Route"
     if result is None or not result.legs:
         await interaction.followup.send(
-            "No profitable UEX circular route found for those filters right now.",
+            "No profitable UEX circular route found from that starting point right now.",
             ephemeral=True,
         )
         return
 
-    embed = build_trade_route_embed(route_type_name, result, max_stops, purchase_system, sell_system)
+    embed = build_trade_route_embed(route_type_name, result, starting_point, max_stops, stay_system)
     await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@trade_routing_command.autocomplete("starting_point")
+async def trade_starting_point_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    locations = await bot.sources.autocomplete_trade_locations(current)
+    return [
+        app_commands.Choice(name=location[:100], value=location[:100])
+        for location in locations[:25]
+    ]
 
 
 @trade_routing_command.autocomplete("ship")
@@ -436,8 +452,7 @@ async def trade_ship_autocomplete(
     ]
 
 
-@trade_routing_command.autocomplete("purchase_system")
-@trade_routing_command.autocomplete("sell_system")
+@trade_routing_command.autocomplete("stay_system")
 async def trade_system_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -857,18 +872,18 @@ def build_commodity_embed(
 def build_trade_route_embed(
     route_type: str,
     result: TradeRouteResult,
+    starting_point: str,
     max_stops: int,
-    purchase_system: str | None = None,
-    sell_system: str | None = None,
+    stay_system: str | None = None,
 ) -> discord.Embed:
     description = [
         _line("Ship", result.ship),
+        _line("Starting Point", starting_point),
         _line("Cargo", f"{_format_number(result.cargo_capacity_scu)} SCU"),
         _line("Investment", _format_currency(result.investment, "aUEC")),
         _line("Max Stops", str(max_stops)),
         _line("Estimated Loop Profit", _format_currency(_trade_route_total_profit(result), "aUEC")),
-        _line("Purchase System", purchase_system),
-        _line("Sell System", sell_system),
+        _line("Stay In System", stay_system),
         "Loop: each sell stop is the next buy stop, and the final sell stop returns to the start.",
     ]
     embed = discord.Embed(

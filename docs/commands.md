@@ -112,19 +112,19 @@ Options:
 
 | Option | Required | Purpose |
 | --- | --- | --- |
+| `starting_point` | Yes | Starting trade terminal for the circular route. Autocomplete is available, and users can still type a terminal manually. |
 | `route_type` | No | Route type. Defaults to `Circular Route`. |
 | `ship` | No | Ship name for route planning. Defaults to `Ironclad Assault`. |
 | `investment` | No | aUEC investment for route planning. Defaults to `1,000,000`. |
 | `max_stops` | No | Maximum route stops, from 2 to 5. Defaults to `5`. |
-| `purchase_system` | No | Filters purchase locations only. |
-| `sell_system` | No | Filters sell locations only. |
+| `stay_system` | No | Keeps the full circular route inside one star system. |
 
 Examples:
 
 ```text
-/trade routing
-/trade routing route_type:Circular Route ship:Ironclad Assault investment:1000000 max_stops:5
-/trade routing ship:Caterpillar investment:2000000 purchase_system:Stanton sell_system:Pyro
+/trade routing starting_point:ARC-L3
+/trade routing starting_point:ARC-L3 route_type:Circular Route ship:Ironclad Assault investment:1000000 max_stops:5
+/trade routing starting_point:Area 18 ship:Caterpillar investment:2000000 stay_system:Stanton
 ```
 
 Route behavior:
@@ -134,8 +134,9 @@ Route behavior:
 - Limits purchasable SCU by cargo capacity, investment, purchase stock, and sell demand.
 - Builds a closed loop where each sell location is the next buy location.
 - The final sell location returns to the starting buy location.
-- Shows the highest estimated profit circular route found in Discord.
-- `purchase_system` and `sell_system` can make a closed loop impossible when they do not overlap.
+- Optimizes for maximum estimated profit across the whole loop, not just one leg.
+- Shows the highest estimated profit circular route found from the selected starting point.
+- `stay_system` can make a closed loop impossible when UEX does not have a profitable loop inside that system.
 - Does not require a SC Trade Tools API token.
 
 ## `/exec`

@@ -257,6 +257,7 @@ def test_calculate_trade_route_legs_builds_best_closed_loop() -> None:
         cargo_capacity_scu=40,
         investment=10_000,
         max_stops=2,
+        starting_point="A",
     )
 
     assert len(legs) == 2
@@ -268,13 +269,13 @@ def test_calculate_trade_route_legs_builds_best_closed_loop() -> None:
     assert legs[1].sell_terminal == legs[0].buy_terminal
 
 
-def test_calculate_trade_route_legs_returns_empty_when_filters_prevent_loop() -> None:
+def test_calculate_trade_route_legs_stays_inside_requested_system() -> None:
     source = UEXSource.__new__(UEXSource)
     legs = source._calculate_trade_route_legs(
         [
             {
                 "commodity_name": "Agricium",
-                "terminal_name": "Stanton Seller",
+                "terminal_name": "A",
                 "price_sell_avg": 1000,
                 "status_sell": 1,
                 "scu_sell_stock_avg": 10,
@@ -282,24 +283,32 @@ def test_calculate_trade_route_legs_returns_empty_when_filters_prevent_loop() ->
             },
             {
                 "commodity_name": "Agricium",
-                "terminal_name": "Pyro Seller",
-                "price_sell_avg": 800,
-                "status_sell": 1,
-                "scu_sell_stock_avg": 10,
-                "star_system_name": "Pyro",
-            },
-            {
-                "commodity_name": "Agricium",
-                "terminal_name": "Stanton Buyer",
-                "price_buy_avg": 1200,
+                "terminal_name": "B",
+                "price_buy_avg": 1400,
                 "status_buy": 1,
                 "scu_buy_avg": 10,
                 "star_system_name": "Stanton",
             },
             {
-                "commodity_name": "Agricium",
+                "commodity_name": "Gold",
+                "terminal_name": "B",
+                "price_sell_avg": 500,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "A",
+                "price_buy_avg": 900,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Gold",
                 "terminal_name": "Pyro Buyer",
-                "price_buy_avg": 1600,
+                "price_buy_avg": 2000,
                 "status_buy": 1,
                 "scu_buy_avg": 10,
                 "star_system_name": "Pyro",
@@ -308,8 +317,41 @@ def test_calculate_trade_route_legs_returns_empty_when_filters_prevent_loop() ->
         cargo_capacity_scu=20,
         investment=20_000,
         max_stops=5,
-        purchase_system="Stanton",
-        sell_system="Pyro",
+        starting_point="A",
+        stay_system="Stanton",
+    )
+
+    assert len(legs) == 2
+    assert all(leg.buy_system == "Stanton" for leg in legs)
+    assert all(leg.sell_system == "Stanton" for leg in legs)
+    assert legs[-1].sell_terminal == "A"
+
+
+def test_calculate_trade_route_legs_returns_empty_for_unknown_start() -> None:
+    source = UEXSource.__new__(UEXSource)
+    legs = source._calculate_trade_route_legs(
+        [
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "A",
+                "price_sell_avg": 100,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "B",
+                "price_buy_avg": 150,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+        ],
+        cargo_capacity_scu=20,
+        investment=20_000,
+        max_stops=5,
+        starting_point="Area 18",
     )
 
     assert legs == []
@@ -334,3 +376,10 @@ def test_enrich_price_rows_adds_terminal_location_details() -> None:
     assert rows[0]["star_system_name"] == "Stanton"
     assert rows[0]["planet_name"] == "ArcCorp"
     assert rows[0]["city_name"] == "Area 18"
+
+
+def test_trade_location_value_accepts_autocomplete_display() -> None:
+    source = UEXSource.__new__(UEXSource)
+
+    assert source._trade_location_value("ARC-L3 - ARC-L3 Modern Express Station (Stanton)") == "ARC-L3"
+    assert source._trade_location_value("Jackson's Swap (Pyro)") == "Jackson's Swap"

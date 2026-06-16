@@ -85,10 +85,10 @@ class UEXSource:
         self,
         ship: str,
         cargo_capacity_scu: int | float,
+        starting_point: str,
         investment: int | float,
         max_stops: int = 5,
-        purchase_system: str | None = None,
-        sell_system: str | None = None,
+        stay_system: str | None = None,
     ) -> TradeRouteResult | None:
         if cargo_capacity_scu <= 0 or investment <= 0:
             return None
@@ -101,8 +101,8 @@ class UEXSource:
             float(cargo_capacity_scu),
             float(investment),
             max_stops,
-            purchase_system,
-            sell_system,
+            starting_point,
+            stay_system,
         )
         return TradeRouteResult(
             ship=ship,
@@ -111,6 +111,42 @@ class UEXSource:
             legs=legs,
             source_name=self.name,
         )
+
+    async def autocomplete_trade_locations(self, query: str, limit: int = 25) -> list[str]:
+        prices = await self._fetch_all_prices()
+        terminals_by_id = await self._fetch_terminals_by_id()
+        enriched_prices = self._enrich_price_rows(prices, terminals_by_id)
+        normalized_query = self._normalize(query)
+        display_by_terminal: dict[str, str] = {}
+
+        for row in enriched_prices:
+            if not self._positive(row.get("price_sell_avg") or row.get("price_sell")):
+                continue
+            if not self._positive(row.get("status_sell")):
+                continue
+            terminal_name = self._string_or_none(row.get("terminal_name"))
+            if not terminal_name:
+                continue
+            key = self._terminal_key(terminal_name)
+            display_by_terminal.setdefault(key, self._trade_location_display(row))
+
+        displays = sorted(display_by_terminal.values(), key=str.lower)
+        if not normalized_query:
+            return displays[:limit]
+
+        starts = [
+            display
+            for display in displays
+            if self._normalize(display).startswith(normalized_query)
+            or self._normalize(self._trade_location_value(display)).startswith(normalized_query)
+        ]
+        contains = [
+            display
+            for display in displays
+            if normalized_query in self._normalize(display)
+            and display not in starts
+        ]
+        return (starts + contains)[:limit]
 
     async def _find_commodity(self, query: str) -> dict | None:
         normalized_query = self._normalize(self._strip_code_suffix(query))
@@ -282,11 +318,11 @@ class UEXSource:
         cargo_capacity_scu: float,
         investment: float,
         max_stops: int,
-        purchase_system: str | None = None,
-        sell_system: str | None = None,
+        starting_point: str,
+        stay_system: str | None = None,
     ) -> list[TradeRouteLeg]:
-        normalized_purchase_system = self._normalize(purchase_system)
-        normalized_sell_system = self._normalize(sell_system)
+        normalized_start = self._normalize(self._trade_location_value(starting_point))
+        normalized_stay_system = self._normalize(stay_system)
         rows_by_commodity: dict[str, list[dict]] = {}
 
         for row in prices:
@@ -302,14 +338,14 @@ class UEXSource:
                 for row in rows
                 if self._positive(row.get("price_sell_avg") or row.get("price_sell"))
                 and self._positive(row.get("status_sell"))
-                and self._matches_system(row, normalized_purchase_system)
+                and self._matches_system(row, normalized_stay_system)
             ]
             sell_rows = [
                 row
                 for row in rows
                 if self._positive(row.get("price_buy_avg") or row.get("price_buy"))
                 and self._positive(row.get("status_buy"))
-                and self._matches_system(row, normalized_sell_system)
+                and self._matches_system(row, normalized_stay_system)
             ]
 
             for purchase in purchase_rows:
@@ -354,9 +390,14 @@ class UEXSource:
                         )
                     )
 
-        return self._best_circular_route(candidates, max_stops)
+        return self._best_circular_route(candidates, max_stops, normalized_start)
 
-    def _best_circular_route(self, candidates: list[TradeRouteLeg], max_stops: int) -> list[TradeRouteLeg]:
+    def _best_circular_route(
+        self,
+        candidates: list[TradeRouteLeg],
+        max_stops: int,
+        normalized_start: str,
+    ) -> list[TradeRouteLeg]:
         max_stops = max(2, max_stops)
         candidates.sort(key=lambda leg: float(leg.profit), reverse=True)
 
@@ -377,7 +418,11 @@ class UEXSource:
 
         best_route: list[TradeRouteLeg] = []
         best_profit = 0.0
-        start_candidates = sorted(best_by_pair.values(), key=lambda leg: float(leg.profit), reverse=True)[:1000]
+        start_candidates = [
+            leg
+            for leg in sorted(best_by_pair.values(), key=lambda leg: float(leg.profit), reverse=True)
+            if self._terminal_key(leg.buy_terminal) == normalized_start
+        ][:1000]
 
         def route_profit(route: list[TradeRouteLeg]) -> float:
             return sum(float(leg.profit) for leg in route)
@@ -434,6 +479,24 @@ class UEXSource:
 
     def _terminal_key(self, terminal_name: str) -> str:
         return self._normalize(terminal_name)
+
+    def _trade_location_display(self, row: dict) -> str:
+        terminal_name = str(row.get("terminal_name") or "Unknown terminal")
+        system = self._string_or_none(row.get("star_system_name"))
+        location = self._location(row)
+        if system and location and location != terminal_name:
+            return f"{terminal_name} - {location} ({system})"
+        if system:
+            return f"{terminal_name} ({system})"
+        return terminal_name
+
+    def _trade_location_value(self, value: object) -> str:
+        text = str(value or "").strip()
+        if " - " in text:
+            return text.split(" - ", 1)[0].strip()
+        if text.endswith(")") and "(" in text:
+            return text.rsplit("(", 1)[0].strip()
+        return text
 
     def _filter_prices_by_system(self, prices: list[dict], normalized_system: str) -> list[dict]:
         if not normalized_system:

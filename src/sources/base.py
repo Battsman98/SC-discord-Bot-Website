@@ -133,11 +133,14 @@ class GameInfoSource(Protocol):
         self,
         ship: str,
         cargo_capacity_scu: int | float,
+        starting_point: str,
         investment: int | float,
         max_stops: int = 5,
-        purchase_system: str | None = None,
-        sell_system: str | None = None,
+        stay_system: str | None = None,
     ) -> TradeRouteResult | None:
+        ...
+
+    async def autocomplete_trade_locations(self, query: str, limit: int = 25) -> list[str]:
         ...
 
     async def close(self) -> None:

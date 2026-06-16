@@ -79,19 +79,37 @@ class SourceRegistry:
         self,
         ship: str,
         cargo_capacity_scu: int | float,
+        starting_point: str,
         investment: int | float,
         max_stops: int = 5,
-        purchase_system: str | None = None,
-        sell_system: str | None = None,
+        stay_system: str | None = None,
     ) -> TradeRouteResult | None:
         for source in self._sources:
             lookup = getattr(source, "lookup_trade_routes", None)
             if lookup is None:
                 continue
-            result = await lookup(ship, cargo_capacity_scu, investment, max_stops, purchase_system, sell_system)
+            result = await lookup(ship, cargo_capacity_scu, starting_point, investment, max_stops, stay_system)
             if result is not None:
                 return result
         return None
+
+    async def autocomplete_trade_locations(self, query: str, limit: int = 25) -> list[str]:
+        seen: set[str] = set()
+        matches: list[str] = []
+
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_trade_locations", None)
+            if autocomplete is None:
+                continue
+            for name in await autocomplete(query, limit):
+                if name in seen:
+                    continue
+                seen.add(name)
+                matches.append(name)
+                if len(matches) >= limit:
+                    return matches
+
+        return matches
 
     async def close(self) -> None:
         for source in self._sources:
