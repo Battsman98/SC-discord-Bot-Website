@@ -359,21 +359,14 @@ trade_group = app_commands.Group(name="trade", description="Trade planning tools
 @trade_group.command(name="routing", description="Find Star Citizen trade route candidates from UEX.")
 @app_commands.describe(
     starting_point="Required starting trade terminal for the circular route.",
-    route_type="Optional route type. Defaults to Circular Route.",
     ship="Ship for route planning.",
     investment="aUEC investment for route planning.",
     max_stops="Maximum route stops, from 2 to 5.",
     stay_system="Optional star system to keep the full loop inside.",
 )
-@app_commands.choices(
-    route_type=[
-        app_commands.Choice(name="Circular Route", value="circular_route"),
-    ]
-)
 async def trade_routing_command(
     interaction: discord.Interaction,
     starting_point: str,
-    route_type: app_commands.Choice[str] | None = None,
     ship: str = "Ironclad Assault",
     investment: int = 1_000_000,
     max_stops: int = 5,
@@ -408,7 +401,6 @@ async def trade_routing_command(
         max_stops,
         stay_system,
     )
-    route_type_name = route_type.name if route_type else "Circular Route"
     if result is None or not result.legs:
         await interaction.followup.send(
             "No profitable UEX circular route found from that starting point right now.",
@@ -416,7 +408,7 @@ async def trade_routing_command(
         )
         return
 
-    embed = build_trade_route_embed(route_type_name, result, starting_point, max_stops, stay_system)
+    embed = build_trade_route_embed(result, starting_point, max_stops, stay_system)
     await interaction.followup.send(embed=embed, ephemeral=True)
 
 
@@ -870,7 +862,6 @@ def build_commodity_embed(
 
 
 def build_trade_route_embed(
-    route_type: str,
     result: TradeRouteResult,
     starting_point: str,
     max_stops: int,
@@ -892,7 +883,7 @@ def build_trade_route_embed(
         loop_line,
     ]
     embed = discord.Embed(
-        title=route_type,
+        title="Circular Route",
         description="\n".join(line for line in description if line),
         color=discord.Color.teal(),
     )

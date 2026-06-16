@@ -113,7 +113,6 @@ Options:
 | Option | Required | Purpose |
 | --- | --- | --- |
 | `starting_point` | Yes | Starting trade terminal for the circular route. Autocomplete is available, and users can still type a terminal manually. |
-| `route_type` | No | Route type. Defaults to `Circular Route`. |
 | `ship` | No | Ship name for route planning. Defaults to `Ironclad Assault`. |
 | `investment` | No | aUEC investment for route planning. Defaults to `1,000,000`. |
 | `max_stops` | No | Maximum route stops, from 2 to 5. Defaults to `5`. |
@@ -123,7 +122,7 @@ Examples:
 
 ```text
 /trade routing starting_point:ARC-L3
-/trade routing starting_point:ARC-L3 route_type:Circular Route ship:Ironclad Assault investment:1000000 max_stops:5
+/trade routing starting_point:ARC-L3 ship:Ironclad Assault investment:1000000 max_stops:5
 /trade routing starting_point:Area 18 ship:Caterpillar investment:2000000 stay_system:Stanton
 ```
 
