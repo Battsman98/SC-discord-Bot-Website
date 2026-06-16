@@ -79,6 +79,38 @@ class CommodityResult:
 
 
 @dataclass(frozen=True)
+class BlueprintIngredient:
+    name: str
+    quantity: int | float | None
+    unit: str | None
+    slot: str | None
+
+
+@dataclass(frozen=True)
+class BlueprintMission:
+    name: str
+    contractor: str | None
+    mission_type: str | None
+    locations: str | None
+    min_standing_name: str | None
+    min_standing_reputation: int | float | None
+    drop_chance: int | float | None
+
+
+@dataclass(frozen=True)
+class BlueprintResult:
+    name: str
+    category: str | None
+    craft_time_seconds: int | None
+    tiers: int | None
+    version: str | None
+    ingredients: list[BlueprintIngredient]
+    missions: list[BlueprintMission]
+    source_name: str
+    source_url: str
+
+
+@dataclass(frozen=True)
 class TradeRouteLeg:
     commodity_name: str
     buy_price: int | float
@@ -128,6 +160,24 @@ class GameInfoSource(Protocol):
         ...
 
     async def autocomplete_commodities(self, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def lookup_blueprints(
+        self,
+        query: str | None = None,
+        category: str | None = None,
+        material: str | None = None,
+        mission_type: str | None = None,
+        contractor: str | None = None,
+        location: str | None = None,
+        limit: int = 3,
+    ) -> list[BlueprintResult]:
+        ...
+
+    async def autocomplete_blueprints(self, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def autocomplete_blueprint_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
         ...
 
     async def lookup_trade_routes(

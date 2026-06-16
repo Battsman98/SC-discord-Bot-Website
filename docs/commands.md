@@ -102,6 +102,47 @@ Examples:
 /commodity Gold purchase_system:Stanton sell_system:Pyro quantity_scu:100
 ```
 
+## `/blueprint`
+
+Searches Star Citizen crafting blueprints using SC Craft Tools data.
+
+Response visibility: private to the user.
+
+Autocomplete:
+
+- `name` supports blueprint/item name suggestions.
+- `category`, `material`, `mission_type`, `contractor`, and `location` support dropdown suggestions from current crafting data.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `name` | No | Blueprint or crafted item name to search for. |
+| `category` | No | Blueprint category, such as armour, ammo, or vehicle gear. |
+| `material` | No | Required material/resource used by the blueprint. |
+| `mission_type` | No | Mission type that can award the blueprint. |
+| `contractor` | No | Mission contractor that can award the blueprint. |
+| `location` | No | Mission location or system. |
+
+At least one option is required.
+
+Current output:
+
+- Blueprint category
+- Craft time and tiers
+- Required materials and quantities
+- Missions that can award the blueprint
+- Mission contractor, mission type, drop chance, and required reputation level when available
+
+Examples:
+
+```text
+/blueprint name:Aril Arms
+/blueprint material:Iron category:Vehiclegear / Salvage
+/blueprint mission_type:Salvage contractor:Adagio Holdings
+/blueprint location:Stanton material:Tungsten
+```
+
 ## `/trade routing`
 
 Finds Star Citizen circular trade route candidates using UEX data.

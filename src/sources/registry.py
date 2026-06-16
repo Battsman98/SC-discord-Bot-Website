@@ -2,7 +2,8 @@ import aiohttp
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import CommodityResult, GameInfoSource, LookupResult, ShipResult, TradeRouteResult
+from src.sources.base import BlueprintResult, CommodityResult, GameInfoSource, LookupResult, ShipResult, TradeRouteResult
+from src.sources.sc_craft_tools import SCCraftToolsSource
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 from src.sources.uex import UEXSource
 
@@ -75,6 +76,61 @@ class SourceRegistry:
 
         return matches
 
+    async def lookup_blueprints(
+        self,
+        query: str | None = None,
+        category: str | None = None,
+        material: str | None = None,
+        mission_type: str | None = None,
+        contractor: str | None = None,
+        location: str | None = None,
+        limit: int = 3,
+    ) -> list[BlueprintResult]:
+        for source in self._sources:
+            lookup = getattr(source, "lookup_blueprints", None)
+            if lookup is None:
+                continue
+            results = await lookup(query, category, material, mission_type, contractor, location, limit)
+            if results:
+                return results
+        return []
+
+    async def autocomplete_blueprints(self, query: str, limit: int = 25) -> list[str]:
+        seen: set[str] = set()
+        matches: list[str] = []
+
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_blueprints", None)
+            if autocomplete is None:
+                continue
+            for name in await autocomplete(query, limit):
+                if name in seen:
+                    continue
+                seen.add(name)
+                matches.append(name)
+                if len(matches) >= limit:
+                    return matches
+
+        return matches
+
+    async def autocomplete_blueprint_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        seen: set[str] = set()
+        matches: list[str] = []
+
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_blueprint_filter", None)
+            if autocomplete is None:
+                continue
+            for name in await autocomplete(filter_name, query, limit):
+                if name in seen:
+                    continue
+                seen.add(name)
+                matches.append(name)
+                if len(matches) >= limit:
+                    return matches
+
+        return matches
+
     async def lookup_trade_routes(
         self,
         ship: str,
@@ -129,5 +185,6 @@ async def build_default_registry(settings: Settings, cache: SQLiteCache) -> Sour
     sources: list[GameInfoSource] = [
         StarCitizenWikiSource(settings, cache, session),
         UEXSource(settings, cache, session),
+        SCCraftToolsSource(settings, cache, session),
     ]
     return SourceRegistry(sources, session)

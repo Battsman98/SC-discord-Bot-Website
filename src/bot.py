@@ -8,7 +8,16 @@ from discord.ext import commands
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import CommodityMarket, CommodityResult, ShipResult, TradeRouteLeg, TradeRouteResult
+from src.sources.base import (
+    BlueprintIngredient,
+    BlueprintMission,
+    BlueprintResult,
+    CommodityMarket,
+    CommodityResult,
+    ShipResult,
+    TradeRouteLeg,
+    TradeRouteResult,
+)
 from src.sources.registry import SourceRegistry, build_default_registry
 from src.timers import (
     ExecHangarStatus,
@@ -52,6 +61,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(lookup_command)
         self.tree.add_command(ship_command)
         self.tree.add_command(commodity_command)
+        self.tree.add_command(blueprint_command)
         self.tree.add_command(exec_command)
         self.tree.add_command(execset_command)
         self.tree.add_command(execclear_command)
@@ -351,6 +361,97 @@ async def commodity_system_autocomplete(
     if not matches and normalized:
         matches = [system for system in systems if normalized in system.lower()]
     return [app_commands.Choice(name=system, value=system) for system in matches[:25]]
+
+
+@app_commands.command(name="blueprint", description="Search Star Citizen crafting blueprints.")
+@app_commands.describe(
+    name="Blueprint or item name to search.",
+    category="Optional blueprint category.",
+    material="Optional required material or resource.",
+    mission_type="Optional mission type that can award the blueprint.",
+    contractor="Optional mission contractor.",
+    location="Optional mission location or system.",
+)
+async def blueprint_command(
+    interaction: discord.Interaction,
+    name: str | None = None,
+    category: str | None = None,
+    material: str | None = None,
+    mission_type: str | None = None,
+    contractor: str | None = None,
+    location: str | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    if not any([name, category, material, mission_type, contractor, location]):
+        await interaction.response.send_message("Add a blueprint name or at least one filter.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    results = await bot.sources.lookup_blueprints(
+        query=name,
+        category=category,
+        material=material,
+        mission_type=mission_type,
+        contractor=contractor,
+        location=location,
+        limit=3,
+    )
+
+    if not results:
+        await interaction.followup.send("No blueprints found for those filters.", ephemeral=True)
+        return
+
+    await interaction.followup.send(
+        embeds=[
+            build_blueprint_embed(result, name, category, material, mission_type, contractor, location)
+            for result in results
+        ],
+        ephemeral=True,
+    )
+
+
+@blueprint_command.autocomplete("name")
+async def blueprint_name_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    names = await bot.sources.autocomplete_blueprints(current)
+    return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
+
+
+@blueprint_command.autocomplete("category")
+@blueprint_command.autocomplete("material")
+@blueprint_command.autocomplete("mission_type")
+@blueprint_command.autocomplete("contractor")
+@blueprint_command.autocomplete("location")
+async def blueprint_filter_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    field_map = {
+        "category": "category",
+        "material": "resource",
+        "mission_type": "mission_type",
+        "contractor": "contractor",
+        "location": "location",
+    }
+    names = await bot.sources.autocomplete_blueprint_filter(
+        field_map.get(_focused_option_name(interaction), "category"),
+        current,
+    )
+    return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
 
 
 trade_group = app_commands.Group(name="trade", description="Trade planning tools.")
@@ -861,6 +962,85 @@ def build_commodity_embed(
     return embed
 
 
+def build_blueprint_embed(
+    result: BlueprintResult,
+    name: str | None = None,
+    category: str | None = None,
+    material: str | None = None,
+    mission_type: str | None = None,
+    contractor: str | None = None,
+    location: str | None = None,
+) -> discord.Embed:
+    description = [
+        _line("Category", result.category),
+        _line("Craft Time", _format_seconds_duration(result.craft_time_seconds)),
+        _line("Tiers", str(result.tiers) if result.tiers is not None else None),
+        _line("Search", name),
+        _line("Category Filter", category),
+        _line("Material Filter", material),
+        _line("Mission Type Filter", mission_type),
+        _line("Contractor Filter", contractor),
+        _line("Location Filter", location),
+    ]
+    embed = discord.Embed(
+        title=result.name,
+        description="\n".join(line for line in description if line),
+        url=result.source_url,
+        color=discord.Color.dark_gold(),
+    )
+    embed.add_field(name="Materials", value=_format_blueprint_ingredients(result.ingredients), inline=False)
+    embed.add_field(name="Blueprint Missions", value=_format_blueprint_missions(result.missions), inline=False)
+    embed.set_footer(text=f"Source: {result.source_name} | {result.version or 'Current version'}")
+    return embed
+
+
+def _format_blueprint_ingredients(ingredients: list[BlueprintIngredient]) -> str:
+    if not ingredients:
+        return "No material data found."
+
+    lines = []
+    for ingredient in ingredients:
+        quantity = _format_number(ingredient.quantity) if ingredient.quantity is not None else "Unknown"
+        unit = ingredient.unit or "SCU"
+        slot = f" ({ingredient.slot.title()})" if ingredient.slot else ""
+        lines.append(f"{ingredient.name}: {quantity} {unit}{slot}")
+    return _limit_lines(lines, 1000)
+
+
+def _format_blueprint_missions(missions: list[BlueprintMission]) -> str:
+    if not missions:
+        return "No mission drop data found."
+
+    lines = []
+    for mission in missions[:8]:
+        rep = mission.min_standing_name or "Unknown rep"
+        if mission.min_standing_reputation is not None:
+            rep = f"{rep} ({_format_number(mission.min_standing_reputation)} rep)"
+        details = " | ".join(
+            part
+            for part in [
+                mission.contractor,
+                mission.mission_type,
+                _format_drop_chance(mission.drop_chance),
+                rep,
+            ]
+            if part
+        )
+        suffix = f" - {details}" if details else ""
+        lines.append(f"{mission.name}{suffix}")
+
+    if len(missions) > 8:
+        lines.append(f"{len(missions) - 8} more mission(s) available.")
+    return _limit_lines(lines, 1000)
+
+
+def _format_drop_chance(value: int | float | None) -> str | None:
+    if value is None:
+        return None
+    percent = float(value) * 100 if float(value) <= 1 else float(value)
+    return f"{_format_number(percent)}% drop"
+
+
 def build_trade_route_embed(
     result: TradeRouteResult,
     starting_point: str,
@@ -1083,6 +1263,47 @@ def _format_number(value: int | float | None) -> str:
     if isinstance(value, float) and not value.is_integer():
         return f"{value:,.2f}"
     return f"{int(value):,}"
+
+
+def _format_seconds_duration(seconds: int | None) -> str | None:
+    if seconds is None:
+        return None
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} min"
+    hours = minutes // 60
+    remaining_minutes = minutes % 60
+    return f"{hours} hr {remaining_minutes} min" if remaining_minutes else f"{hours} hr"
+
+
+def _limit_lines(lines: list[str], max_length: int) -> str:
+    kept = []
+    for line in lines:
+        candidate = "\n".join([*kept, line])
+        if len(candidate) > max_length:
+            kept.append("More available.")
+            break
+        kept.append(line)
+    return "\n".join(kept)
+
+
+def _focused_option_name(interaction: discord.Interaction) -> str:
+    def find_focused(options: list[dict]) -> str | None:
+        for option in options:
+            if option.get("focused"):
+                return str(option.get("name") or "")
+            nested = option.get("options")
+            if isinstance(nested, list):
+                focused = find_focused(nested)
+                if focused:
+                    return focused
+        return None
+
+    data = interaction.data if isinstance(interaction.data, dict) else {}
+    options = data.get("options")
+    if not isinstance(options, list):
+        return ""
+    return find_focused(options) or ""
 
 
 def configure_logging() -> None:
