@@ -53,18 +53,60 @@ def test_parse_commodity_orders_buy_and_sell_markets() -> None:
     )
 
     assert result.name == "Gold"
-    assert result.buy_from[0].terminal_name == "Low Sell Price"
-    assert result.buy_from[0].price == 29500
-    assert result.buy_from[0].demand == 100
+    assert result.buy_from[0].terminal_name == "High Buy Price"
+    assert result.buy_from[0].price == 32500
+    assert result.buy_from[0].demand == 45
     assert result.buy_from[0].system == "Stanton"
-    assert result.buy_from[0].planet == "Crusader"
-    assert result.buy_from[0].location == "Mining Outpost"
-    assert result.sell_to[0].terminal_name == "High Buy Price"
-    assert result.sell_to[0].price == 32500
-    assert result.sell_to[0].demand == 45
+    assert result.buy_from[0].planet == "ArcCorp"
+    assert result.buy_from[0].location == "Area 18"
+    assert result.sell_to[0].terminal_name == "Low Sell Price"
+    assert result.sell_to[0].price == 29500
+    assert result.sell_to[0].demand == 100
     assert result.sell_to[0].system == "Stanton"
-    assert result.sell_to[0].planet == "ArcCorp"
-    assert result.sell_to[0].location == "Area 18"
+    assert result.sell_to[0].planet == "Crusader"
+    assert result.sell_to[0].location == "Mining Outpost"
+
+
+def test_parse_commodity_lists_sell_only_commodities_as_sell_locations() -> None:
+    source = UEXSource.__new__(UEXSource)
+    result = source._parse_commodity(
+        {
+            "name": "Janalite",
+            "code": "JANA",
+            "kind": "Mineral",
+            "price_buy": 0,
+            "price_sell": 1577080,
+            "is_illegal": 0,
+            "is_mineral": 1,
+            "is_raw": 1,
+            "is_refined": 0,
+            "is_harvestable": 1,
+            "wiki": "https://starcitizen.tools/Janalite",
+        },
+        [
+            {
+                "terminal_name": "TDD Area 18",
+                "price_buy": 0,
+                "price_buy_avg": 0,
+                "status_buy": 0,
+                "scu_buy": 0,
+                "scu_buy_avg": 0,
+                "price_sell": 1300000,
+                "price_sell_avg": 1300000,
+                "status_sell": 1,
+                "scu_sell_stock": 1,
+                "scu_sell_stock_avg": 1,
+                "city_name": "Area 18",
+                "planet_name": "ArcCorp",
+                "star_system_name": "Stanton",
+            },
+        ],
+    )
+
+    assert result.buy_from == []
+    assert len(result.sell_to) == 1
+    assert result.sell_to[0].terminal_name == "TDD Area 18"
+    assert result.sell_to[0].price == 1300000
 
 
 def test_autocomplete_commodities_prefers_starts_with_matches() -> None:
@@ -363,12 +405,12 @@ def test_parse_commodity_can_filter_purchase_and_sell_systems_separately() -> No
                 "star_system_name": "Stanton",
             },
         ],
-        purchase_system="Stanton",
-        sell_system="Pyro",
+        purchase_system="Pyro",
+        sell_system="Stanton",
     )
 
-    assert [market.terminal_name for market in result.buy_from] == ["Stanton Seller"]
-    assert [market.terminal_name for market in result.sell_to] == ["Pyro Buyer"]
+    assert [market.terminal_name for market in result.buy_from] == ["Pyro Buyer"]
+    assert [market.terminal_name for market in result.sell_to] == ["Stanton Seller"]
 
 
 def test_calculate_trade_route_legs_builds_best_closed_loop() -> None:

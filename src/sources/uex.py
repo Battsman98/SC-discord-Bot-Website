@@ -61,7 +61,7 @@ class UEXSource:
         normalized_purchase_system = self._normalize(purchase_system) or normalized_system
         normalized_sell_system = self._normalize(sell_system) or normalized_system
         cache_key = (
-            f"uex:commodity:v6:{commodity['name'].lower()}:"
+            f"uex:commodity:v7:{commodity['name'].lower()}:"
             f"buy-{normalized_purchase_system or 'all'}:"
             f"sell-{normalized_sell_system or 'all'}"
         )
@@ -572,24 +572,24 @@ class UEXSource:
         sell_prices = self._filter_prices_by_system(prices, normalized_sell_system)
 
         buy_from = [
-            self._market(row, "price_sell_avg", "scu_sell_stock_avg")
-            for row in purchase_prices
-            if self._positive(row.get("price_sell_avg") or row.get("price_sell"))
-            and self._positive(row.get("status_sell"))
-        ]
-        sell_to = [
             self._market(row, "price_buy_avg", "scu_buy_avg")
-            for row in sell_prices
+            for row in purchase_prices
             if self._positive(row.get("price_buy_avg") or row.get("price_buy"))
             and self._positive(row.get("status_buy"))
+        ]
+        sell_to = [
+            self._market(row, "price_sell_avg", "scu_sell_stock_avg")
+            for row in sell_prices
+            if self._positive(row.get("price_sell_avg") or row.get("price_sell"))
+            and self._positive(row.get("status_sell"))
         ]
 
         return CommodityResult(
             name=str(commodity.get("name") or "Unknown commodity"),
             code=self._string_or_none(commodity.get("code")),
             kind=self._string_or_none(commodity.get("kind")),
-            average_buy_price=commodity.get("price_sell") or None,
-            average_sell_price=commodity.get("price_buy") or None,
+            average_buy_price=commodity.get("price_buy") or None,
+            average_sell_price=commodity.get("price_sell") or None,
             is_illegal=bool(commodity.get("is_illegal")),
             is_mineral=bool(commodity.get("is_mineral")),
             is_raw=bool(commodity.get("is_raw")),
