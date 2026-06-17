@@ -118,7 +118,7 @@ Options:
 
 | Option | Required | Purpose |
 | --- | --- | --- |
-| `material` | Yes | Mineable material name, code, or rock signature, such as `Gold`, `Agricium`, `GOLD`, `HADA`, or `4270`. |
+| `material` | Yes | Mineable material name, code, rock signature, or multiple materials, such as `Gold`, `Agricium`, `GOLD`, `HADA`, `4270`, or `Gold, Borase`. |
 | `system` | No | Filters mining locations to one star system. |
 | `planet` | No | Filters listed locations by planet, moon, lagrange point, or point of interest. |
 
@@ -142,9 +142,13 @@ Examples:
 ```text
 /mining material:Gold
 /mining material:4270
+/mining material:Gold, Borase
+/mining material:Gold Borase Bexalite
 /mining material:Agricium system:Stanton
 /mining material:Hadanite planet:Daymar
 ```
+
+Multiple-material searches show only the shared rock signatures for the searched materials.
 
 ## `/miningadd`
 

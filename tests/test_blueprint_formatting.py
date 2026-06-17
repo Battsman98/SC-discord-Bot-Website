@@ -5,8 +5,11 @@ from src.bot import (
     _blueprint_result_label,
     add_community_mining_location,
     apply_community_mining_locations,
+    build_multi_mining_signature_embed,
     _format_blueprint_missions,
     _format_mining_location_page,
+    _mining_multi_search_terms,
+    _mining_space_search_terms,
     _mining_location_page_count,
     _format_rock_signatures,
     build_mining_embed,
@@ -15,10 +18,87 @@ from src.cache import SQLiteCache
 from src.sources.base import BlueprintMission, BlueprintResult, MiningLocationResult, MiningSystemLocations
 
 
+class FakeMiningSources:
+    def __init__(self, results: dict[str, MiningLocationResult]) -> None:
+        self.results = results
+
+    async def lookup_mining_material(
+        self,
+        material: str,
+        system: str | None = None,
+        planet: str | None = None,
+    ) -> MiningLocationResult | None:
+        del system, planet
+        return self.results.get(material.lower())
+
+
 def test_format_rock_signatures_shows_clusters_to_six() -> None:
     text = _format_rock_signatures([3185])
 
     assert text == "3,185: 1x 3,185 | 2x 6,370 | 3x 9,555 | 4x 12,740 | 5x 15,925 | 6x 19,110"
+
+
+def test_mining_multi_search_terms_accept_simple_separators() -> None:
+    assert _mining_multi_search_terms("gold, borase + bexalite") == ["gold", "borase", "bexalite"]
+    assert _mining_space_search_terms("gold borase") == ["gold", "borase"]
+
+
+def test_build_multi_mining_signature_embed_shows_shared_signatures_only() -> None:
+    gold = MiningLocationResult(
+        material_name="Gold",
+        code="GOLD",
+        kind=None,
+        refined_sell_price=None,
+        raw_sell_price=None,
+        is_harvestable=False,
+        is_volatile_qt=False,
+        is_volatile_time=False,
+        is_explosive=False,
+        systems=[],
+        lagrange_points=[],
+        planets=[],
+        moons=[],
+        points_of_interest=[],
+        source_url="https://uexcorp.space/mining/locations/commodity/gold-ore/",
+        source_name="UEX",
+        rock_signatures=[3200, 3570, 3585, 3600],
+        location_groups=[],
+    )
+    borase = MiningLocationResult(
+        material_name="Borase",
+        code="BORA",
+        kind=None,
+        refined_sell_price=None,
+        raw_sell_price=None,
+        is_harvestable=False,
+        is_volatile_qt=False,
+        is_volatile_time=False,
+        is_explosive=False,
+        systems=[],
+        lagrange_points=[],
+        planets=[],
+        moons=[],
+        points_of_interest=[],
+        source_url="https://uexcorp.space/mining/locations/commodity/borase-ore/",
+        source_name="UEX",
+        rock_signatures=[3570, 3585, 3600],
+        location_groups=[],
+    )
+
+    embed = asyncio.run(
+        build_multi_mining_signature_embed(
+            FakeMiningSources({"gold": gold, "borase": borase}),
+            "gold, borase",
+            ["gold", "borase"],
+        )
+    )
+
+    assert embed.title == "Mining Signature Match"
+    assert "Materials: Gold, Borase" in embed.description
+    assert "3,570:" in embed.fields[0].value
+    assert "3,585:" in embed.fields[0].value
+    assert "3,600:" in embed.fields[0].value
+    assert "3,200:" not in embed.fields[0].value
 
 
 def test_build_mining_embed_groups_locations_and_omits_kind() -> None:

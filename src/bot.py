@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import re
 from pathlib import Path
 
 import discord
@@ -533,7 +534,20 @@ async def mining_command(
         return
 
     await interaction.response.defer(thinking=True, ephemeral=True)
-    result = await bot.sources.lookup_mining_material(material, system, planet)
+    result: MiningLocationResult | None = None
+    terms = _mining_multi_search_terms(material)
+    if len(terms) == 1 and not _has_mining_multi_separator(material):
+        result = await bot.sources.lookup_mining_material(material, system, planet)
+        if result is None:
+            terms = _mining_space_search_terms(material)
+
+    if len(terms) > 1:
+        embed = await build_multi_mining_signature_embed(bot.sources, material, terms)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        return
+
+    if result is None:
+        result = await bot.sources.lookup_mining_material(material, system, planet)
     if result is None:
         await interaction.followup.send(f"No mining material found for `{material}`.", ephemeral=True)
         return
@@ -557,9 +571,10 @@ async def mining_material_autocomplete(
     if not isinstance(bot, GameAssistBot):
         return []
 
-    names = await bot.sources.autocomplete_mining_materials(current)
+    prefix, partial = _mining_autocomplete_prefix(current)
+    names = await bot.sources.autocomplete_mining_materials(partial)
     return [
-        app_commands.Choice(name=name[:100], value=name[:100])
+        app_commands.Choice(name=f"{prefix}{name}"[:100], value=f"{prefix}{name}"[:100])
         for name in names[:25]
     ]
 
@@ -1938,6 +1953,46 @@ def build_mining_embed(
     return embed
 
 
+async def build_multi_mining_signature_embed(
+    sources: SourceRegistry,
+    query: str,
+    terms: list[str],
+) -> discord.Embed:
+    results: list[tuple[str, MiningLocationResult, list[int]]] = []
+    missing: list[str] = []
+    for term in terms:
+        result = await sources.lookup_mining_material(term)
+        if result is None:
+            missing.append(term)
+            continue
+        signatures = _mining_term_signatures(result, term)
+        results.append((term, result, signatures))
+
+    material_names = _unique_preserve_order([result.material_name for _, result, _ in results])
+    shared_signatures = _shared_mining_signatures([signatures for _, _, signatures in results])
+    description = [
+        _line("Search", query),
+        _line("Materials", ", ".join(material_names) if material_names else None),
+    ]
+    if missing:
+        description.append(_line("Not Found", ", ".join(missing)))
+
+    embed = discord.Embed(
+        title="Mining Signature Match",
+        description="\n".join(line for line in description if line) or "No matching materials found.",
+        color=discord.Color.dark_gold(),
+    )
+    embed.add_field(
+        name="Rock Signatures",
+        value=_format_rock_signatures(shared_signatures)
+        if shared_signatures
+        else "No shared rock signatures found for those materials.",
+        inline=False,
+    )
+    embed.set_footer(text="Multi-material mining searches show shared rock signatures only.")
+    return embed
+
+
 def build_blueprint_embed(
     result: BlueprintResult,
     name: str | None = None,
@@ -2404,6 +2459,73 @@ def _format_location_group(locations: list[str]) -> str:
             break
         lines.append(location)
     return "\n".join(lines)
+
+
+def _has_mining_multi_separator(value: str) -> bool:
+    return bool(re.search(r"\s*(,|;|\+|&|\band\b)\s*", value, flags=re.IGNORECASE))
+
+
+def _mining_multi_search_terms(value: str) -> list[str]:
+    if not _has_mining_multi_separator(value):
+        return [value.strip()] if value.strip() else []
+    return [
+        term.strip()
+        for term in re.split(r"\s*(?:,|;|\+|&|\band\b)\s*", value, flags=re.IGNORECASE)
+        if term.strip()
+    ]
+
+
+def _mining_space_search_terms(value: str) -> list[str]:
+    return [term.strip() for term in value.split() if term.strip()]
+
+
+def _mining_autocomplete_prefix(value: str) -> tuple[str, str]:
+    match = re.search(r"^(?P<prefix>.*(?:,|;|\+|&|\band\b)\s*)(?P<partial>[^,;+&]*)$", value, flags=re.IGNORECASE)
+    if match is None:
+        return "", value
+    return match.group("prefix"), match.group("partial")
+
+
+def _mining_term_signatures(result: MiningLocationResult, term: str) -> list[int]:
+    signatures = result.rock_signatures or []
+    signature = _mining_signature_number(term)
+    if signature is None:
+        return signatures
+    return [
+        base_signature
+        for base_signature in signatures
+        if _mining_signature_matches_cluster(signature, base_signature)
+    ]
+
+
+def _mining_signature_number(value: object) -> int | None:
+    text = str(value or "").replace(",", "").strip()
+    return int(text) if text.isdigit() else None
+
+
+def _mining_signature_matches_cluster(signature: int, base_signature: int) -> bool:
+    return signature == base_signature or (signature % base_signature == 0 and 1 <= signature // base_signature <= 6)
+
+
+def _shared_mining_signatures(signature_groups: list[list[int]]) -> list[int]:
+    if not signature_groups or any(not signatures for signatures in signature_groups):
+        return []
+    shared = set(signature_groups[0])
+    for signatures in signature_groups[1:]:
+        shared.intersection_update(signatures)
+    return sorted(shared)
+
+
+def _unique_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        key = _normalize_text(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(value)
+    return unique
 
 
 async def add_community_mining_location(cache: SQLiteCache, entry: dict) -> None:
