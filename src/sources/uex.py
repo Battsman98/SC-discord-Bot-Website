@@ -408,8 +408,13 @@ class UEXSource:
         return {
             material
             for material, values in signatures.items()
-            if signature in values
+            if any(self._mining_signature_matches_cluster(signature, base_signature) for base_signature in values)
         }
+
+    def _mining_signature_matches_cluster(self, signature: int, base_signature: int) -> bool:
+        if signature == base_signature:
+            return True
+        return signature % base_signature == 0 and 1 <= signature // base_signature <= 6
 
     async def _get_location_filter_names(self) -> list[str]:
         if self._location_filter_names is not None:
