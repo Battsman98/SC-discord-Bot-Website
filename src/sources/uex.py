@@ -113,6 +113,7 @@ class UEXSource:
         result = await self._fetch_mining_location_result(commodity, system_code)
         if result is None:
             return None
+        result = await self._with_mining_sell_prices(result, commodity)
         result = await self._with_mining_signatures(result, commodity)
         result = await self._with_mining_location_groups(result, commodity, system_code)
 
@@ -894,8 +895,8 @@ class UEXSource:
             material_name=self._mining_material_base_name(commodity),
             code=self._string_or_none(commodity.get("code")),
             kind=self._string_or_none(commodity.get("kind")),
-            refined_sell_price=commodity.get("price_sell") or None,
-            raw_sell_price=commodity.get("price_buy") or commodity.get("price_sell") or None,
+            refined_sell_price=None,
+            raw_sell_price=commodity.get("price_sell") or None,
             is_harvestable=bool(commodity.get("is_harvestable")),
             is_volatile_qt=bool(commodity.get("is_volatile_qt")),
             is_volatile_time=bool(commodity.get("is_volatile_time")),
@@ -909,6 +910,47 @@ class UEXSource:
             source_name=self.name,
             rock_signatures=[],
             location_groups=[],
+        )
+
+    async def _with_mining_sell_prices(
+        self,
+        result: MiningLocationResult,
+        commodity: dict,
+    ) -> MiningLocationResult:
+        raw_sell_price = commodity.get("price_sell") or result.raw_sell_price
+        refined_sell_price = None
+
+        base_name = self._normalize(self._mining_material_base_name(commodity))
+        if commodity.get("is_refinable") or str(commodity.get("name") or "").endswith(("(Ore)", "(Raw)")):
+            commodities = await self._get_commodities()
+            for row in commodities:
+                if self._normalize(row.get("name")) != base_name:
+                    continue
+                if not self._positive(row.get("price_sell")):
+                    continue
+                refined_sell_price = row.get("price_sell")
+                break
+
+        return MiningLocationResult(
+            material_name=result.material_name,
+            code=result.code,
+            kind=result.kind,
+            refined_sell_price=refined_sell_price,
+            raw_sell_price=raw_sell_price,
+            is_harvestable=result.is_harvestable,
+            is_volatile_qt=result.is_volatile_qt,
+            is_volatile_time=result.is_volatile_time,
+            is_explosive=result.is_explosive,
+            systems=result.systems,
+            lagrange_points=result.lagrange_points,
+            planets=result.planets,
+            moons=result.moons,
+            points_of_interest=result.points_of_interest,
+            source_url=result.source_url,
+            source_name=result.source_name,
+            location_basis=result.location_basis,
+            rock_signatures=result.rock_signatures,
+            location_groups=result.location_groups,
         )
 
     def _parse_mining_sections(self, lines: list[str]) -> dict[str, list[str]]:

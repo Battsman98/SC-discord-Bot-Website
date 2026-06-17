@@ -83,13 +83,13 @@ Current output:
 Purchase location logic:
 
 - Filters by `system` or `purchase_system` when provided.
-- Uses average terminal sell price from UEX.
-- Shows the top 3 lowest average prices, meaning the cheapest places for the player to buy.
+- Uses UEX terminal buy-side fields.
+- Shows the top 3 lowest average prices when UEX lists places to purchase the commodity.
 
 Sell location logic:
 
 - Filters by `system` or `sell_system` when provided.
-- Uses average terminal buy price from UEX.
+- Uses UEX terminal sell-side fields.
 - Shows the top 3 highest average prices, meaning the best places for the player to sell.
 
 Examples:

@@ -234,6 +234,93 @@ def test_parse_mining_location_result_groups_locations() -> None:
     assert result.points_of_interest == ["Pyro Clusters"]
 
 
+def test_parse_mining_location_result_does_not_use_buy_price_as_raw_sell() -> None:
+    source = UEXSource.__new__(UEXSource)
+    result = source._parse_mining_location_result(
+        {
+            "name": "Janalite",
+            "code": "JANA",
+            "kind": "Mineral",
+            "price_buy": 999999,
+            "price_sell": 1577080,
+            "is_harvestable": 1,
+            "is_volatile_qt": 0,
+            "is_volatile_time": 0,
+            "is_explosive": 0,
+        },
+        "<html><body><h3>Star Systems</h3><p>Stanton</p></body></html>",
+        "https://uexcorp.space/mining/locations/commodity/janalite/",
+    )
+
+    assert result.raw_sell_price == 1577080
+    assert result.refined_sell_price is None
+
+
+def test_parse_mining_location_result_omits_missing_raw_sell_price() -> None:
+    source = UEXSource.__new__(UEXSource)
+    result = source._parse_mining_location_result(
+        {
+            "name": "Gold (Ore)",
+            "code": "GOLD",
+            "kind": "Metal",
+            "price_buy": 12345,
+            "price_sell": 0,
+            "is_harvestable": 0,
+            "is_volatile_qt": 0,
+            "is_volatile_time": 0,
+            "is_explosive": 0,
+        },
+        "<html><body><h3>Star Systems</h3><p>Stanton</p></body></html>",
+        "https://uexcorp.space/mining/locations/commodity/gold-ore/",
+    )
+
+    assert result.raw_sell_price is None
+
+
+def test_with_mining_sell_prices_uses_refined_commodity_sell_price() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._commodities = [
+        {
+            "name": "Gold",
+            "price_sell": 30934,
+        },
+        {
+            "name": "Gold (Ore)",
+            "price_sell": 0,
+        },
+    ]
+    result = source._parse_mining_location_result(
+        {
+            "name": "Gold (Ore)",
+            "code": "GOLD",
+            "kind": "Metal",
+            "price_buy": 0,
+            "price_sell": 0,
+            "is_refinable": 1,
+            "is_harvestable": 0,
+            "is_volatile_qt": 0,
+            "is_volatile_time": 0,
+            "is_explosive": 0,
+        },
+        "<html><body><h3>Star Systems</h3><p>Stanton</p></body></html>",
+        "https://uexcorp.space/mining/locations/commodity/gold-ore/",
+    )
+
+    enriched = asyncio.run(
+        source._with_mining_sell_prices(
+            result,
+            {
+                "name": "Gold (Ore)",
+                "price_sell": 0,
+                "is_refinable": 1,
+            },
+        )
+    )
+
+    assert enriched.raw_sell_price is None
+    assert enriched.refined_sell_price == 30934
+
+
 def test_parse_mining_mom_associations_links_shared_deposit_materials() -> None:
     source = UEXSource.__new__(UEXSource)
     script = '''
