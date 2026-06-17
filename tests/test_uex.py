@@ -364,6 +364,45 @@ def test_parse_star_head_signatures_groups_by_material() -> None:
     assert signatures["borase"] == [3570, 3585]
 
 
+def test_find_mining_material_accepts_rock_signature() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {"iron": [4270]}
+    source._commodities = [
+        {
+            "name": "Iron (Ore)",
+            "code": "IRON",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_inert": 0,
+        }
+    ]
+
+    match = asyncio.run(source._find_mining_material("4,270"))
+
+    assert match is not None
+    assert match["name"] == "Iron (Ore)"
+
+
+def test_autocomplete_mining_materials_accepts_rock_signature() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {"iron": [4270]}
+    source._commodities = [
+        {
+            "name": "Iron (Ore)",
+            "code": "IRON",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_inert": 0,
+        }
+    ]
+
+    matches = asyncio.run(source.autocomplete_mining_materials("4270"))
+
+    assert matches == ["Iron (Ore) (IRON)"]
+
+
 def test_merge_mining_location_results_keeps_primary_material() -> None:
     source = UEXSource.__new__(UEXSource)
     primary = source._parse_mining_location_result(

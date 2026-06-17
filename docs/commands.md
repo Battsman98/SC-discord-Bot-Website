@@ -110,7 +110,7 @@ Response visibility: private to the user.
 
 Autocomplete:
 
-- `material` supports mineable material dropdown suggestions.
+- `material` supports mineable material dropdown suggestions and rock signature searches.
 - `system` supports `Stanton`, `Pyro`, and `Nyx`.
 - `planet` supports planet, moon, lagrange point, and point-of-interest suggestions.
 
@@ -118,7 +118,7 @@ Options:
 
 | Option | Required | Purpose |
 | --- | --- | --- |
-| `material` | Yes | Mineable material name or code, such as `Gold`, `Agricium`, `GOLD`, or `HADA`. |
+| `material` | Yes | Mineable material name, code, or rock signature, such as `Gold`, `Agricium`, `GOLD`, `HADA`, or `4270`. |
 | `system` | No | Filters mining locations to one star system. |
 | `planet` | No | Filters listed locations by planet, moon, lagrange point, or point of interest. |
 
@@ -141,6 +141,7 @@ Examples:
 
 ```text
 /mining material:Gold
+/mining material:4270
 /mining material:Agricium system:Stanton
 /mining material:Hadanite planet:Daymar
 ```

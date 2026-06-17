@@ -133,6 +133,17 @@ class UEXSource:
         if not normalized_query:
             return names[:limit]
 
+        signature = self._mining_signature_value(query)
+        if signature is not None:
+            signature_names = await self._get_mining_material_names_for_signature(signature)
+            signature_matches = [
+                self._display_name(material)
+                for material in materials
+                if self._normalize(self._mining_material_base_name(material)) in signature_names
+            ]
+            if signature_matches:
+                return signature_matches[:limit]
+
         starts = [
             self._display_name(row)
             for row in materials
@@ -360,6 +371,12 @@ class UEXSource:
         if not normalized_query:
             return None
 
+        signature = self._mining_signature_value(query)
+        if signature is not None:
+            match = await self._find_mining_material_by_signature(signature)
+            if match is not None:
+                return match
+
         materials = await self._get_mining_materials()
         for material in materials:
             if self._normalize(self._mining_material_base_name(material)) == normalized_query:
@@ -374,6 +391,25 @@ class UEXSource:
             if normalized_query in self._normalize(material.get("code")):
                 return material
         return None
+
+    async def _find_mining_material_by_signature(self, signature: int) -> dict | None:
+        signature_names = await self._get_mining_material_names_for_signature(signature)
+        if not signature_names:
+            return None
+
+        materials = await self._get_mining_materials()
+        for material in materials:
+            if self._normalize(self._mining_material_base_name(material)) in signature_names:
+                return material
+        return None
+
+    async def _get_mining_material_names_for_signature(self, signature: int) -> set[str]:
+        signatures = await self._get_mining_signature_map()
+        return {
+            material
+            for material, values in signatures.items()
+            if signature in values
+        }
 
     async def _get_location_filter_names(self) -> list[str]:
         if self._location_filter_names is not None:
@@ -1121,6 +1157,10 @@ class UEXSource:
         if name.endswith("(Ore)") or name.endswith("(Raw)") or row.get("is_raw"):
             return 0
         return 1
+
+    def _mining_signature_value(self, value: object) -> int | None:
+        text = str(value or "").replace(",", "").strip()
+        return int(text) if text.isdigit() else None
 
     def _mining_system_code(self, system: str | None) -> str | None:
         normalized_system = self._normalize(system)
