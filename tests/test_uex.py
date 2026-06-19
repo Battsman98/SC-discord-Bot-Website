@@ -193,6 +193,43 @@ def test_autocomplete_mining_materials_uses_raw_materials() -> None:
     assert matches == ["Gold (Ore) (GOLD)"]
 
 
+def test_find_mining_material_accepts_quantanium_alias() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._commodities = [
+        {
+            "name": "Quantainium (Raw)",
+            "code": "QUAN",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_inert": 0,
+        }
+    ]
+
+    match = asyncio.run(source._find_mining_material("Quantanium"))
+
+    assert match is not None
+    assert match["name"] == "Quantainium (Raw)"
+
+
+def test_autocomplete_mining_materials_accepts_quantanium_alias() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._commodities = [
+        {
+            "name": "Quantainium (Raw)",
+            "code": "QUAN",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_inert": 0,
+        }
+    ]
+
+    matches = asyncio.run(source.autocomplete_mining_materials("quantanium", limit=5))
+
+    assert matches == ["Quantainium (Raw) (QUAN)"]
+
+
 def test_parse_mining_location_result_groups_locations() -> None:
     source = UEXSource.__new__(UEXSource)
     result = source._parse_mining_location_result(

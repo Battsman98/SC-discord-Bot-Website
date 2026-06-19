@@ -127,7 +127,7 @@ class UEXSource:
 
     async def autocomplete_mining_materials(self, query: str, limit: int = 25) -> list[str]:
         materials = await self._get_mining_materials()
-        normalized_query = self._normalize(self._strip_code_suffix(query))
+        normalized_query = self._mining_material_alias(self._normalize(self._strip_code_suffix(query)))
         names = [self._display_name(row) for row in materials]
 
         if not normalized_query:
@@ -367,7 +367,7 @@ class UEXSource:
         )
 
     async def _find_mining_material(self, query: str) -> dict | None:
-        normalized_query = self._normalize(self._strip_code_suffix(query).replace("(ore)", ""))
+        normalized_query = self._mining_material_alias(self._normalize(self._strip_code_suffix(query).replace("(ore)", "")))
         if not normalized_query:
             return None
 
@@ -1162,6 +1162,12 @@ class UEXSource:
         if name.endswith("(Ore)") or name.endswith("(Raw)") or row.get("is_raw"):
             return 0
         return 1
+
+    def _mining_material_alias(self, normalized_query: str) -> str:
+        return {
+            "quantanium": "quantainium",
+            "quantanium raw": "quantainium",
+        }.get(normalized_query, normalized_query)
 
     def _mining_signature_value(self, value: object) -> int | None:
         text = str(value or "").replace(",", "").strip()
