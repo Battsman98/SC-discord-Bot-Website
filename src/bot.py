@@ -230,6 +230,7 @@ class GameAssistBot(commands.Bot):
             try:
                 message = await channel.fetch_message(message_id)
                 await message.edit(content=None, embed=embed)
+                await self.delete_recent_duplicate_embed_messages(channel, "Executive Hangar Clock", message.id)
                 logging.info("Updated Executive Hangar status message %s", message_id)
                 return
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
@@ -240,6 +241,7 @@ class GameAssistBot(commands.Bot):
             try:
                 await existing_message.edit(content=None, embed=embed)
                 await self.cache.set(cache_key, existing_message.id, 315360000)
+                await self.delete_recent_duplicate_embed_messages(channel, "Executive Hangar Clock", existing_message.id)
                 logging.info("Reused Executive Hangar status message %s", existing_message.id)
                 return
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
@@ -247,6 +249,7 @@ class GameAssistBot(commands.Bot):
 
         message = await channel.send(embed=embed)
         await self.cache.set(cache_key, message.id, 315360000)
+        await self.delete_recent_duplicate_embed_messages(channel, "Executive Hangar Clock", message.id)
         logging.info("Created Executive Hangar status message %s", message.id)
 
     async def find_recent_embed_message(
@@ -267,6 +270,30 @@ class GameAssistBot(commands.Bot):
             return None
 
         return None
+
+    async def delete_recent_duplicate_embed_messages(
+        self,
+        channel: discord.abc.Messageable,
+        title: str,
+        keep_message_id: int,
+    ) -> None:
+        if not hasattr(channel, "history"):
+            return
+
+        try:
+            async for message in channel.history(limit=50):
+                if message.id == keep_message_id:
+                    continue
+                if self.user is not None and message.author.id != self.user.id:
+                    continue
+                if any(embed.title == title for embed in message.embeds):
+                    try:
+                        await message.delete()
+                        logging.info("Deleted duplicate %s message %s", title, message.id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        logging.info("Could not delete duplicate %s message %s", title, message.id)
+        except (discord.Forbidden, discord.HTTPException):
+            logging.info("Could not scan for duplicate %s messages", title)
 
     async def sync_cz_timers_message(self) -> None:
         if not self.settings.cz_timers_channel_id:
@@ -1424,14 +1451,17 @@ async def exec_command(interaction: discord.Interaction) -> None:
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
 
-    await interaction.response.defer(thinking=True)
-    try:
-        status_context = await bot.resolve_exec_status_context()
-    except Exception:
-        await interaction.followup.send("Could not fetch the Executive Hangar timer right now.")
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    await bot.sync_exec_status_message()
+
+    if bot.settings.exec_status_channel_id:
+        await interaction.followup.send(
+            f"Executive Hangar panel refreshed in <#{bot.settings.exec_status_channel_id}>.",
+            ephemeral=True,
+        )
         return
 
-    await interaction.followup.send(embed=build_exec_status_embed(status_context))
+    await interaction.followup.send("Executive Hangar status channel is not configured.", ephemeral=True)
 
 
 @app_commands.command(name="execset", description="Correct the Executive Hangar timer.")
