@@ -271,6 +271,57 @@ def test_parse_mining_location_result_groups_locations() -> None:
     assert result.points_of_interest == ["Pyro Clusters"]
 
 
+def test_with_mining_location_groups_skips_unscoped_system_fallback() -> None:
+    source = UEXSource.__new__(UEXSource)
+    commodity = {"name": "Iron (Ore)", "code": "IRONO"}
+    result = source._parse_mining_location_result(
+        commodity,
+        """
+        <html><body>
+        <a>Routes</a>
+        <h3>Star Systems</h3><p>Stanton</p><p>Pyro</p><p>Nyx</p>
+        </body></html>
+        """,
+        "https://uexcorp.space/mining/locations/commodity/iron-ore/",
+    )
+
+    async def fake_fetch_mining_location_result(commodity: dict, system_code: str | None):
+        html_by_code = {
+            "ST": """
+                <html><body><a>Routes</a>
+                <h3>Star Systems</h3><p>Stanton</p>
+                <h3>Lagrange Points</h3><p>ARC-L3</p>
+                </body></html>
+            """,
+            "PY": """
+                <html><body><a>Routes</a>
+                <h3>Star Systems</h3><p>Pyro</p>
+                <h3>Planets</h3><p>Bloom</p>
+                </body></html>
+            """,
+            "NY": """
+                <html><body><a>Routes</a>
+                <h3>Star Systems</h3><p>Stanton</p><p>Pyro</p><p>Nyx</p>
+                <h3>Lagrange Points</h3><p>ARC-L3</p>
+                <h3>Planets</h3><p>Bloom</p>
+                </body></html>
+            """,
+        }
+        return source._parse_mining_location_result(
+            commodity,
+            html_by_code[system_code],
+            f"https://uexcorp.space/mining/locations/commodity/iron-ore/system/{system_code}/",
+        )
+
+    source._fetch_mining_location_result = fake_fetch_mining_location_result
+
+    grouped = asyncio.run(source._with_mining_location_groups(result, commodity, None))
+
+    assert [group.system for group in grouped.location_groups] == ["Stanton", "Pyro"]
+    assert grouped.location_groups[0].lagrange_points == ["ARC-L3"]
+    assert grouped.location_groups[1].planets == ["Bloom"]
+
+
 def test_parse_mining_location_result_does_not_use_buy_price_as_raw_sell() -> None:
     source = UEXSource.__new__(UEXSource)
     result = source._parse_mining_location_result(

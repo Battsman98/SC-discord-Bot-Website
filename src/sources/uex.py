@@ -701,7 +701,10 @@ class UEXSource:
         system_code: str | None,
     ) -> MiningLocationResult:
         if system_code:
-            groups = [self._mining_system_group(result, self._mining_system_name(system_code))]
+            system = self._mining_system_name(system_code)
+            groups = [
+                self._mining_system_group(result, system)
+            ] if self._is_mining_system_scoped_result(result, system) else []
         else:
             groups = []
             for system in sorted(result.systems, key=self._mining_system_sort_key):
@@ -711,6 +714,8 @@ class UEXSource:
                     continue
                 system_result = await self._fetch_mining_location_result(commodity, code)
                 if system_result is None:
+                    continue
+                if not self._is_mining_system_scoped_result(system_result, system):
                     continue
                 groups.append(self._mining_system_group(system_result, system))
 
@@ -1108,6 +1113,14 @@ class UEXSource:
             moons=result.moons,
             points_of_interest=result.points_of_interest,
         )
+
+    def _is_mining_system_scoped_result(self, result: MiningLocationResult, system: str) -> bool:
+        normalized_system = self._normalize(system)
+        normalized_systems = {
+            self._normalize(candidate)
+            for candidate in result.systems
+        }
+        return normalized_systems == {normalized_system}
 
     def _mining_system_name(self, system_code: str) -> str:
         return {
