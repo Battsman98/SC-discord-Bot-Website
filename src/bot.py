@@ -808,11 +808,20 @@ async def blueprint_command(
 
     await interaction.response.defer(thinking=True, ephemeral=True)
     try:
-        result_limit = 3 if name else 25
+        lookup_name = name
+        lookup_material = material
+        if name and not any([category, material, mission_type, contractor]):
+            exact_blueprint_name = await _exact_blueprint_name_match(bot, name)
+            exact_material = await _exact_blueprint_filter_match(bot, "resource", name)
+            if exact_material and not exact_blueprint_name:
+                lookup_name = None
+                lookup_material = exact_material
+
+        result_limit = 3 if lookup_name else 25
         results = await bot.sources.lookup_blueprints(
-            query=name,
+            query=lookup_name,
             category=category,
-            material=material,
+            material=lookup_material,
             mission_type=mission_type,
             contractor=contractor,
             limit=result_limit,
@@ -822,12 +831,12 @@ async def blueprint_command(
             await interaction.followup.send("No blueprints found for those filters.", ephemeral=True)
             return
 
-        if not name:
+        if not lookup_name:
             has_next = bool(
                 await bot.sources.lookup_blueprints(
                     query=None,
                     category=category,
-                    material=material,
+                    material=lookup_material,
                     mission_type=mission_type,
                     contractor=contractor,
                     limit=BLUEPRINT_PAGE_SIZE,
@@ -838,7 +847,7 @@ async def blueprint_command(
                 embed=build_blueprint_selection_embed(
                     results,
                     category=category,
-                    material=material,
+                    material=lookup_material,
                     mission_type=mission_type,
                     contractor=contractor,
                     page=1,
@@ -847,7 +856,7 @@ async def blueprint_command(
                 view=BlueprintSelectView(
                     results,
                     category=category,
-                    material=material,
+                    material=lookup_material,
                     mission_type=mission_type,
                     contractor=contractor,
                     page=1,
@@ -861,17 +870,33 @@ async def blueprint_command(
             result = results[0]
             has_next = _blueprint_mission_page_count(result.missions) > 1
             kwargs = {
-                "embed": build_blueprint_embed(result, name, category, material, mission_type, contractor, mission_page=1),
+                "embed": build_blueprint_embed(
+                    result,
+                    lookup_name,
+                    category,
+                    lookup_material,
+                    mission_type,
+                    contractor,
+                    mission_page=1,
+                ),
                 "ephemeral": True,
             }
             if has_next:
-                kwargs["view"] = BlueprintDetailView(result, name, category, material, mission_type, contractor, page=1)
+                kwargs["view"] = BlueprintDetailView(
+                    result,
+                    lookup_name,
+                    category,
+                    lookup_material,
+                    mission_type,
+                    contractor,
+                    page=1,
+                )
             await interaction.followup.send(**kwargs)
             return
 
         await interaction.followup.send(
             embeds=[
-                build_blueprint_embed(result, name, category, material, mission_type, contractor, mission_page=1)
+                build_blueprint_embed(result, lookup_name, category, lookup_material, mission_type, contractor, mission_page=1)
                 for result in results
             ],
             ephemeral=True,
@@ -920,6 +945,28 @@ async def blueprint_filter_autocomplete(
         current,
     )
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
+
+
+async def _exact_blueprint_name_match(bot: GameAssistBot, query: str) -> str | None:
+    names = await bot.sources.autocomplete_blueprints(query)
+    return _exact_choice_match(query, names)
+
+
+async def _exact_blueprint_filter_match(bot: GameAssistBot, filter_name: str, query: str) -> str | None:
+    names = await bot.sources.autocomplete_blueprint_filter(filter_name, query)
+    return _exact_choice_match(query, names)
+
+
+def _exact_choice_match(query: str, choices: list[str]) -> str | None:
+    normalized_query = _normalize_choice(query)
+    for choice in choices:
+        if _normalize_choice(choice) == normalized_query:
+            return choice
+    return None
+
+
+def _normalize_choice(value: str) -> str:
+    return " ".join(value.lower().replace("-", " ").split())
 
 
 class BlueprintSelect(discord.ui.Select):

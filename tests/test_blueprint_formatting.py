@@ -3,6 +3,7 @@ import asyncio
 from src.bot import (
     _blueprint_mission_page_count,
     _blueprint_result_label,
+    _exact_choice_match,
     add_community_mining_location,
     apply_community_mining_locations,
     build_multi_mining_signature_embed,
@@ -323,3 +324,8 @@ def test_blueprint_result_label_includes_component_size() -> None:
     )
 
     assert _blueprint_result_label(result) == "Quantum Drive | Size 1"
+
+
+def test_exact_choice_match_requires_full_normalized_match() -> None:
+    assert _exact_choice_match("iron", ["Iron"]) == "Iron"
+    assert _exact_choice_match("iron", ["Chiron Arms"]) is None
