@@ -233,11 +233,40 @@ class GameAssistBot(commands.Bot):
                 logging.info("Updated Executive Hangar status message %s", message_id)
                 return
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                logging.info("Could not update previous Executive Hangar status message; creating a new one")
+                logging.info("Could not update previous Executive Hangar status message; searching for an existing one")
+
+        existing_message = await self.find_recent_embed_message(channel, "Executive Hangar Clock")
+        if existing_message is not None:
+            try:
+                await existing_message.edit(content=None, embed=embed)
+                await self.cache.set(cache_key, existing_message.id, 315360000)
+                logging.info("Reused Executive Hangar status message %s", existing_message.id)
+                return
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logging.info("Could not reuse existing Executive Hangar status message; creating a new one")
 
         message = await channel.send(embed=embed)
         await self.cache.set(cache_key, message.id, 315360000)
         logging.info("Created Executive Hangar status message %s", message.id)
+
+    async def find_recent_embed_message(
+        self,
+        channel: discord.abc.Messageable,
+        title: str,
+    ) -> discord.Message | None:
+        if not hasattr(channel, "history"):
+            return None
+
+        try:
+            async for message in channel.history(limit=50):
+                if self.user is not None and message.author.id != self.user.id:
+                    continue
+                if any(embed.title == title for embed in message.embeds):
+                    return message
+        except (discord.Forbidden, discord.HTTPException):
+            return None
+
+        return None
 
     async def sync_cz_timers_message(self) -> None:
         if not self.settings.cz_timers_channel_id:
