@@ -1,6 +1,13 @@
 from types import SimpleNamespace
 
-from src.bot import build_command_channel_directory_embed, _format_interaction_options, _interaction_command_name
+import discord
+
+from src.bot import (
+    build_command_channel_directory_embed,
+    _format_interaction_options,
+    _interaction_command_name,
+    _message_embed_matches,
+)
 from src.config import Settings
 
 
@@ -68,3 +75,13 @@ def test_command_channel_directory_groups_commands_by_channel() -> None:
 
     assert "<#111>: /ship" in embed.description
     assert "<#222>: /commodity, /trade routing" in embed.description
+
+
+def test_message_embed_matches_existing_embed_payload() -> None:
+    embed = discord.Embed(title="Discord Bot Commands - /mining", description="Mining help")
+    message = SimpleNamespace(embeds=[embed])
+
+    assert _message_embed_matches(message, embed)
+
+    changed_embed = discord.Embed(title="Discord Bot Commands - /mining", description="Updated help")
+    assert not _message_embed_matches(message, changed_embed)

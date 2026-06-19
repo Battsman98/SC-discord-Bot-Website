@@ -183,19 +183,23 @@ class GameAssistBot(commands.Bot):
             if index < len(message_ids):
                 try:
                     message = await channel.fetch_message(message_ids[index])
-                    await message.edit(content=None, embed=embed)
+                    if not _message_embed_matches(message, embed) or message.content:
+                        await message.edit(content=None, embed=embed)
+                        await asyncio.sleep(1)
                     updated_message_ids.append(message.id)
                     continue
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     logging.info("Could not update commands reference message part %s; creating a new one", index + 1)
 
             message = await channel.send(embed=embed)
+            await asyncio.sleep(1)
             updated_message_ids.append(message.id)
 
         for stale_message_id in message_ids[len(embeds):]:
             try:
                 message = await channel.fetch_message(stale_message_id)
                 await message.delete()
+                await asyncio.sleep(1)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logging.info("Could not delete stale commands reference message %s", stale_message_id)
 
@@ -229,7 +233,8 @@ class GameAssistBot(commands.Bot):
         if isinstance(message_id, int):
             try:
                 message = await channel.fetch_message(message_id)
-                await message.edit(content=None, embed=embed)
+                if not _message_embed_matches(message, embed) or message.content:
+                    await message.edit(content=None, embed=embed)
                 await self.delete_recent_duplicate_embed_messages(channel, "Executive Hangar Clock", message.id)
                 logging.info("Updated Executive Hangar status message %s", message_id)
                 return
@@ -239,7 +244,8 @@ class GameAssistBot(commands.Bot):
         existing_message = await self.find_recent_embed_message(channel, "Executive Hangar Clock")
         if existing_message is not None:
             try:
-                await existing_message.edit(content=None, embed=embed)
+                if not _message_embed_matches(existing_message, embed) or existing_message.content:
+                    await existing_message.edit(content=None, embed=embed)
                 await self.cache.set(cache_key, existing_message.id, 315360000)
                 await self.delete_recent_duplicate_embed_messages(channel, "Executive Hangar Clock", existing_message.id)
                 logging.info("Reused Executive Hangar status message %s", existing_message.id)
@@ -318,7 +324,8 @@ class GameAssistBot(commands.Bot):
         if isinstance(message_id, int):
             try:
                 message = await channel.fetch_message(message_id)
-                await message.edit(content=None, embed=embed, view=view)
+                if not _message_embed_matches(message, embed) or message.content:
+                    await message.edit(content=None, embed=embed, view=view)
                 logging.info("Updated CZ timers dashboard message %s", message_id)
                 return
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
@@ -2467,6 +2474,12 @@ def build_commands_reference_embeds(settings: Settings | None = None) -> list[di
             embeds.append(embed)
 
     return embeds
+
+
+def _message_embed_matches(message: discord.Message, embed: discord.Embed) -> bool:
+    if len(message.embeds) != 1:
+        return False
+    return message.embeds[0].to_dict() == embed.to_dict()
 
 
 def build_command_channel_directory_embed(settings: Settings) -> discord.Embed:
