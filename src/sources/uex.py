@@ -1358,7 +1358,6 @@ class UEXSource:
 
                     quantity_scu = min(
                         cargo_capacity_scu,
-                        investment / buy_price,
                         self._available_scu(purchase, "scu_sell_stock_avg", "scu_sell_stock"),
                         self._available_scu(sale, "scu_buy_avg", "scu_buy"),
                     )
@@ -1386,13 +1385,14 @@ class UEXSource:
                         )
                     )
 
-        return self._best_circular_route(candidates, max_stops, start_keys)
+        return self._best_circular_route(candidates, max_stops, start_keys, investment)
 
     def _best_circular_route(
         self,
         candidates: list[TradeRouteLeg],
         max_stops: int,
         start_keys: set[str],
+        investment: float,
     ) -> list[TradeRouteLeg]:
         max_stops = max(2, max_stops)
         candidates.sort(key=lambda leg: float(leg.profit), reverse=True)
@@ -1420,18 +1420,16 @@ class UEXSource:
             if self._terminal_key(leg.buy_terminal) in start_keys
         ][:1000]
 
-        def route_profit(route: list[TradeRouteLeg]) -> float:
-            return sum(float(leg.profit) for leg in route)
-
         def search(route: list[TradeRouteLeg], start_terminal: str, visited_terminals: set[str]) -> None:
             nonlocal best_route, best_profit
 
             current_terminal = self._terminal_key(route[-1].sell_terminal)
             if len(route) >= 2 and current_terminal == start_terminal:
-                profit = route_profit(route)
+                simulated_route = self._simulate_trade_route_wallet(route, investment)
+                profit = self._route_profit(simulated_route)
                 if profit > best_profit:
                     best_profit = profit
-                    best_route = route.copy()
+                    best_route = simulated_route
                 return
 
             if len(route) >= max_stops:
@@ -1474,27 +1472,26 @@ class UEXSource:
         if best_route:
             return best_route
 
-        return self._best_route_with_empty_return(start_candidates, outgoing, max_stops)
+        return self._best_route_with_empty_return(start_candidates, outgoing, max_stops, investment)
 
     def _best_route_with_empty_return(
         self,
         start_candidates: list[TradeRouteLeg],
         outgoing: dict[str, list[TradeRouteLeg]],
         max_stops: int,
+        investment: float,
     ) -> list[TradeRouteLeg]:
         best_route: list[TradeRouteLeg] = []
         best_profit = 0.0
 
-        def route_profit(route: list[TradeRouteLeg]) -> float:
-            return sum(float(leg.profit) for leg in route)
-
         def search(route: list[TradeRouteLeg], visited_terminals: set[str]) -> None:
             nonlocal best_route, best_profit
 
-            profit = route_profit(route)
+            simulated_route = self._simulate_trade_route_wallet(route, investment)
+            profit = self._route_profit(simulated_route)
             if profit > best_profit:
                 best_profit = profit
-                best_route = route.copy()
+                best_route = simulated_route
 
             if len(route) >= max_stops:
                 return
@@ -1527,6 +1524,47 @@ class UEXSource:
             search([start_leg], visited)
 
         return best_route
+
+    def _simulate_trade_route_wallet(
+        self,
+        route: list[TradeRouteLeg],
+        starting_cash: float,
+    ) -> list[TradeRouteLeg]:
+        cash = starting_cash
+        simulated_route: list[TradeRouteLeg] = []
+
+        for leg in route:
+            quantity_scu = min(float(leg.quantity_scu), cash / float(leg.buy_price))
+            if quantity_scu <= 0:
+                return []
+
+            investment_used = float(leg.buy_price) * quantity_scu
+            payout = float(leg.sell_price) * quantity_scu
+            profit = payout - investment_used
+            cash = cash - investment_used + payout
+            simulated_route.append(
+                TradeRouteLeg(
+                    commodity_name=leg.commodity_name,
+                    buy_price=leg.buy_price,
+                    sell_price=leg.sell_price,
+                    quantity_scu=quantity_scu,
+                    investment_used=investment_used,
+                    profit=profit,
+                    buy_system=leg.buy_system,
+                    buy_planet=leg.buy_planet,
+                    buy_location=leg.buy_location,
+                    buy_terminal=leg.buy_terminal,
+                    sell_system=leg.sell_system,
+                    sell_planet=leg.sell_planet,
+                    sell_location=leg.sell_location,
+                    sell_terminal=leg.sell_terminal,
+                )
+            )
+
+        return simulated_route
+
+    def _route_profit(self, route: list[TradeRouteLeg]) -> float:
+        return sum(float(leg.profit) for leg in route)
 
     def _terminal_key(self, terminal_name: str) -> str:
         return self._normalize(terminal_name)

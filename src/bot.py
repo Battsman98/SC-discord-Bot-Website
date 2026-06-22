@@ -2387,9 +2387,10 @@ def build_trade_route_embed(
         _line("Ship", result.ship),
         _line("Starting Point", starting_point),
         _line("Cargo", f"{_format_number(result.cargo_capacity_scu)} SCU"),
-        _line("Investment", _format_currency(result.investment, "aUEC")),
+        _line("Starting Cash", _format_currency(result.investment, "aUEC")),
         _line("Max Stops", str(max_stops)),
         _line("Estimated Loop Profit", _format_currency(_trade_route_total_profit(result), "aUEC")),
+        _line("Estimated Ending Cash", _format_currency(_trade_route_ending_cash(result), "aUEC")),
         _line("Stay In System", stay_system),
         loop_line,
     ]
@@ -2425,6 +2426,10 @@ def build_trade_route_embed(
 
 def _trade_route_total_profit(result: TradeRouteResult) -> float:
     return sum(float(leg.profit) for leg in result.legs)
+
+
+def _trade_route_ending_cash(result: TradeRouteResult) -> float:
+    return float(result.investment) + _trade_route_total_profit(result)
 
 
 def _format_trade_route_leg(leg: TradeRouteLeg) -> str:

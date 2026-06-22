@@ -241,7 +241,7 @@ Options:
 | --- | --- | --- |
 | `starting_point` | Yes | Starting trade terminal for the circular route. Autocomplete is available, and users can still type a terminal manually. |
 | `ship` | No | Ship name for route planning. Defaults to `Ironclad Assault`. |
-| `investment` | No | aUEC investment for route planning. Defaults to `1,000,000`. |
+| `investment` | No | Starting aUEC cash for the whole route. Defaults to `1,000,000`. |
 | `max_stops` | No | Maximum route stops, from 2 to 5. Defaults to `5`. |
 | `stay_system` | No | Keeps the full circular route inside one star system. |
 
@@ -257,7 +257,9 @@ Route behavior:
 
 - Uses UEX average terminal prices, stock, and demand.
 - Uses the selected ship's cargo capacity from the ship lookup data.
-- Limits purchasable SCU by cargo capacity, investment, purchase stock, and sell demand.
+- Treats `investment` as starting cash for the whole route.
+- Recalculates buying power after each sell, so profit or loss from one leg affects the next leg.
+- Limits purchasable SCU by cargo capacity, current cash, purchase stock, and sell demand.
 - Builds a closed loop where each sell location is the next buy location.
 - The final sell location returns to the starting buy location.
 - Optimizes for maximum estimated profit across the whole loop, not just one leg.

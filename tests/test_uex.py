@@ -865,6 +865,57 @@ def test_calculate_trade_route_legs_allows_lower_profit_leg_when_loop_is_profita
     assert legs[1].sell_terminal == "A"
 
 
+def test_calculate_trade_route_legs_reuses_updated_wallet_balance() -> None:
+    source = UEXSource.__new__(UEXSource)
+    legs = source._calculate_trade_route_legs(
+        [
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "A",
+                "price_sell_avg": 100,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Gold",
+                "terminal_name": "B",
+                "price_buy_avg": 200,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Diamond",
+                "terminal_name": "B",
+                "price_sell_avg": 200,
+                "status_sell": 1,
+                "scu_sell_stock_avg": 10,
+                "star_system_name": "Stanton",
+            },
+            {
+                "commodity_name": "Diamond",
+                "terminal_name": "A",
+                "price_buy_avg": 300,
+                "status_buy": 1,
+                "scu_buy_avg": 10,
+                "star_system_name": "Stanton",
+            },
+        ],
+        cargo_capacity_scu=10,
+        investment=1_000,
+        max_stops=2,
+        starting_point="A",
+    )
+
+    assert len(legs) == 2
+    assert legs[0].quantity_scu == 10
+    assert legs[0].profit == 1000
+    assert legs[1].quantity_scu == 10
+    assert legs[1].investment_used == 2000
+    assert sum(float(leg.profit) for leg in legs) == 2000
+
+
 def test_calculate_trade_route_legs_matches_location_alias_as_start() -> None:
     source = UEXSource.__new__(UEXSource)
     legs = source._calculate_trade_route_legs(
