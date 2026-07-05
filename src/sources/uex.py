@@ -82,11 +82,19 @@ class UEXSource:
         if not normalized_query:
             return names[:limit]
 
+        exact_codes = [
+            self._display_name(row)
+            for row in commodities
+            if self._normalize(row.get("code")) == normalized_query
+        ]
         starts = [
             self._display_name(row)
             for row in commodities
-            if self._normalize(row.get("name")).startswith(normalized_query)
-            or self._normalize(row.get("code")).startswith(normalized_query)
+            if (
+                self._normalize(row.get("name")).startswith(normalized_query)
+                or self._normalize(row.get("code")).startswith(normalized_query)
+            )
+            and self._display_name(row) not in exact_codes
         ]
         contains = [
             self._display_name(row)
@@ -95,9 +103,10 @@ class UEXSource:
                 normalized_query in self._normalize(row.get("name"))
                 or normalized_query in self._normalize(row.get("code"))
             )
+            and self._display_name(row) not in exact_codes
             and self._display_name(row) not in starts
         ]
-        return (starts + contains)[:limit]
+        return (exact_codes + starts + contains)[:limit]
 
     async def lookup_mining_material(
         self,
@@ -218,11 +227,12 @@ class UEXSource:
         if not normalized_query:
             return names[:limit]
 
-        starts = [name for name in names if self._normalize(name).startswith(normalized_query)]
+        query_aliases = self._item_query_aliases(normalized_query)
+        starts = [name for name in names if any(self._normalize(name).startswith(alias) for alias in query_aliases)]
         contains = [
             name
             for name in names
-            if normalized_query in self._normalize(name) and name not in starts
+            if any(alias in self._normalize(name) for alias in query_aliases) and name not in starts
         ]
         return (starts + contains)[:limit]
 
@@ -1242,18 +1252,19 @@ class UEXSource:
         section: str | None = None,
         size: str | None = None,
     ) -> list[dict]:
-        normalized_query = self._normalize(query)
+        normalized_queries = self._item_query_aliases(self._normalize(query))
         normalized_category = self._normalize(category)
         normalized_section = self._normalize(section)
         normalized_size = self._normalize(size)
 
         filtered = []
         for item in items:
-            if normalized_query and not (
-                normalized_query in self._normalize(item.get("name"))
-                or normalized_query in self._normalize(item.get("category"))
-                or normalized_query in self._normalize(item.get("section"))
-                or normalized_query in self._normalize(item.get("company_name"))
+            if normalized_queries and not any(
+                query in self._normalize(item.get("name"))
+                or query in self._normalize(item.get("category"))
+                or query in self._normalize(item.get("section"))
+                or query in self._normalize(item.get("company_name"))
+                for query in normalized_queries
             ):
                 continue
             if normalized_category and self._normalize(item.get("category")) != normalized_category:
@@ -1264,6 +1275,16 @@ class UEXSource:
                 continue
             filtered.append(item)
         return filtered
+
+    def _item_query_aliases(self, normalized_query: str) -> list[str]:
+        if not normalized_query:
+            return []
+
+        aliases = {
+            "medpen": ["medpen", "med pen", "paramed", "medical"],
+            "med pen": ["med pen", "medpen", "paramed", "medical"],
+        }
+        return aliases.get(normalized_query, [normalized_query])
 
     def _item_result(self, row: dict, purchases: list[ItemPurchaseLocation]) -> ItemLocatorResult:
         item_id = self._int_or_none(row.get("id")) or 0

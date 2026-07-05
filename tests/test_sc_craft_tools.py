@@ -103,10 +103,12 @@ def test_autocomplete_blueprint_filter_uses_config_hints() -> None:
     categories = asyncio.run(source.autocomplete_blueprint_filter("category", "veh", 5))
     quantum_categories = asyncio.run(source.autocomplete_blueprint_filter("category", "quant", 5))
     resources = asyncio.run(source.autocomplete_blueprint_filter("resource", "co", 5))
+    material_aliases = asyncio.run(source.autocomplete_blueprint_filter("material", "ir", 5))
 
     assert categories == []
     assert quantum_categories == ["Quantum Drive"]
     assert resources == ["Copper"]
+    assert material_aliases == ["Iron"]
 
 
 def test_category_filter_values_matches_display_category() -> None:

@@ -138,6 +138,7 @@ class SCCraftToolsSource:
         ][:limit]
 
     async def autocomplete_blueprint_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        filter_name = self._api_filter_name(filter_name)
         config = await self._get_config()
         hints = config.get("filterHints") if isinstance(config, dict) else {}
         values = hints.get(filter_name) if isinstance(hints, dict) else []
@@ -158,6 +159,11 @@ class SCCraftToolsSource:
         starts = [name for name in names if self._normalize(name).startswith(normalized_query)]
         contains = [name for name in names if normalized_query in self._normalize(name) and name not in starts]
         return (starts + contains)[:limit]
+
+    def _api_filter_name(self, filter_name: str) -> str:
+        return {
+            "material": "resource",
+        }.get(filter_name, filter_name)
 
     async def _get_config(self) -> dict:
         if self._config is not None:

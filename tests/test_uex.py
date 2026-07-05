@@ -135,6 +135,23 @@ def test_autocomplete_commodities_matches_codes() -> None:
     assert matches == ["Agricium (AGRI)"]
 
 
+def test_autocomplete_commodities_prefers_exact_code_matches() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._commodities = [
+        {"name": "Construction Material Pebbles", "code": "CMATP"},
+        {"name": "Construction Material Rubble", "code": "CMATR"},
+        {"name": "Construction Materials", "code": "CMAT"},
+    ]
+
+    matches = asyncio.run(source.autocomplete_commodities("cmat", limit=3))
+
+    assert matches == [
+        "Construction Materials (CMAT)",
+        "Construction Material Pebbles (CMATP)",
+        "Construction Material Rubble (CMATR)",
+    ]
+
+
 def test_find_commodity_accepts_display_name_with_code() -> None:
     source = UEXSource.__new__(UEXSource)
     source._commodities = [
@@ -228,6 +245,28 @@ def test_autocomplete_mining_materials_accepts_quantanium_alias() -> None:
     matches = asyncio.run(source.autocomplete_mining_materials("quantanium", limit=5))
 
     assert matches == ["Quantainium (Raw) (QUAN)"]
+
+
+def test_filter_items_accepts_medpen_alias() -> None:
+    source = UEXSource.__new__(UEXSource)
+    items = [
+        {
+            "name": "ParaMed Medical Device",
+            "category": "Medical",
+            "section": "FPS Consumable",
+            "company_name": "CureLife",
+        },
+        {
+            "name": "LifeGuard Medical Attachment",
+            "category": "Medical",
+            "section": "FPS Weapon Attachment",
+            "company_name": "Klaus & Werner",
+        },
+    ]
+
+    matches = source._filter_items(items, query="medpen")
+
+    assert [item["name"] for item in matches] == ["ParaMed Medical Device", "LifeGuard Medical Attachment"]
 
 
 def test_parse_mining_location_result_groups_locations() -> None:
