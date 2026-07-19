@@ -712,9 +712,8 @@ class UEXSource:
     ) -> MiningLocationResult:
         if system_code:
             system = self._mining_system_name(system_code)
-            groups = [
-                self._mining_system_group(result, system)
-            ] if self._is_mining_system_scoped_result(result, system) else []
+            groups = [self._mining_system_group_for_result(result, system)]
+            groups = [group for group in groups if self._has_mining_system_group_locations(group)]
         else:
             groups = []
             for system in sorted(result.systems, key=self._mining_system_sort_key):
@@ -725,9 +724,9 @@ class UEXSource:
                 system_result = await self._fetch_mining_location_result(commodity, code)
                 if system_result is None:
                     continue
-                if not self._is_mining_system_scoped_result(system_result, system):
-                    continue
-                groups.append(self._mining_system_group(system_result, system))
+                group = self._mining_system_group_for_result(system_result, system)
+                if self._has_mining_system_group_locations(group):
+                    groups.append(group)
 
         return MiningLocationResult(
             material_name=result.material_name,
@@ -1123,6 +1122,89 @@ class UEXSource:
             moons=result.moons,
             points_of_interest=result.points_of_interest,
         )
+
+    def _mining_system_group_for_result(self, result: MiningLocationResult, system: str) -> MiningSystemLocations:
+        if self._is_mining_system_scoped_result(result, system):
+            return self._mining_system_group(result, system)
+
+        return MiningSystemLocations(
+            system=system,
+            lagrange_points=self._mining_locations_for_system(result.lagrange_points, system, "lagrange_points"),
+            planets=self._mining_locations_for_system(result.planets, system, "planets"),
+            moons=self._mining_locations_for_system(result.moons, system, "moons"),
+            points_of_interest=self._mining_locations_for_system(
+                result.points_of_interest,
+                system,
+                "points_of_interest",
+            ),
+        )
+
+    def _has_mining_system_group_locations(self, group: MiningSystemLocations) -> bool:
+        return any([group.lagrange_points, group.planets, group.moons, group.points_of_interest])
+
+    def _mining_locations_for_system(self, locations: list[str], system: str, location_type: str) -> list[str]:
+        normalized_system = self._normalize(system)
+        return [
+            location
+            for location in locations
+            if self._mining_location_system(location, location_type) == normalized_system
+        ]
+
+    def _mining_location_system(self, location: str, location_type: str) -> str | None:
+        normalized_location = self._normalize(location)
+        if location_type == "lagrange_points":
+            prefix = normalized_location.split(" ", 1)[0]
+            if prefix in {"arc", "cru", "hur", "mic"}:
+                return "stanton"
+            return None
+
+        return {
+            "planets": {
+                "arccorp": "stanton",
+                "crusader": "stanton",
+                "hurston": "stanton",
+                "microtech": "stanton",
+                "bloom": "pyro",
+                "monox": "pyro",
+                "pyro i": "pyro",
+                "pyro ii": "pyro",
+                "pyro iii": "pyro",
+                "pyro iv": "pyro",
+                "pyro v": "pyro",
+                "pyro vi": "pyro",
+                "terminus": "pyro",
+                "delamar": "nyx",
+            },
+            "moons": {
+                "aberdeen": "stanton",
+                "arial": "stanton",
+                "calliope": "stanton",
+                "cellin": "stanton",
+                "clio": "stanton",
+                "daymar": "stanton",
+                "euterpe": "stanton",
+                "ita": "stanton",
+                "lyria": "stanton",
+                "magda": "stanton",
+                "wala": "stanton",
+                "yela": "stanton",
+                "adir": "pyro",
+                "fairo": "pyro",
+                "fuego": "pyro",
+                "ignis": "pyro",
+                "vatra": "pyro",
+                "vuur": "pyro",
+            },
+            "points_of_interest": {
+                "aaron halo": "stanton",
+                "yela ring": "stanton",
+                "akiro cluster": "pyro",
+                "pyro clusters": "pyro",
+                "glaciem ring": "nyx",
+                "keeger belt": "nyx",
+                "levski": "nyx",
+            },
+        }.get(location_type, {}).get(normalized_location)
 
     def _is_mining_system_scoped_result(self, result: MiningLocationResult, system: str) -> bool:
         normalized_system = self._normalize(system)

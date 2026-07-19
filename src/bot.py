@@ -760,6 +760,8 @@ class MiningLocationView(discord.ui.View):
         self.system = system
         self.planet = planet
         self.page = page
+        if not system and _mining_location_page_count(result) > 1:
+            self.add_item(MiningSystemSelect(result, planet))
         self._sync_buttons()
 
     def _sync_buttons(self) -> None:
@@ -785,6 +787,33 @@ class MiningLocationView(discord.ui.View):
         await interaction.response.edit_message(
             embed=build_mining_embed(self.result, self.system, self.planet, page=self.page),
             view=self,
+        )
+
+
+class MiningSystemSelect(discord.ui.Select):
+    def __init__(self, result: MiningLocationResult, planet: str | None = None) -> None:
+        options = [
+            discord.SelectOption(label=group.system, value=group.system)
+            for group in result.location_groups or []
+            if _mining_system_group_has_locations(group)
+        ][:25]
+        super().__init__(
+            placeholder="Filter by system",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=1,
+        )
+        self.result = result
+        self.planet = planet
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        system = self.values[0]
+        result = _mining_result_for_system(self.result, system)
+        view = MiningLocationView(result, system, self.planet) if _mining_location_page_count(result) > 1 else None
+        await interaction.response.edit_message(
+            embed=build_mining_embed(result, system, self.planet),
+            view=view,
         )
 
 
@@ -2038,6 +2067,7 @@ def build_mining_embed(
     planet: str | None = None,
     page: int = 1,
 ) -> discord.Embed:
+    page_count = _mining_location_page_count(result)
     description = [
         _line("Code", result.code),
         _format_mining_signature_block(result.rock_signatures),
@@ -2046,6 +2076,7 @@ def build_mining_embed(
         _line("Location Basis", result.location_basis),
         _line("Refined Sell", _format_currency(result.refined_sell_price, "aUEC") if result.refined_sell_price else None),
         _line("Raw Sell", _format_currency(result.raw_sell_price, "aUEC") if result.raw_sell_price else None),
+        _line("Tip", "Use the system selector or optional `system` field to narrow results." if page_count > 1 and not system else None),
     ]
     flags = _format_mining_flags(result)
     if flags:
@@ -2057,7 +2088,6 @@ def build_mining_embed(
         url=result.source_url,
         color=discord.Color.dark_gold(),
     )
-    page_count = _mining_location_page_count(result)
     field_name = "Mining Locations"
     if page_count > 1:
         field_name = f"{field_name} (Page {page}/{page_count})"
@@ -2798,6 +2828,46 @@ def _mining_location_lines(result: MiningLocationResult) -> list[str]:
         lines.extend(detail_lines)
 
     return lines or ["No matching locations found."]
+
+
+def _mining_system_group_has_locations(group: MiningSystemLocations) -> bool:
+    return any([group.lagrange_points, group.planets, group.moons, group.points_of_interest])
+
+
+def _mining_result_for_system(result: MiningLocationResult, system: str) -> MiningLocationResult:
+    normalized_system = _normalize_text(system)
+    group = next(
+        (
+            group
+            for group in result.location_groups or []
+            if _normalize_text(group.system) == normalized_system
+        ),
+        None,
+    )
+    if group is None:
+        return result
+
+    return MiningLocationResult(
+        material_name=result.material_name,
+        code=result.code,
+        kind=result.kind,
+        refined_sell_price=result.refined_sell_price,
+        raw_sell_price=result.raw_sell_price,
+        is_harvestable=result.is_harvestable,
+        is_volatile_qt=result.is_volatile_qt,
+        is_volatile_time=result.is_volatile_time,
+        is_explosive=result.is_explosive,
+        systems=[group.system],
+        lagrange_points=group.lagrange_points,
+        planets=group.planets,
+        moons=group.moons,
+        points_of_interest=group.points_of_interest,
+        source_url=result.source_url,
+        source_name=result.source_name,
+        location_basis=result.location_basis,
+        rock_signatures=result.rock_signatures,
+        location_groups=[group],
+    )
 
 
 def _mining_location_detail_line(label: str, locations: list[str]) -> str | None:

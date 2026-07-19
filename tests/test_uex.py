@@ -310,7 +310,7 @@ def test_parse_mining_location_result_groups_locations() -> None:
     assert result.points_of_interest == ["Pyro Clusters"]
 
 
-def test_with_mining_location_groups_skips_unscoped_system_fallback() -> None:
+def test_with_mining_location_groups_splits_unscoped_system_fallback() -> None:
     source = UEXSource.__new__(UEXSource)
     commodity = {"name": "Iron (Ore)", "code": "IRONO"}
     result = source._parse_mining_location_result(
@@ -343,6 +343,7 @@ def test_with_mining_location_groups_skips_unscoped_system_fallback() -> None:
                 <h3>Star Systems</h3><p>Stanton</p><p>Pyro</p><p>Nyx</p>
                 <h3>Lagrange Points</h3><p>ARC-L3</p>
                 <h3>Planets</h3><p>Bloom</p>
+                <h3>Points of Interest</h3><p>Glaciem Ring</p><p>Keeger Belt</p>
                 </body></html>
             """,
         }
@@ -356,9 +357,36 @@ def test_with_mining_location_groups_skips_unscoped_system_fallback() -> None:
 
     grouped = asyncio.run(source._with_mining_location_groups(result, commodity, None))
 
-    assert [group.system for group in grouped.location_groups] == ["Stanton", "Pyro"]
+    assert [group.system for group in grouped.location_groups] == ["Stanton", "Pyro", "Nyx"]
     assert grouped.location_groups[0].lagrange_points == ["ARC-L3"]
     assert grouped.location_groups[1].planets == ["Bloom"]
+    assert grouped.location_groups[2].lagrange_points == []
+    assert grouped.location_groups[2].planets == []
+    assert grouped.location_groups[2].points_of_interest == ["Glaciem Ring", "Keeger Belt"]
+
+
+def test_system_specific_mining_lookup_splits_unscoped_nyx_result() -> None:
+    source = UEXSource.__new__(UEXSource)
+    commodity = {"name": "Aluminum (Ore)", "code": "ALUM"}
+    result = source._parse_mining_location_result(
+        commodity,
+        """
+        <html><body><a>Routes</a>
+        <h3>Star Systems</h3><p>Nyx</p><p>Pyro</p><p>Stanton</p>
+        <h3>Lagrange Points</h3><p>ARC-L1</p>
+        <h3>Moons</h3><p>Aberdeen</p><p>Magda</p>
+        <h3>Points of Interest</h3><p>Aaron Halo</p><p>Glaciem Ring</p><p>Keeger Belt</p><p>Pyro Clusters</p>
+        </body></html>
+        """,
+        "https://uexcorp.space/mining/locations/commodity/aluminum-ore/system/NY/",
+    )
+
+    grouped = asyncio.run(source._with_mining_location_groups(result, commodity, "NY"))
+
+    assert [group.system for group in grouped.location_groups] == ["Nyx"]
+    assert grouped.location_groups[0].lagrange_points == []
+    assert grouped.location_groups[0].moons == []
+    assert grouped.location_groups[0].points_of_interest == ["Glaciem Ring", "Keeger Belt"]
 
 
 def test_parse_mining_location_result_does_not_use_buy_price_as_raw_sell() -> None:

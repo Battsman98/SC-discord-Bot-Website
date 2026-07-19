@@ -12,6 +12,7 @@ from src.bot import (
     _mining_multi_search_terms,
     _mining_space_search_terms,
     _mining_location_page_count,
+    _mining_result_for_system,
     _format_rock_signatures,
     build_mining_embed,
 )
@@ -152,6 +153,88 @@ def test_build_mining_embed_groups_locations_and_omits_kind() -> None:
     assert len(embed.fields) == 1
     assert embed.fields[0].name == "Mining Locations"
     assert _mining_location_page_count(result) == 1
+
+
+def test_mining_embed_prompts_system_filter_for_long_results() -> None:
+    result = MiningLocationResult(
+        material_name="Iron",
+        code="IRONO",
+        kind=None,
+        refined_sell_price=None,
+        raw_sell_price=1000,
+        is_harvestable=False,
+        is_volatile_qt=False,
+        is_volatile_time=False,
+        is_explosive=False,
+        systems=["Stanton", "Pyro", "Nyx"],
+        lagrange_points=[],
+        planets=[],
+        moons=[],
+        points_of_interest=[],
+        source_url="https://uexcorp.space/mining/locations/commodity/iron-ore/",
+        source_name="UEX",
+        rock_signatures=[4270],
+        location_groups=[
+            MiningSystemLocations(
+                system=f"System {index}",
+                lagrange_points=[],
+                planets=[f"Planet {index}"],
+                moons=[],
+                points_of_interest=[],
+            )
+            for index in range(13)
+        ],
+    )
+
+    embed = build_mining_embed(result)
+
+    assert _mining_location_page_count(result) > 1
+    assert "Tip: Use the system selector or optional `system` field to narrow results." in embed.description
+
+
+def test_mining_result_for_system_keeps_selected_group_only() -> None:
+    result = MiningLocationResult(
+        material_name="Iron",
+        code="IRONO",
+        kind=None,
+        refined_sell_price=None,
+        raw_sell_price=1000,
+        is_harvestable=False,
+        is_volatile_qt=False,
+        is_volatile_time=False,
+        is_explosive=False,
+        systems=["Stanton", "Nyx"],
+        lagrange_points=[],
+        planets=[],
+        moons=[],
+        points_of_interest=[],
+        source_url="https://uexcorp.space/mining/locations/commodity/iron-ore/",
+        source_name="UEX",
+        rock_signatures=[4270],
+        location_groups=[
+            MiningSystemLocations(
+                system="Stanton",
+                lagrange_points=["ARC-L3"],
+                planets=[],
+                moons=[],
+                points_of_interest=[],
+            ),
+            MiningSystemLocations(
+                system="Nyx",
+                lagrange_points=[],
+                planets=[],
+                moons=[],
+                points_of_interest=["Glaciem Ring", "Keeger Belt"],
+            ),
+        ],
+    )
+
+    filtered = _mining_result_for_system(result, "Nyx")
+
+    assert filtered.systems == ["Nyx"]
+    assert filtered.lagrange_points == []
+    assert filtered.points_of_interest == ["Glaciem Ring", "Keeger Belt"]
+    assert [group.system for group in filtered.location_groups] == ["Nyx"]
 
 
 def test_community_mining_locations_merge_into_grouped_output(tmp_path) -> None:
