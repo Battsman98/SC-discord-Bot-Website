@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 from urllib.parse import quote
 
 import aiohttp
@@ -36,6 +38,7 @@ class UEXSource:
         self._location_filter_names: list[str] | None = None
         self._mining_associations: dict[str, list[str]] | None = None
         self._mining_signatures: dict[str, list[int]] | None = None
+        self._mining_fallbacks: dict[str, dict] | None = None
 
     async def lookup(self, query: str):
         return None
@@ -121,7 +124,8 @@ class UEXSource:
         system_code = self._mining_system_code(system)
         result = await self._fetch_mining_location_result(commodity, system_code)
         if result is None:
-            return None
+            fallback = self._fallback_mining_location_result(commodity, system_code)
+            return self._filter_mining_result(fallback, planet) if fallback is not None else None
         result = await self._with_mining_sell_prices(result, commodity)
         result = await self._with_mining_signatures(result, commodity)
         result = await self._with_mining_location_groups(result, commodity, system_code)
@@ -1837,6 +1841,63 @@ class UEXSource:
             if isinstance(group, dict)
         ]
         return MiningLocationResult(**cached)
+
+    def _fallback_mining_location_result(
+        self,
+        commodity: dict,
+        system_code: str | None = None,
+    ) -> MiningLocationResult | None:
+        if getattr(self, "_mining_fallbacks", None) is None:
+            fallback_path = Path(__file__).resolve().parents[1] / "data" / "mining_locations.json"
+            try:
+                payload = json.loads(fallback_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                payload = {}
+            materials = payload.get("materials") if isinstance(payload, dict) else None
+            self._mining_fallbacks = materials if isinstance(materials, dict) else {}
+
+        code = str(commodity.get("code") or "").upper()
+        cached = self._mining_fallbacks.get(code)
+        if not isinstance(cached, dict):
+            return None
+
+        result = self._mining_result_from_cache(cached)
+        if system_code is None:
+            return result
+
+        system_name = self._mining_system_name(system_code)
+        group = next(
+            (
+                candidate
+                for candidate in result.location_groups or []
+                if self._normalize(candidate.system) == self._normalize(system_name)
+            ),
+            None,
+        )
+        if group is None:
+            return None
+
+        return MiningLocationResult(
+            material_name=result.material_name,
+            code=result.code,
+            kind=result.kind,
+            refined_sell_price=result.refined_sell_price,
+            raw_sell_price=result.raw_sell_price,
+            is_harvestable=result.is_harvestable,
+            is_volatile_qt=result.is_volatile_qt,
+            is_volatile_time=result.is_volatile_time,
+            is_explosive=result.is_explosive,
+            systems=[group.system],
+            lagrange_points=group.lagrange_points,
+            planets=group.planets,
+            moons=group.moons,
+            points_of_interest=group.points_of_interest,
+            source_url=result.source_url,
+            source_name=result.source_name,
+            location_basis=result.location_basis,
+            rock_signatures=result.rock_signatures or [],
+            location_groups=[group],
+        )
 
     async def close(self) -> None:
         return None

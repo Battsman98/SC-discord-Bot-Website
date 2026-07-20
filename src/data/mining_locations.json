@@ -1,0 +1,2220 @@
+{
+  "generated_from": "https://uexcorp.space/mining/locations/",
+  "materials": {
+    "AGRI": {
+      "code": "AGRI",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "ARC-L3",
+        "CRU-L5",
+        "MIC-L4"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L3",
+            "CRU-L5",
+            "MIC-L4"
+          ],
+          "moons": [
+            "Cellin",
+            "Daymar",
+            "Yela"
+          ],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Vuur"
+          ],
+          "planets": [
+            "Terminus"
+          ],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Agricium",
+      "moons": [
+        "Cellin",
+        "Daymar",
+        "Vuur",
+        "Yela"
+      ],
+      "planets": [
+        "Terminus"
+      ],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 9564,
+      "rock_signatures": [
+        3370,
+        3840,
+        3855,
+        3885
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/agricium-ore/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "ALUM": {
+      "code": "ALUM",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "ARC-L1",
+        "ARC-L2",
+        "CRU L3",
+        "HUR-L1",
+        "HUR-L2",
+        "HUR-L4",
+        "HUR-L5",
+        "MIC-L1",
+        "MIC-L2",
+        "MIC-L5"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L1",
+            "ARC-L2",
+            "CRU L3",
+            "HUR-L1",
+            "HUR-L2",
+            "HUR-L4",
+            "HUR-L5",
+            "MIC-L1",
+            "MIC-L2",
+            "MIC-L5"
+          ],
+          "moons": [
+            "Aberdeen",
+            "Arial",
+            "Ita",
+            "Magda"
+          ],
+          "planets": [],
+          "points_of_interest": [
+            "Aaron Halo"
+          ],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Glaciem Ring",
+            "Keeger Belt"
+          ],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Aluminum",
+      "moons": [
+        "Aberdeen",
+        "Arial",
+        "Ita",
+        "Magda"
+      ],
+      "planets": [],
+      "points_of_interest": [
+        "Aaron Halo",
+        "Glaciem Ring",
+        "Keeger Belt",
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 3683,
+      "rock_signatures": [
+        4225,
+        4285
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/aluminum-ore/",
+      "systems": [
+        "Nyx",
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "APHO": {
+      "code": "APHO",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Aberdeen",
+            "Arial",
+            "Calliope",
+            "Cellin",
+            "Clio",
+            "Daymar",
+            "Euterpe",
+            "Ita",
+            "Lyria",
+            "Magda",
+            "Wala",
+            "Yela"
+          ],
+          "planets": [
+            "ArcCorp",
+            "Hurston",
+            "MicroTech"
+          ],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Adir",
+            "Fairo",
+            "Fuego",
+            "Ignis",
+            "Vatra",
+            "Vuur"
+          ],
+          "planets": [
+            "Bloom",
+            "Monox",
+            "Pyro I",
+            "Pyro IV",
+            "Terminus"
+          ],
+          "points_of_interest": [],
+          "system": "Pyro"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Delamar"
+          ],
+          "points_of_interest": [],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Aphorite",
+      "moons": [
+        "Aberdeen",
+        "Adir",
+        "Arial",
+        "Calliope",
+        "Cellin",
+        "Clio",
+        "Daymar",
+        "Euterpe",
+        "Fairo",
+        "Fuego",
+        "Ignis",
+        "Ita",
+        "Lyria",
+        "Magda",
+        "Vatra",
+        "Vuur",
+        "Wala",
+        "Yela"
+      ],
+      "planets": [
+        "ArcCorp",
+        "Bloom",
+        "Delamar",
+        "Hurston",
+        "MicroTech",
+        "Monox",
+        "Pyro I",
+        "Pyro IV",
+        "Terminus"
+      ],
+      "points_of_interest": [],
+      "raw_sell_price": 100566,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/aphorite/",
+      "systems": [
+        "Nyx",
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "ASLW": {
+      "code": "ASLW",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [
+        "ARC-L5",
+        "CRU-L4",
+        "MIC-L4"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L5",
+            "CRU-L4",
+            "MIC-L4"
+          ],
+          "moons": [
+            "Ita",
+            "Magda"
+          ],
+          "planets": [],
+          "points_of_interest": [
+            "Aaron Halo"
+          ],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Fuego",
+            "Vuur"
+          ],
+          "planets": [],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Aslarite",
+      "moons": [
+        "Fuego",
+        "Ita",
+        "Magda",
+        "Vuur"
+      ],
+      "planets": [],
+      "points_of_interest": [
+        "Aaron Halo",
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 5089,
+      "rock_signatures": [
+        3840,
+        3855,
+        3885
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/aslarite-raw/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "BERA": {
+      "code": "BERA",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Bloom",
+            "Pyro I"
+          ],
+          "points_of_interest": [],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Beradom",
+      "moons": [],
+      "planets": [
+        "Bloom",
+        "Pyro I"
+      ],
+      "points_of_interest": [],
+      "raw_sell_price": 145410,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/beradom/",
+      "systems": [
+        "Pyro"
+      ]
+    },
+    "BERY": {
+      "code": "BERY",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [
+        "ARC-L3",
+        "CRU-L5",
+        "MIC-L4"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L3",
+            "CRU-L5",
+            "MIC-L4"
+          ],
+          "moons": [
+            "Wala"
+          ],
+          "planets": [],
+          "points_of_interest": [
+            "Aaron Halo"
+          ],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Beryl",
+      "moons": [
+        "Wala"
+      ],
+      "planets": [],
+      "points_of_interest": [
+        "Aaron Halo",
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 19890,
+      "rock_signatures": [
+        3170,
+        3540
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/beryl-raw/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "BEXA": {
+      "code": "BEXA",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [
+        "CRU L2",
+        "CRU-L1",
+        "HUR-L3"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "CRU L2",
+            "CRU-L1",
+            "HUR-L3"
+          ],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Fairo",
+            "Fuego",
+            "Vuur"
+          ],
+          "planets": [],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Glaciem Ring",
+            "Keeger Belt"
+          ],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Bexalite",
+      "moons": [
+        "Fairo",
+        "Fuego",
+        "Vuur"
+      ],
+      "planets": [],
+      "points_of_interest": [
+        "Glaciem Ring",
+        "Keeger Belt",
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 28841,
+      "rock_signatures": [
+        3570,
+        3585,
+        3600
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/bexalite-raw/",
+      "systems": [
+        "Nyx",
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "BORA": {
+      "code": "BORA",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "HUR-L1",
+        "HUR-L4",
+        "HUR-L5"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "HUR-L1",
+            "HUR-L4",
+            "HUR-L5"
+          ],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Adir",
+            "Fuego"
+          ],
+          "planets": [
+            "Bloom",
+            "Pyro IV"
+          ],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Borase",
+      "moons": [
+        "Adir",
+        "Fuego"
+      ],
+      "planets": [
+        "Bloom",
+        "Pyro IV"
+      ],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 27093,
+      "rock_signatures": [
+        3570,
+        3585,
+        3600
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/borase-ore/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "CARW": {
+      "code": "CARW",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Aberdeen",
+            "Daymar"
+          ],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        }
+      ],
+      "material_name": "Caranite",
+      "moons": [
+        "Aberdeen",
+        "Daymar"
+      ],
+      "planets": [],
+      "points_of_interest": [],
+      "raw_sell_price": null,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/caranite-raw/",
+      "systems": [
+        "Stanton"
+      ]
+    },
+    "COPP": {
+      "code": "COPP",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "ARC-L3",
+        "ARC-L5",
+        "CRU L2",
+        "CRU-L1",
+        "CRU-L4",
+        "CRU-L5",
+        "MIC-L3",
+        "MIC-L4"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L3",
+            "ARC-L5",
+            "CRU L2",
+            "CRU-L1",
+            "CRU-L4",
+            "CRU-L5",
+            "MIC-L3",
+            "MIC-L4"
+          ],
+          "moons": [
+            "Clio",
+            "Euterpe",
+            "Lyria",
+            "Wala"
+          ],
+          "planets": [],
+          "points_of_interest": [
+            "Aaron Halo",
+            "Yela Ring"
+          ],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Pyro I",
+            "Pyro IV",
+            "Terminus"
+          ],
+          "points_of_interest": [
+            "Akiro Cluster",
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Copper",
+      "moons": [
+        "Clio",
+        "Euterpe",
+        "Lyria",
+        "Wala"
+      ],
+      "planets": [
+        "Pyro I",
+        "Pyro IV",
+        "Terminus"
+      ],
+      "points_of_interest": [
+        "Aaron Halo",
+        "Akiro Cluster",
+        "Pyro Clusters",
+        "Yela Ring"
+      ],
+      "raw_sell_price": 1200,
+      "refined_sell_price": 3710,
+      "rock_signatures": [
+        4195,
+        4240
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/copper-ore/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "CORU": {
+      "code": "CORU",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [
+        "ARC-L1",
+        "ARC-L2",
+        "ARC-L4",
+        "CRU L3",
+        "HUR-L1",
+        "HUR-L2",
+        "HUR-L4",
+        "HUR-L5",
+        "MIC-L1",
+        "MIC-L2",
+        "MIC-L5"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L1",
+            "ARC-L2",
+            "ARC-L4",
+            "CRU L3",
+            "HUR-L1",
+            "HUR-L2",
+            "HUR-L4",
+            "HUR-L5",
+            "MIC-L1",
+            "MIC-L2",
+            "MIC-L5"
+          ],
+          "moons": [
+            "Aberdeen",
+            "Arial"
+          ],
+          "planets": [
+            "Hurston"
+          ],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Corundum",
+      "moons": [
+        "Aberdeen",
+        "Arial"
+      ],
+      "planets": [
+        "Hurston"
+      ],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 3666,
+      "rock_signatures": [
+        4225,
+        4285
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/corundum-raw/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "DOLI": {
+      "code": "DOLI",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "ArcCorp",
+            "Hurston",
+            "MicroTech"
+          ],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Bloom",
+            "Monox",
+            "Pyro I",
+            "Pyro IV",
+            "Terminus"
+          ],
+          "points_of_interest": [],
+          "system": "Pyro"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Delamar"
+          ],
+          "points_of_interest": [],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Dolivine",
+      "moons": [],
+      "planets": [
+        "ArcCorp",
+        "Bloom",
+        "Delamar",
+        "Hurston",
+        "MicroTech",
+        "Monox",
+        "Pyro I",
+        "Pyro IV",
+        "Terminus"
+      ],
+      "points_of_interest": [],
+      "raw_sell_price": 145904,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/dolivine/",
+      "systems": [
+        "Nyx",
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "FEYN": {
+      "code": "FEYN",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Aberdeen"
+          ],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Pyro IV"
+          ],
+          "points_of_interest": [],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Feynmaline",
+      "moons": [
+        "Aberdeen"
+      ],
+      "planets": [
+        "Pyro IV"
+      ],
+      "points_of_interest": [],
+      "raw_sell_price": 341571,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/feynmaline/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "GLAC": {
+      "code": "GLAC",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Aberdeen"
+          ],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Monox"
+          ],
+          "points_of_interest": [],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Glacosite",
+      "moons": [
+        "Aberdeen"
+      ],
+      "planets": [
+        "Monox"
+      ],
+      "points_of_interest": [],
+      "raw_sell_price": 98435,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/glacosite/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "GOLD": {
+      "code": "GOLD",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "ARC-L5",
+        "CRU-L4",
+        "MIC-L3"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L5",
+            "CRU-L4",
+            "MIC-L3"
+          ],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Fairo",
+            "Ignis",
+            "Vatra"
+          ],
+          "planets": [
+            "Terminus"
+          ],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Gold",
+      "moons": [
+        "Fairo",
+        "Ignis",
+        "Vatra"
+      ],
+      "planets": [
+        "Terminus"
+      ],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 29220,
+      "rock_signatures": [
+        3200,
+        3570,
+        3585,
+        3600
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/gold-ore/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "HADA": {
+      "code": "HADA",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Aberdeen",
+            "Arial",
+            "Calliope",
+            "Cellin",
+            "Clio",
+            "Daymar",
+            "Euterpe",
+            "Ita",
+            "Lyria",
+            "Magda",
+            "Wala",
+            "Yela"
+          ],
+          "planets": [
+            "ArcCorp",
+            "Hurston",
+            "MicroTech"
+          ],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Adir",
+            "Fairo",
+            "Fuego",
+            "Ignis",
+            "Vatra",
+            "Vuur"
+          ],
+          "planets": [
+            "Bloom",
+            "Monox",
+            "Pyro I",
+            "Pyro IV",
+            "Terminus"
+          ],
+          "points_of_interest": [],
+          "system": "Pyro"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Delamar"
+          ],
+          "points_of_interest": [],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Hadanite",
+      "moons": [
+        "Aberdeen",
+        "Adir",
+        "Arial",
+        "Calliope",
+        "Cellin",
+        "Clio",
+        "Daymar",
+        "Euterpe",
+        "Fairo",
+        "Fuego",
+        "Ignis",
+        "Ita",
+        "Lyria",
+        "Magda",
+        "Vatra",
+        "Vuur",
+        "Wala",
+        "Yela"
+      ],
+      "planets": [
+        "ArcCorp",
+        "Bloom",
+        "Delamar",
+        "Hurston",
+        "MicroTech",
+        "Monox",
+        "Pyro I",
+        "Pyro IV",
+        "Terminus"
+      ],
+      "points_of_interest": [],
+      "raw_sell_price": 545577,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/hadanite/",
+      "systems": [
+        "Nyx",
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "HEPH": {
+      "code": "HEPH",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [
+        "ARC-L1",
+        "ARC-L2",
+        "ARC-L4",
+        "CRU L3",
+        "HUR-L1",
+        "HUR-L2",
+        "HUR-L4",
+        "HUR-L5",
+        "MIC-L1",
+        "MIC-L2",
+        "MIC-L5"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L1",
+            "ARC-L2",
+            "ARC-L4",
+            "CRU L3",
+            "HUR-L1",
+            "HUR-L2",
+            "HUR-L4",
+            "HUR-L5",
+            "MIC-L1",
+            "MIC-L2",
+            "MIC-L5"
+          ],
+          "moons": [
+            "Arial",
+            "Calliope"
+          ],
+          "planets": [
+            "MicroTech"
+          ],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Fuego",
+            "Vuur"
+          ],
+          "planets": [
+            "Monox"
+          ],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Hephaestanite",
+      "moons": [
+        "Arial",
+        "Calliope",
+        "Fuego",
+        "Vuur"
+      ],
+      "planets": [
+        "MicroTech",
+        "Monox"
+      ],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 4659,
+      "rock_signatures": [
+        4180,
+        4255
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/hephaestanite-raw/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "ICEW": {
+      "code": "ICEW",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Liquid",
+      "lagrange_points": [
+        "ARC-L3",
+        "ARC-L5",
+        "HUR-L3",
+        "MIC-L3",
+        "MIC-L4"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L3",
+            "ARC-L5",
+            "HUR-L3",
+            "MIC-L3",
+            "MIC-L4"
+          ],
+          "moons": [
+            "Calliope",
+            "Clio",
+            "Euterpe"
+          ],
+          "planets": [
+            "MicroTech"
+          ],
+          "points_of_interest": [
+            "Aaron Halo",
+            "Yela Ring"
+          ],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Akiro Cluster",
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Glaciem Ring",
+            "Keeger Belt"
+          ],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Ice",
+      "moons": [
+        "Calliope",
+        "Clio",
+        "Euterpe"
+      ],
+      "planets": [
+        "MicroTech"
+      ],
+      "points_of_interest": [
+        "Aaron Halo",
+        "Akiro Cluster",
+        "Glaciem Ring",
+        "Keeger Belt",
+        "Pyro Clusters",
+        "Yela Ring"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/ice-raw/",
+      "systems": [
+        "Nyx",
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "IRONO": {
+      "code": "IRONO",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "ARC-L3",
+        "ARC-L5",
+        "CRU L2",
+        "CRU-L1",
+        "CRU-L4",
+        "CRU-L5",
+        "HUR-L3",
+        "MIC-L3",
+        "MIC-L4"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L3",
+            "ARC-L5",
+            "CRU L2",
+            "CRU-L1",
+            "CRU-L4",
+            "CRU-L5",
+            "HUR-L3",
+            "MIC-L3",
+            "MIC-L4"
+          ],
+          "moons": [
+            "Calliope",
+            "Lyria",
+            "Magda",
+            "Wala"
+          ],
+          "planets": [
+            "MicroTech"
+          ],
+          "points_of_interest": [
+            "Aaron Halo",
+            "Yela Ring"
+          ],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Adir",
+            "Fairo",
+            "Fuego",
+            "Vatra",
+            "Vuur"
+          ],
+          "planets": [
+            "Bloom",
+            "Monox",
+            "Pyro I",
+            "Pyro IV"
+          ],
+          "points_of_interest": [
+            "Akiro Cluster",
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Glaciem Ring",
+            "Keeger Belt"
+          ],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Iron",
+      "moons": [
+        "Adir",
+        "Calliope",
+        "Fairo",
+        "Fuego",
+        "Lyria",
+        "Magda",
+        "Vatra",
+        "Vuur",
+        "Wala"
+      ],
+      "planets": [
+        "Bloom",
+        "MicroTech",
+        "Monox",
+        "Pyro I",
+        "Pyro IV"
+      ],
+      "points_of_interest": [
+        "Aaron Halo",
+        "Akiro Cluster",
+        "Glaciem Ring",
+        "Keeger Belt",
+        "Pyro Clusters",
+        "Yela Ring"
+      ],
+      "raw_sell_price": 1000,
+      "refined_sell_price": 3346,
+      "rock_signatures": [
+        4270
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/iron-ore/",
+      "systems": [
+        "Nyx",
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "JANA": {
+      "code": "JANA",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Daymar",
+            "Ita",
+            "Magda",
+            "Wala"
+          ],
+          "planets": [
+            "Hurston"
+          ],
+          "points_of_interest": [],
+          "system": "Stanton"
+        }
+      ],
+      "material_name": "Janalite",
+      "moons": [
+        "Daymar",
+        "Ita",
+        "Magda",
+        "Wala"
+      ],
+      "planets": [
+        "Hurston"
+      ],
+      "points_of_interest": [],
+      "raw_sell_price": 1561540,
+      "refined_sell_price": null,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/janalite/",
+      "systems": [
+        "Stanton"
+      ]
+    },
+    "LARA": {
+      "code": "LARA",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "HUR-L1",
+        "HUR-L4",
+        "HUR-L5"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "HUR-L1",
+            "HUR-L4",
+            "HUR-L5"
+          ],
+          "moons": [
+            "Lyria",
+            "Wala"
+          ],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Pyro IV"
+          ],
+          "points_of_interest": [],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Laranite",
+      "moons": [
+        "Lyria",
+        "Wala"
+      ],
+      "planets": [
+        "Pyro IV"
+      ],
+      "points_of_interest": [],
+      "raw_sell_price": null,
+      "refined_sell_price": 8567,
+      "rock_signatures": [
+        3385,
+        3825,
+        3870
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/laranite-raw/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "LINW": {
+      "code": "LINW",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Glaciem Ring",
+            "Keeger Belt"
+          ],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Lindinium",
+      "moons": [],
+      "planets": [],
+      "points_of_interest": [
+        "Glaciem Ring",
+        "Keeger Belt"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 48667,
+      "rock_signatures": [
+        3400
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/lindinium-ore/",
+      "systems": [
+        "Nyx"
+      ]
+    },
+    "OURW": {
+      "code": "OURW",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Minteral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Aberdeen",
+            "Arial"
+          ],
+          "planets": [
+            "Hurston"
+          ],
+          "points_of_interest": [
+            "Yela Ring"
+          ],
+          "system": "Stanton"
+        }
+      ],
+      "material_name": "Ouratite",
+      "moons": [
+        "Aberdeen",
+        "Arial"
+      ],
+      "planets": [
+        "Hurston"
+      ],
+      "points_of_interest": [
+        "Yela Ring"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 45833,
+      "rock_signatures": [
+        3370
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/ouratite-raw/",
+      "systems": [
+        "Stanton"
+      ]
+    },
+    "QUAN": {
+      "code": "QUAN",
+      "is_explosive": true,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": true,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [],
+      "material_name": "Quantainium",
+      "moons": [],
+      "planets": [],
+      "points_of_interest": [],
+      "raw_sell_price": null,
+      "refined_sell_price": 150370,
+      "rock_signatures": [
+        3170
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/quantainium-raw/",
+      "systems": [
+        "Stanton"
+      ]
+    },
+    "QUAR": {
+      "code": "QUAR",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Cellin",
+            "Daymar",
+            "Yela"
+          ],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Bloom"
+          ],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Quartz",
+      "moons": [
+        "Cellin",
+        "Daymar",
+        "Yela"
+      ],
+      "planets": [
+        "Bloom"
+      ],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 4367,
+      "rock_signatures": [
+        4180,
+        4210,
+        4255
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/quartz-raw/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "RICO": {
+      "code": "RICO",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Adir",
+            "Ignis",
+            "Vatra"
+          ],
+          "planets": [
+            "Bloom",
+            "Terminus"
+          ],
+          "points_of_interest": [
+            "Akiro Cluster",
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Riccite",
+      "moons": [
+        "Adir",
+        "Ignis",
+        "Vatra"
+      ],
+      "planets": [
+        "Bloom",
+        "Terminus"
+      ],
+      "points_of_interest": [
+        "Akiro Cluster",
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 68935,
+      "rock_signatures": [
+        3385
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/riccite-ore/",
+      "systems": [
+        "Pyro"
+      ]
+    },
+    "SADA": {
+      "code": "SADA",
+      "is_explosive": false,
+      "is_harvestable": true,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "OV Breaker Stations"
+          ],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Sadaryx",
+      "moons": [],
+      "planets": [],
+      "points_of_interest": [
+        "OV Breaker Stations"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 500000,
+      "rock_signatures": [],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/sadaryx-raw/",
+      "systems": [
+        "Nyx"
+      ]
+    },
+    "SAVW": {
+      "code": "SAVW",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Glaciem Ring",
+            "Keeger Belt",
+            "OV Breaker Stations"
+          ],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Savrilium",
+      "moons": [],
+      "planets": [],
+      "points_of_interest": [
+        "Glaciem Ring",
+        "Keeger Belt",
+        "OV Breaker Stations"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 126923,
+      "rock_signatures": [
+        3200
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/savrilium-ore/",
+      "systems": [
+        "Nyx"
+      ]
+    },
+    "STIL": {
+      "code": "STIL",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Man-made",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Bloom",
+            "Monox",
+            "Pyro I",
+            "Pyro IV",
+            "Pyro V",
+            "Terminus"
+          ],
+          "points_of_interest": [
+            "Akiro Cluster",
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Stileron",
+      "moons": [],
+      "planets": [
+        "Bloom",
+        "Monox",
+        "Pyro I",
+        "Pyro IV",
+        "Pyro V",
+        "Terminus"
+      ],
+      "points_of_interest": [
+        "Akiro Cluster",
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 135641,
+      "rock_signatures": [
+        3185
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/stileron-raw/",
+      "systems": [
+        "Pyro"
+      ]
+    },
+    "TARA": {
+      "code": "TARA",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Mineral",
+      "lagrange_points": [
+        "ARC-L1",
+        "ARC-L2",
+        "ARC-L4",
+        "HUR-L2"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L1",
+            "ARC-L2",
+            "ARC-L4",
+            "HUR-L2"
+          ],
+          "moons": [
+            "Cellin",
+            "Clio",
+            "Euterpe",
+            "Yela"
+          ],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Taranite",
+      "moons": [
+        "Cellin",
+        "Clio",
+        "Euterpe",
+        "Yela"
+      ],
+      "planets": [],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 25600,
+      "rock_signatures": [
+        3185,
+        3555
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/taranite-raw/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "TINO": {
+      "code": "TINO",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Arial",
+            "Ita"
+          ],
+          "planets": [
+            "Hurston"
+          ],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Ignis"
+          ],
+          "planets": [
+            "Monox",
+            "Pyro I"
+          ],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Tin",
+      "moons": [
+        "Arial",
+        "Ignis",
+        "Ita"
+      ],
+      "planets": [
+        "Hurston",
+        "Monox",
+        "Pyro I"
+      ],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 3956,
+      "rock_signatures": [
+        4195,
+        4240
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/tin-ore/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "TITA": {
+      "code": "TITA",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "CRU L2",
+        "CRU-L1",
+        "HUR-L3"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "CRU L2",
+            "CRU-L1",
+            "HUR-L3"
+          ],
+          "moons": [
+            "Aberdeen",
+            "Magda"
+          ],
+          "planets": [],
+          "points_of_interest": [
+            "Aaron Halo",
+            "Yela Ring"
+          ],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [
+            "Terminus"
+          ],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Titanium",
+      "moons": [
+        "Aberdeen",
+        "Magda"
+      ],
+      "planets": [
+        "Terminus"
+      ],
+      "points_of_interest": [
+        "Aaron Halo",
+        "Pyro Clusters",
+        "Yela Ring"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 8111,
+      "rock_signatures": [
+        3840,
+        3855,
+        3885
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/titanium-ore/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "TORIO": {
+      "code": "TORIO",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "CRU L3",
+        "MIC-L1",
+        "MIC-L2",
+        "MIC-L5"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "CRU L3",
+            "MIC-L1",
+            "MIC-L2",
+            "MIC-L5"
+          ],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Akiro Cluster",
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [
+            "Glaciem Ring",
+            "Keeger Belt"
+          ],
+          "system": "Nyx"
+        }
+      ],
+      "material_name": "Torite",
+      "moons": [],
+      "planets": [],
+      "points_of_interest": [
+        "Akiro Cluster",
+        "Glaciem Ring",
+        "Keeger Belt",
+        "OV Breaker Stations",
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 7795,
+      "rock_signatures": [
+        3900
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/torite-ore/",
+      "systems": [
+        "Nyx",
+        "Pyro",
+        "Stanton"
+      ]
+    },
+    "TUNG": {
+      "code": "TUNG",
+      "is_explosive": false,
+      "is_harvestable": false,
+      "is_volatile_qt": false,
+      "is_volatile_time": false,
+      "kind": "Metal",
+      "lagrange_points": [
+        "ARC-L1",
+        "ARC-L2",
+        "ARC-L4",
+        "HUR-L2"
+      ],
+      "location_basis": null,
+      "location_groups": [
+        {
+          "lagrange_points": [
+            "ARC-L1",
+            "ARC-L2",
+            "ARC-L4",
+            "HUR-L2"
+          ],
+          "moons": [],
+          "planets": [],
+          "points_of_interest": [],
+          "system": "Stanton"
+        },
+        {
+          "lagrange_points": [],
+          "moons": [
+            "Adir",
+            "Fairo"
+          ],
+          "planets": [],
+          "points_of_interest": [
+            "Pyro Clusters"
+          ],
+          "system": "Pyro"
+        }
+      ],
+      "material_name": "Tungsten",
+      "moons": [
+        "Adir",
+        "Fairo"
+      ],
+      "planets": [],
+      "points_of_interest": [
+        "Pyro Clusters"
+      ],
+      "raw_sell_price": null,
+      "refined_sell_price": 10215,
+      "rock_signatures": [
+        3400,
+        3825,
+        3870
+      ],
+      "source_name": "UEX",
+      "source_url": "https://uexcorp.space/mining/locations/commodity/tungsten-ore/",
+      "systems": [
+        "Pyro",
+        "Stanton"
+      ]
+    }
+  },
+  "source": "UEX"
+}
