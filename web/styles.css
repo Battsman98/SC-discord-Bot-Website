@@ -702,8 +702,9 @@ article.tool-panel.active {
 
 .saved-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+  align-items: start;
 }
 
 .saved-pill {
@@ -719,17 +720,41 @@ article.tool-panel.active {
 
 .hangar-card {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr) 76px;
-  gap: 12px;
-  align-items: start;
+  gap: 9px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--control);
-  padding: 10px;
+  padding: 9px;
+  min-width: 0;
+}
+
+.hangar-image-button {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.hangar-image-button:hover,
+.hangar-image-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .hangar-card .ship-image-frame {
   width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+}
+
+.hangar-card .ship-image-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .hangar-card-body {
@@ -752,6 +777,53 @@ article.tool-panel.active {
 .hangar-name span {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.hangar-card-details {
+  display: none;
+}
+
+.hangar-card.expanded {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(240px, 38%) minmax(0, 1fr);
+  gap: 18px;
+  padding: 14px;
+}
+
+.hangar-card.expanded > .hangar-name {
+  display: none;
+}
+
+.hangar-card.expanded .hangar-card-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-content: start;
+}
+
+.hangar-detail-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.hangar-detail-heading div {
+  display: grid;
+  gap: 3px;
+}
+
+.hangar-detail-heading strong {
+  font-size: 1.25rem;
+}
+
+.hangar-detail-heading span {
+  color: var(--muted);
+}
+
+.hangar-card.expanded .ship-manage-menu {
+  grid-column: 1 / -1;
 }
 
 .hangar-specs {
@@ -1453,11 +1525,11 @@ article.tool-panel.active {
   }
 
   .hangar-card {
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 1fr;
   }
 
-  .hangar-actions {
-    grid-column: 1 / -1;
+  .hangar-card.expanded {
+    grid-template-columns: 1fr;
   }
 
   .ship-manage-menu {

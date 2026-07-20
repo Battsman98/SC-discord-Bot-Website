@@ -153,6 +153,7 @@ document.querySelector("[data-action-button='clearExec']").addEventListener("cli
 document.querySelector("[data-action-button='refreshAudit']").addEventListener("click", loadAudit);
 document.querySelector("[data-action-button='refreshBlueprints']").addEventListener("click", loadSavedBlueprints);
 document.querySelector("[data-action-button='refreshShips']").addEventListener("click", loadSavedShips);
+document.querySelector("[data-action-button='backToOverview']").addEventListener("click", () => activateTab("overview"));
 document.querySelector("[data-action-button='refreshInventory']").addEventListener("click", loadInventory);
 document.querySelector("[data-action-button='exportInventory']").addEventListener("click", exportInventory);
 document.querySelector("[data-action-button='clearStationInventory']").addEventListener("click", clearStationInventory);
@@ -654,22 +655,30 @@ async function loadSavedShips(options = {}) {
       const displayName = shipDisplayName(item.name);
       const displayLoanerFor = item.loaner_for ? shipDisplayName(item.loaner_for) : "";
       const specs = hangarSpecs(item);
-      return `<article class="hangar-card">
+      const ownership = `${shipOwnershipLabel(item.ownership_type)}${displayLoanerFor ? ` for ${displayLoanerFor}` : ""}`;
+      return `<article class="hangar-card" data-hangar-card="${escapeAttribute(item.name)}">
+      <button type="button" class="hangar-image-button" data-hangar-expand="${escapeAttribute(item.name)}" aria-expanded="false" aria-label="Show details for ${escapeAttribute(displayName)}">
       <div class="ship-image-frame">
         ${item.image_url ? `<img src="${escapeAttribute(item.image_url)}" alt="${escapeAttribute(displayName)}">` : `<span class="ship-image-placeholder">No image</span>`}
       </div>
-      <div class="hangar-card-body">
-        <div class="hangar-name">
-          <strong>${escapeHtml(displayName)}</strong>
-          <span>${escapeHtml(shipOwnershipLabel(item.ownership_type))}${displayLoanerFor ? ` for ${escapeHtml(displayLoanerFor)}` : ""}</span>
+      </button>
+      <div class="hangar-name">
+        <strong>${escapeHtml(displayName)}</strong>
+        <span>${escapeHtml(ownership)}</span>
+      </div>
+      <div class="hangar-card-details">
+        <div class="hangar-detail-heading">
+          <div><strong>${escapeHtml(displayName)}</strong><span>${escapeHtml(ownership)}</span></div>
+          <button type="button" data-hangar-collapse="${escapeAttribute(item.name)}">Back</button>
         </div>
+        <div class="hangar-card-body">
         ${specs.length ? `<dl class="hangar-specs">${specs.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>` : ""}
         ${item.notes ? `<p class="hangar-notes">${escapeHtml(item.notes)}</p>` : ""}
-      </div>
-      <div class="hangar-actions">
-        <button type="button" data-ship-manage="${escapeAttribute(item.name)}">Manage</button>
-      </div>
-      <div class="ship-manage-menu" data-ship-menu="${escapeAttribute(item.name)}">
+        </div>
+        <div class="hangar-actions">
+          <button type="button" data-ship-manage="${escapeAttribute(item.name)}">Manage</button>
+        </div>
+        <div class="ship-manage-menu" data-ship-menu="${escapeAttribute(item.name)}">
         <label class="manage-ownership">
           <span>Ownership</span>
           <select data-ship-update-type="${escapeAttribute(item.name)}">
@@ -685,6 +694,7 @@ async function loadSavedShips(options = {}) {
         <div class="manage-actions">
           <button type="button" data-ship-update="${escapeAttribute(item.name)}">Update</button>
           <button type="button" data-ship-remove="${escapeAttribute(item.name)}">Remove</button>
+        </div>
         </div>
       </div>
     </article>`;
@@ -752,7 +762,7 @@ function connectorInstallPrompt(message) {
     </div>
     <ol class="connector-steps" hidden>
       <li>Unzip the downloaded connector folder.</li>
-      <li>Open <code>chrome://extensions</code> or <code>edge://extensions</code>.</li>
+      <li>Open <a href="chrome://extensions">chrome://extensions</a> or <a href="edge://extensions">edge://extensions</a>. If your browser blocks internal links, copy and paste the address.</li>
       <li>Turn on Developer mode.</li>
       <li>Choose <strong>Load unpacked</strong> and select the unzipped folder.</li>
       <li>Sign into RSI in this browser, then click <strong>Import RSI Hangar</strong> again.</li>
@@ -1950,6 +1960,12 @@ function bindSectionToggles(target) {
 
 function bindShipManageButtons(target, ships) {
   const shipByName = new Map(ships.map((ship) => [ship.name, ship]));
+  target.querySelectorAll("[data-hangar-expand]").forEach((button) => {
+    button.addEventListener("click", () => toggleHangarCard(target, button.dataset.hangarExpand));
+  });
+  target.querySelectorAll("[data-hangar-collapse]").forEach((button) => {
+    button.addEventListener("click", () => collapseHangarCard(target, button.dataset.hangarCollapse));
+  });
   target.querySelectorAll("[data-ship-manage]").forEach((button) => {
     button.addEventListener("click", () => {
       const menu = target.querySelector(`[data-ship-menu="${cssEscape(button.dataset.shipManage)}"]`);
@@ -1977,6 +1993,26 @@ function bindShipManageButtons(target, ships) {
     });
   });
   bindShipRemoveButtons(target);
+}
+
+function toggleHangarCard(target, name) {
+  const card = target.querySelector(`[data-hangar-card="${cssEscape(name)}"]`);
+  if (!card) return;
+  const willExpand = !card.classList.contains("expanded");
+  target.querySelectorAll(".hangar-card.expanded").forEach((item) => setHangarCardExpanded(item, false));
+  setHangarCardExpanded(card, willExpand);
+  if (willExpand) card.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function collapseHangarCard(target, name) {
+  const card = target.querySelector(`[data-hangar-card="${cssEscape(name)}"]`);
+  if (card) setHangarCardExpanded(card, false);
+}
+
+function setHangarCardExpanded(card, expanded) {
+  card.classList.toggle("expanded", expanded);
+  card.querySelector("[data-hangar-expand]")?.setAttribute("aria-expanded", String(expanded));
+  if (!expanded) card.querySelector(".ship-manage-menu")?.classList.remove("active");
 }
 
 function bindShipRemoveButtons(target) {
