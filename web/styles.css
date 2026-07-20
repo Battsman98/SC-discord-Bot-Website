@@ -9,6 +9,9 @@
   --accent: #e49a18;
   --accent-2: #ffc247;
   --danger: #f06d6d;
+  --ambient: rgba(228, 154, 24, 0.09);
+  --glow: rgba(228, 154, 24, 0.22);
+  --panel-tint: rgba(228, 154, 24, 0.035);
   --radius: 8px;
   font-family: Inter, "Segoe UI", Arial, sans-serif;
 }
@@ -24,8 +27,63 @@ body {
   flex-direction: column;
   color: var(--text);
   background:
-    linear-gradient(120deg, rgba(228, 154, 24, 0.09), transparent 34%),
+    linear-gradient(120deg, var(--ambient), transparent 34%),
     linear-gradient(180deg, #111214 0%, var(--bg) 36%, #000 100%);
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+body[data-mfd-theme="drake"] {
+  --bg: #080704; --surface: #19150d; --surface-2: #292115; --line: #80652e;
+  --text: #fff2ca; --muted: #bea976; --accent: #f6a800; --accent-2: #ffd151;
+  --ambient: rgba(246, 168, 0, 0.14); --glow: rgba(246, 168, 0, 0.28); --panel-tint: rgba(246, 168, 0, 0.045);
+}
+
+body[data-mfd-theme="grey-market"] {
+  --bg: #070509; --surface: #17121c; --surface-2: #261d2d; --line: #765984;
+  --text: #f6eaff; --muted: #b8a1c0; --accent: #bf62ed; --accent-2: #a9f86b;
+  --ambient: rgba(191, 98, 237, 0.13); --glow: rgba(191, 98, 237, 0.27); --panel-tint: rgba(169, 248, 107, 0.035);
+}
+
+body[data-mfd-theme="argo"] {
+  --bg: #070706; --surface: #181713; --surface-2: #2a281e; --line: #7d713d;
+  --text: #fff8d8; --muted: #bdb48d; --accent: #f2c230; --accent-2: #ff7a18;
+  --ambient: rgba(242, 194, 48, 0.13); --glow: rgba(242, 194, 48, 0.27); --panel-tint: rgba(255, 122, 24, 0.04);
+}
+
+body[data-mfd-theme="anvil"] {
+  --bg: #070708; --surface: #171719; --surface-2: #28272a; --line: #68666b;
+  --text: #f1f1f2; --muted: #aaa8ad; --accent: #d7483f; --accent-2: #f5a34f;
+  --ambient: rgba(215, 72, 63, 0.13); --glow: rgba(215, 72, 63, 0.27); --panel-tint: rgba(215, 72, 63, 0.04);
+}
+
+body[data-mfd-theme="origin"] {
+  --bg: #05090b; --surface: #10191d; --surface-2: #1b2a30; --line: #607b86;
+  --text: #f5fcff; --muted: #a9bec6; --accent: #77d8f1; --accent-2: #ffffff;
+  --ambient: rgba(119, 216, 241, 0.12); --glow: rgba(119, 216, 241, 0.25); --panel-tint: rgba(119, 216, 241, 0.035);
+}
+
+body[data-mfd-theme="crusader"] {
+  --bg: #05080d; --surface: #101823; --surface-2: #1a2938; --line: #476d91;
+  --text: #eaf6ff; --muted: #9eb6ca; --accent: #3ca7e8; --accent-2: #8bd9ff;
+  --ambient: rgba(60, 167, 232, 0.13); --glow: rgba(60, 167, 232, 0.27); --panel-tint: rgba(60, 167, 232, 0.04);
+}
+
+body[data-mfd-theme="misc"] {
+  --bg: #040908; --surface: #0e1916; --surface-2: #182923; --line: #477566;
+  --text: #e7fff7; --muted: #9bbdaf; --accent: #35c58b; --accent-2: #9ef0c8;
+  --ambient: rgba(53, 197, 139, 0.12); --glow: rgba(53, 197, 139, 0.26); --panel-tint: rgba(53, 197, 139, 0.035);
+}
+
+body[data-mfd-theme="aegis"] {
+  --bg: #04080a; --surface: #0e171b; --surface-2: #17262c; --line: #466d78;
+  --text: #e9fbff; --muted: #9bb7be; --accent: #42c7dc; --accent-2: #f06b62;
+  --ambient: rgba(66, 199, 220, 0.12); --glow: rgba(66, 199, 220, 0.26); --panel-tint: rgba(240, 107, 98, 0.035);
+}
+
+body[data-mfd-theme="security"] {
+  --bg: #090404; --surface: #1b1010; --surface-2: #2c1919; --line: #804747;
+  --text: #fff0ed; --muted: #c0a09c; --accent: #e84e43; --accent-2: #ffb24f;
+  --ambient: rgba(232, 78, 67, 0.14); --glow: rgba(232, 78, 67, 0.3); --panel-tint: rgba(232, 78, 67, 0.045);
 }
 
 .topbar {
@@ -40,6 +98,7 @@ body {
   top: 0;
   z-index: 3;
   backdrop-filter: blur(16px);
+  box-shadow: 0 1px 18px var(--glow);
 }
 
 .eyebrow {
@@ -359,6 +418,18 @@ button:hover, .button-link:hover, .tabs button.active {
   min-width: 0;
 }
 
+.app-shell:not(.overview-mode) .tab-panel.active::before {
+  content: attr(data-mfd-label) "  /  MFD ONLINE";
+  display: block;
+  margin: 0 0 12px 2px;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px var(--glow);
+}
+
 .dashboard-grid, .two-column {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -366,12 +437,24 @@ button:hover, .button-link:hover, .tabs button.active {
 }
 
 .panel {
-  background: rgba(23, 25, 27, 0.94);
+  background: linear-gradient(135deg, var(--panel-tint), transparent 42%), var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 18px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 1px 0 var(--glow), 0 12px 30px rgba(0, 0, 0, 0.22);
   min-width: 0;
+}
+
+.tab-panel.active .panel h2,
+.tab-panel.active .panel h3 {
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+input:focus, select:focus, textarea:focus, button:focus-visible, .button-link:focus-visible {
+  outline: 1px solid var(--accent-2);
+  outline-offset: 2px;
+  box-shadow: 0 0 14px var(--glow);
 }
 
 .visual-panel {

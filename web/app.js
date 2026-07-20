@@ -19,6 +19,18 @@ const outputs = {
 };
 
 const appShell = document.querySelector(".app-shell");
+const mfdThemes = {
+  overview: { theme: "overview", label: "RSI HOME SYSTEM" },
+  lookup: { theme: "drake", label: "DRAKE INTERPLANETARY" },
+  trade: { theme: "grey-market", label: "GREY MARKET EXCHANGE" },
+  mining: { theme: "argo", label: "ARGO ASTRONAUTICS" },
+  crafting: { theme: "anvil", label: "ANVIL AEROSPACE" },
+  items: { theme: "origin", label: "ORIGIN JUMPWORKS" },
+  inventory: { theme: "crusader", label: "CRUSADER INDUSTRIES" },
+  timers: { theme: "misc", label: "MISC INDUSTRIAL" },
+  commands: { theme: "aegis", label: "AEGIS DYNAMICS" },
+  admin: { theme: "security", label: "SECURITY AUDIT" },
+};
 
 function activateTab(tabId) {
   const panel = document.querySelector(`#${tabId}`);
@@ -29,6 +41,9 @@ function activateTab(tabId) {
   tabButton.classList.add("active");
   panel.classList.add("active");
   appShell.classList.toggle("overview-mode", tabId === "overview");
+  const mfdTheme = mfdThemes[tabId] || mfdThemes.overview;
+  document.body.dataset.mfdTheme = mfdTheme.theme;
+  panel.dataset.mfdLabel = mfdTheme.label;
 }
 
 document.querySelectorAll(".tabs button").forEach((button) => {
