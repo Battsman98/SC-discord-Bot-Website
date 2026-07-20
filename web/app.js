@@ -481,8 +481,6 @@ async function loadHealth() {
     outputs.health.innerHTML = [
       metric("Status", health.status),
       metric("Discord auth", health.discord_auth_enabled ? "Enabled" : "Needs setup"),
-      metric("Database", health.database_path),
-      metric("Routed commands", Object.keys(health.command_channel_ids || {}).length),
     ].join("");
   } catch (error) {
     outputs.health.innerHTML = errorMessage(error.message);
