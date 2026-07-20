@@ -203,7 +203,32 @@ class UEXSource:
         items = await self._get_buyable_items()
         filtered = self._filter_items(items, query, category, section, size)
         start = max(0, page - 1) * limit
-        return [self._item_result(row, []) for row in filtered[start : start + limit]]
+        page_items = filtered[start : start + limit]
+        if not page_items:
+            return []
+
+        item_ids = {self._int_or_none(row.get("id")) for row in page_items}
+        prices = [
+            row
+            for row in await self._fetch_all_item_prices()
+            if self._int_or_none(row.get("id_item")) in item_ids
+            and self._positive(row.get("price_buy"))
+        ]
+        terminals_by_id = await self._fetch_terminals_by_id()
+        prices_by_item: dict[int, list[ItemPurchaseLocation]] = {}
+        for row in self._enrich_price_rows(prices, terminals_by_id):
+            item_id = self._int_or_none(row.get("id_item"))
+            if item_id is None:
+                continue
+            prices_by_item.setdefault(item_id, []).append(self._item_purchase_location(row))
+
+        for purchases in prices_by_item.values():
+            purchases.sort(key=lambda purchase: (float(purchase.price), purchase.terminal_name.lower()))
+
+        return [
+            self._item_result(row, prices_by_item.get(self._int_or_none(row.get("id")) or 0, []))
+            for row in page_items
+        ]
 
     async def lookup_item_by_id(self, item_id: int) -> ItemLocatorResult | None:
         items = await self._get_buyable_items()

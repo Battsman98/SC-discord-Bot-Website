@@ -267,7 +267,7 @@ Route behavior:
 - `stay_system` can make a closed loop impossible when UEX does not have a profitable loop inside that system.
 - Does not require a SC Trade Tools API token.
 
-## `/item locator`
+## `/item search` and `/item locator`
 
 Finds in-game buyable Star Citizen items using UEX item and item price data.
 
@@ -293,10 +293,10 @@ At least one option is required.
 Examples:
 
 ```text
-/item locator name:Atlas
-/item locator category:Quantum Drives size:1
-/item locator section:Armor category:Helmets
-/item locator section:Vehicle Weapons category:Guns
+/item search name:Atlas
+/item search category:Quantum Drives size:1
+/item search section:Armor category:Helmets
+/item search section:Vehicle Weapons category:Guns
 ```
 
 ## `/exec`

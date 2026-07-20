@@ -55,6 +55,8 @@ class GameAssistCommandTree(app_commands.CommandTree):
 
         command_name = _interaction_command_name(interaction)
         allowed_channel_id = bot.settings.command_channel_ids.get(command_name)
+        if allowed_channel_id is None and command_name == "item search":
+            allowed_channel_id = bot.settings.command_channel_ids.get("item locator")
         if allowed_channel_id and interaction.channel_id != allowed_channel_id:
             await bot.log_audit_event(
                 "Command Blocked",
@@ -1300,6 +1302,24 @@ async def item_locator_command(
     )
 
 
+@item_group.command(name="search", description="Search for in-game buyable Star Citizen items.")
+@app_commands.describe(
+    name="Item name to search.",
+    category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
+    section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
+    size="Optional item size.",
+)
+async def item_search_command(
+    interaction: discord.Interaction,
+    name: str | None = None,
+    category: str | None = None,
+    section: str | None = None,
+    size: str | None = None,
+) -> None:
+    await item_locator_command.callback(interaction, name, category, section, size)
+
+
+@item_search_command.autocomplete("name")
 @item_locator_command.autocomplete("name")
 async def item_locator_name_autocomplete(
     interaction: discord.Interaction,
@@ -1312,6 +1332,9 @@ async def item_locator_name_autocomplete(
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
 
 
+@item_search_command.autocomplete("category")
+@item_search_command.autocomplete("section")
+@item_search_command.autocomplete("size")
 @item_locator_command.autocomplete("category")
 @item_locator_command.autocomplete("section")
 @item_locator_command.autocomplete("size")
