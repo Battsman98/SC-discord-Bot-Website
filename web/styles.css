@@ -191,9 +191,6 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .app-shell.overview-mode {
   grid-template-columns: minmax(0, 1fr);
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
   min-height: clamp(680px, calc(100dvh - 190px), 1100px);
 }
 
@@ -202,10 +199,15 @@ button:hover, .button-link:hover, .tabs button.active {
 }
 
 .home-background {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-top: 22px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: #050505;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4);
 }
 
 .app-shell:not(.overview-mode) .home-background {
@@ -231,9 +233,7 @@ button:hover, .button-link:hover, .tabs button.active {
 }
 
 .home-background-shade {
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.42) 52%, rgba(0, 0, 0, 0.62)),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.74));
+  background: linear-gradient(180deg, transparent 62%, rgba(0, 0, 0, 0.62));
 }
 
 .community-mark {
@@ -252,7 +252,6 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .overview-heading {
   margin-bottom: 18px;
-  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
 }
 
 .overview-heading h2 {
@@ -324,6 +323,8 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .home-carousel-dots {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -1305,6 +1306,10 @@ article.tool-panel.active {
     min-height: clamp(760px, calc(100dvh - 210px), 1250px);
   }
 
+  .home-background {
+    aspect-ratio: 1 / 1;
+  }
+
   .field-row, .two-column .field-row, .inline-form, .inventory-filters {
     grid-template-columns: 1fr;
   }
@@ -1397,8 +1402,12 @@ article.tool-panel.active {
     width: 92px;
   }
 
+  .home-background {
+    aspect-ratio: 4 / 5;
+  }
+
   .home-background-shade {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.48), rgba(0, 0, 0, 0.82));
+    background: linear-gradient(180deg, transparent 68%, rgba(0, 0, 0, 0.68));
   }
 
   .home-carousel-controls {
