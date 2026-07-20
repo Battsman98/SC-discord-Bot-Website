@@ -178,22 +178,44 @@ class GameAssistBot(commands.Bot):
         elif isinstance(cached_message_ids, list):
             message_ids = [message_id for message_id in cached_message_ids if isinstance(message_id, int)]
 
+        existing_messages = await self.find_recent_embed_messages(
+            channel,
+            {embed.title for embed in embeds if embed.title},
+            limit=250,
+        )
         updated_message_ids: list[int] = []
         for index, embed in enumerate(embeds):
+            message = None
             if index < len(message_ids):
                 try:
                     message = await channel.fetch_message(message_ids[index])
-                    if not _message_embed_matches(message, embed) or message.content:
-                        await message.edit(content=None, embed=embed)
-                        await asyncio.sleep(1)
-                    updated_message_ids.append(message.id)
-                    continue
+                    if not any(message_embed.title == embed.title for message_embed in message.embeds):
+                        message = None
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    logging.info("Could not update commands reference message part %s; creating a new one", index + 1)
+                    logging.info(
+                        "Could not update commands reference message part %s; searching for an existing one",
+                        index + 1,
+                    )
+
+            if message is None and embed.title:
+                matching_messages = existing_messages.get(embed.title, [])
+                if matching_messages:
+                    message = matching_messages[0]
+
+            if message is not None:
+                if not _message_embed_matches(message, embed) or message.content:
+                    await message.edit(content=None, embed=embed)
+                    await asyncio.sleep(1)
+                updated_message_ids.append(message.id)
+                if embed.title:
+                    await self.delete_recent_duplicate_embed_messages(channel, embed.title, message.id, limit=250)
+                continue
 
             message = await channel.send(embed=embed)
             await asyncio.sleep(1)
             updated_message_ids.append(message.id)
+            if embed.title:
+                await self.delete_recent_duplicate_embed_messages(channel, embed.title, message.id, limit=250)
 
         for stale_message_id in message_ids[len(embeds):]:
             try:
@@ -277,17 +299,41 @@ class GameAssistBot(commands.Bot):
 
         return None
 
+    async def find_recent_embed_messages(
+        self,
+        channel: discord.abc.Messageable,
+        titles: set[str],
+        limit: int = 50,
+    ) -> dict[str, list[discord.Message]]:
+        messages_by_title = {title: [] for title in titles}
+        if not titles or not hasattr(channel, "history"):
+            return messages_by_title
+
+        try:
+            async for message in channel.history(limit=limit):
+                if self.user is not None and message.author.id != self.user.id:
+                    continue
+                for embed in message.embeds:
+                    if embed.title in messages_by_title:
+                        messages_by_title[embed.title].append(message)
+                        break
+        except (discord.Forbidden, discord.HTTPException):
+            logging.info("Could not scan for existing embed messages")
+
+        return messages_by_title
+
     async def delete_recent_duplicate_embed_messages(
         self,
         channel: discord.abc.Messageable,
         title: str,
         keep_message_id: int,
+        limit: int = 50,
     ) -> None:
         if not hasattr(channel, "history"):
             return
 
         try:
-            async for message in channel.history(limit=50):
+            async for message in channel.history(limit=limit):
                 if message.id == keep_message_id:
                     continue
                 if self.user is not None and message.author.id != self.user.id:
