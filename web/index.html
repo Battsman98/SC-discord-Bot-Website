@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game Assist Control Deck</title>
+  <link rel="stylesheet" href="/assets/styles.css?v=20260719-inventory-single-hover-match">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Star Citizen Discord Companion</p>
+      <h1>Game Assist Control Deck</h1>
+    </div>
+    <div class="user-panel" id="userPanel">
+      <span>Checking Discord...</span>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <nav class="tabs" aria-label="Website sections">
+      <button class="active" data-tab="overview">Overview</button>
+      <button data-tab="lookup">Ships</button>
+      <button data-tab="trade">Trade</button>
+      <button data-tab="mining">Mining</button>
+      <button data-tab="crafting">Blueprints</button>
+      <button data-tab="items">Items</button>
+      <button data-tab="inventory">Inventory</button>
+      <button data-tab="timers">Timers</button>
+      <button data-tab="commands">Commands</button>
+      <button data-tab="admin">Audit</button>
+    </nav>
+
+    <section id="overview" class="tab-panel active">
+      <div class="dashboard-grid">
+        <article class="panel">
+          <h2>System</h2>
+          <div id="healthOutput" class="metric-grid"></div>
+        </article>
+        <article class="panel visual-panel">
+          <div class="radar" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div>
+            <h2>Shared Logic</h2>
+            <p>The website uses the same Python source registry, cache, timers, and command documentation as the Discord bot.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="lookup" class="tab-panel">
+      <article class="panel ship-library">
+        <div class="panel-heading">
+          <h2>Hangar</h2>
+          <div class="heading-actions">
+            <button type="button" data-action-button="importRsiPledges">Update</button>
+            <button type="button" data-action-button="refreshShips">Refresh</button>
+          </div>
+          <input id="rsiPledgeImport" type="file" accept=".html,.htm,text/html" multiple hidden>
+        </div>
+        <div id="savedShipsOutput" class="saved-list"></div>
+      </article>
+      <form class="panel form wide" data-action="ship">
+        <h2>Ship Search</h2>
+        <div class="field-row">
+          <input name="query" placeholder="Corsair, Prospector, freight, explorer">
+          <select name="manufacturer" data-ship-facet="manufacturers">
+            <option value="">Any manufacturer</option>
+          </select>
+          <select name="vehicle_type" data-ship-facet="types">
+            <option value="">Any type</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <select name="size" data-ship-facet="sizes">
+            <option value="">Any size</option>
+          </select>
+          <select name="status" data-ship-facet="statuses">
+            <option value="">Any status</option>
+          </select>
+          <select name="sort_by">
+            <option value="name">Sort by name</option>
+            <option value="manufacturer">Sort by manufacturer</option>
+            <option value="size">Sort by size</option>
+            <option value="cargo">Sort by cargo</option>
+          </select>
+        </div>
+        <button type="submit">Search Ships</button>
+      </form>
+      <div id="lookupOutput" class="results"></div>
+    </section>
+
+    <section id="trade" class="tab-panel">
+      <div class="two-column">
+        <form class="panel form" data-action="commodity">
+          <h2>Commodity Lookup</h2>
+          <input name="name" placeholder="Gold, Agricium, HADA" required>
+          <div class="field-row">
+            <input name="purchase_system" placeholder="Purchase system">
+            <input name="sell_system" placeholder="Sell system">
+          </div>
+          <button type="submit">Search Commodity</button>
+        </form>
+        <form class="panel form" data-action="trade">
+          <h2>Trade Routing</h2>
+          <input name="starting_point" placeholder="Starting terminal or location" required>
+          <input name="ship" value="Ironclad Assault" required>
+          <div class="field-row">
+            <input name="investment" type="number" min="1" value="1000000" required>
+            <input name="max_stops" type="number" min="2" max="5" value="5" required>
+          </div>
+          <input name="stay_system" placeholder="Stay in system">
+          <button type="submit">Build Route</button>
+        </form>
+      </div>
+      <div id="tradeOutput" class="results"></div>
+    </section>
+
+    <section id="mining" class="tab-panel">
+      <div class="two-column">
+        <form class="panel form" data-action="mining">
+          <h2>Mining Locator</h2>
+          <input name="material" placeholder="Gold, Borase, Hadanite" required>
+          <div class="field-row">
+            <input name="system" placeholder="System">
+            <input name="planet" placeholder="Planet, moon, L-point, POI">
+          </div>
+          <button type="submit">Find Material</button>
+        </form>
+        <form class="panel form" data-action="miningCommunity">
+          <h2>Update Material Location</h2>
+          <input name="material" placeholder="Material" required>
+          <div class="field-row">
+            <input name="system" placeholder="System" required>
+            <select name="location_type" required>
+              <option value="lagrange_points">Lagrange Point</option>
+              <option value="planets">Planet</option>
+              <option value="moons">Moon</option>
+              <option value="points_of_interest">Point of Interest</option>
+            </select>
+          </div>
+          <input name="location" placeholder="Location name" required>
+          <button type="submit">Add Location</button>
+        </form>
+      </div>
+      <div id="miningOutput" class="results"></div>
+    </section>
+
+    <section id="crafting" class="tab-panel">
+      <article class="panel blueprint-library">
+        <div class="panel-heading">
+          <h2>My Blueprints</h2>
+          <button type="button" data-action-button="refreshBlueprints">Refresh</button>
+        </div>
+        <div id="savedBlueprintsOutput" class="saved-list"></div>
+      </article>
+      <form class="panel form wide" data-action="blueprints">
+        <h2>Blueprint Search</h2>
+        <div class="field-row">
+          <input name="query" placeholder="Blueprint or crafted item">
+          <input name="category" placeholder="Category">
+          <input name="material" placeholder="Material">
+        </div>
+        <div class="field-row">
+          <input name="mission_type" placeholder="Mission type">
+          <input name="contractor" placeholder="Contractor">
+          <input name="location" placeholder="Location">
+        </div>
+        <button type="submit">Search Blueprints</button>
+      </form>
+      <article class="panel blueprint-import">
+        <h2>Blueprint Import</h2>
+        <div class="import-actions">
+          <button type="button" data-action-button="captureBlueprintScreen">Capture Screen</button>
+          <label class="button-link">
+            Upload Screenshots
+            <input id="blueprintImageImport" type="file" accept="image/*" multiple hidden>
+          </label>
+        </div>
+        <textarea id="blueprintOcrText" placeholder="Paste OCR text or copied blueprint names here"></textarea>
+        <button type="button" data-action-button="matchBlueprintText">Find Blueprints</button>
+        <div id="blueprintImportOutput" class="results compact"></div>
+      </article>
+      <div id="craftingOutput" class="results"></div>
+    </section>
+
+    <section id="items" class="tab-panel">
+      <form class="panel form wide" data-action="items">
+        <h2>Item Locator</h2>
+        <div class="field-row">
+          <input name="query" placeholder="Atlas, FS-9, Pembroke">
+          <input name="section" placeholder="Section">
+          <input name="category" placeholder="Category">
+          <input name="size" placeholder="Size">
+        </div>
+        <button type="submit">Find Items</button>
+      </form>
+      <div id="itemsOutput" class="results"></div>
+    </section>
+
+    <section id="inventory" class="tab-panel">
+      <article class="panel inventory-library">
+        <div class="panel-heading">
+          <h2>Station Inventory</h2>
+          <div class="heading-actions">
+            <button type="button" data-action-button="refreshInventory">Refresh</button>
+            <button type="button" data-action-button="exportInventory">Export Excel</button>
+            <button type="button" class="danger-button" data-action-button="clearStationInventory">Clear Station</button>
+            <button type="button" class="danger-button" data-action-button="clearAllInventory">Clear All</button>
+          </div>
+        </div>
+        <form class="inventory-filters" data-action="inventorySearch">
+          <input name="query" placeholder="Search names or notes">
+          <select name="location" id="inventoryLocationFilter">
+            <option value="">Any station/location</option>
+          </select>
+          <select name="category" id="inventoryCategoryFilter">
+            <option value="">Any category</option>
+          </select>
+          <select name="sort_by">
+            <option value="name">Sort by name</option>
+            <option value="location">Sort by station/location</option>
+            <option value="category">Sort by category</option>
+            <option value="quantity">Sort by quantity</option>
+            <option value="updated">Sort by updated</option>
+          </select>
+          <button type="submit">Apply</button>
+        </form>
+        <div id="inventoryOutput" class="inventory-list"></div>
+      </article>
+      <form class="panel form wide" data-action="inventoryAdd">
+        <h2>Add Inventory Item</h2>
+        <div class="field-row">
+          <input name="name" placeholder="Item name" required>
+          <select name="category" data-inventory-category-select data-placeholder="Category"></select>
+          <select name="item_type" data-inventory-type-select data-placeholder="Item type"></select>
+          <input name="item_size" placeholder="Size">
+          <input name="location" placeholder="Station or location" required>
+          <input name="quantity" type="number" min="0" step="0.01" value="1" placeholder="Found/Crafted Qty" required>
+          <input name="quality" type="number" min="0" step="0.01" placeholder="Quality">
+          <input name="volume_scu" type="number" min="0" step="0.000001" placeholder="SCU">
+        </div>
+        <textarea name="notes" placeholder="Notes, quality, loadout use, or storage details"></textarea>
+        <button type="submit">Add Item</button>
+      </form>
+      <article class="panel inventory-import">
+        <h2>Inventory Import</h2>
+        <div class="field-row">
+          <input id="inventoryImportLocation" placeholder="Station/location for captured items">
+          <select id="inventoryImportCategory" data-inventory-category-select data-placeholder="Default category"></select>
+        </div>
+        <div class="import-actions">
+          <button type="button" data-action-button="startInventoryScanner">Share Window</button>
+          <button type="button" data-action-button="startInventoryAutoScan">Start Scan</button>
+          <button type="button" data-action-button="stopInventoryScanner">Stop</button>
+        </div>
+        <div class="scanner-preview">
+          <video id="inventoryScannerVideo" muted playsinline></video>
+          <canvas id="inventoryScannerOverlay"></canvas>
+          <div class="scanner-empty">Low-impact scanner mode. Share Star Citizen, start scan, then hover each item for a few seconds.</div>
+        </div>
+        <details class="scanner-advanced">
+          <summary>Advanced scanner settings</summary>
+          <div class="import-actions">
+            <label>
+              Scan delay
+              <input id="inventoryScannerSpacing" type="number" min="5000" step="500" value="6500">
+            </label>
+            <label>
+              Match strictness
+              <input id="inventoryScannerMinScore" type="number" min="0" max="1" step="0.01" value="0.72">
+            </label>
+            <label>
+              Guide line height
+              <input id="inventoryScannerTextHeight" type="number" min="25" max="85" step="5" value="55">
+            </label>
+            <input id="inventoryScannerExcludeWords" placeholder="Ignore words">
+          </div>
+          <details class="scanner-manual">
+            <summary>Manual OCR text</summary>
+            <textarea id="inventoryOcrText" placeholder="Paste OCR text only if you are troubleshooting scanner reads"></textarea>
+            <button type="button" data-action-button="matchInventoryText">Find Inventory Items</button>
+          </details>
+        </details>
+        <div id="inventoryImportOutput" class="results compact"></div>
+      </article>
+    </section>
+
+    <section id="timers" class="tab-panel">
+      <div class="two-column">
+        <article class="panel">
+          <h2>Executive Hangar</h2>
+          <div id="execOutput" class="results compact"></div>
+          <form class="form inline-form" data-action="execOverride">
+            <select name="phase">
+              <option value="closed">Closed</option>
+              <option value="open">Open</option>
+              <option value="resetting">Resetting</option>
+            </select>
+            <input name="remaining_minutes" type="number" min="1" placeholder="Minutes" required>
+            <button type="submit">Set</button>
+            <button type="button" data-action-button="clearExec">Clear</button>
+          </form>
+        </article>
+        <article class="panel">
+          <h2>Contested Zone Timers</h2>
+          <div id="czOutput" class="timer-list"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="commands" class="tab-panel">
+      <article class="panel">
+        <h2>Command Directory</h2>
+        <div id="commandsOutput" class="markdown"></div>
+      </article>
+    </section>
+
+    <section id="admin" class="tab-panel">
+        <article class="panel">
+          <h2>Audit Events</h2>
+          <button data-action-button="refreshAudit">Refresh</button>
+        <div id="auditOutput" class="results compact"></div>
+      </article>
+    </section>
+  </main>
+
+  <template id="loadingTemplate">
+    <div class="state">Loading...</div>
+  </template>
+
+  <script src="/assets/app.js?v=20260719-inventory-single-hover-match" defer></script>
+</body>
+</html>

@@ -46,6 +46,39 @@ Set comma-separated `BOT_ADMIN_ROLE_IDS` and/or `BOT_ADMIN_USER_IDS` in `.env` t
 
 Set `CZ_TIMERS_CHANNEL_ID` in `.env` to have the bot keep a public Contested Zone timer dashboard with clickable start/reset buttons.
 
+## Website Companion
+
+Run the browser companion locally with:
+
+```powershell
+python -m uvicorn src.web:app --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000/`.
+
+To link website permissions to Discord, create an OAuth2 redirect for the Discord application and set:
+
+```env
+DISCORD_CLIENT_ID=your-application-client-id
+DISCORD_CLIENT_SECRET=your-application-client-secret
+DISCORD_REDIRECT_URI=http://127.0.0.1:8000/auth/discord/callback
+WEB_SESSION_SECRET=replace-with-a-long-random-secret
+```
+
+The website uses the same `DISCORD_GUILD_ID`, `EXEC_ADMIN_ROLE_IDS`, `BOT_ADMIN_ROLE_IDS`, and `BOT_ADMIN_USER_IDS` permission model as the bot. Users must be members of the configured Discord server. If no matching role IDs or user IDs are configured for a permission group, users with Discord's Manage Server permission can use those website actions.
+
+### RSI Pledge Hangar Updates
+
+The Hangar `Update` button can import pledged ships from your RSI account through the optional local connector extension in:
+
+```text
+tools\rsi-connector-extension
+```
+
+Install it in Chrome or Edge with `Load unpacked`, sign into RSI in that same browser, then click `Update` beside Hangar. The extension uses your browser's existing RSI session to fetch pledge pages for the local website. It does not ask for or store your RSI password or cookie value.
+
+If the connector is not installed, the website falls back to importing saved RSI pledge HTML files.
+
 ## Local Setup
 
 Install Python 3.12+ first. On Windows, make sure Python is added to PATH.
@@ -131,6 +164,35 @@ sudo systemctl enable game-assist-bot
 sudo systemctl start game-assist-bot
 sudo journalctl -u game-assist-bot -f
 ```
+
+## Render Deployment
+
+The included `render.yaml` deploys the website and Discord bot together as one
+Starter web service. A 1 GB persistent disk stores the shared SQLite database at
+`/var/data/bot.sqlite3`. Keeping both processes in one service is required while
+the project uses SQLite because a Render disk cannot be shared between separate
+services.
+
+1. Push this repository to GitHub.
+2. In Render, select **New > Blueprint** and connect the repository.
+3. Supply every environment variable marked `sync: false`. Copy the values from
+   the local `.env` file into Render's environment-variable form; never commit
+   the `.env` file.
+4. Set `DISCORD_REDIRECT_URI` to the Render service URL followed by
+   `/auth/discord/callback`, for example:
+
+   ```text
+   https://star-citizen-game-assist.onrender.com/auth/discord/callback
+   ```
+
+5. Add that exact HTTPS callback URL under **OAuth2 > Redirects** in the Discord
+   Developer Portal.
+6. Deploy the Blueprint, then verify `/api/health` and sign in through Discord.
+
+The first deployment starts with a new database. To preserve existing hangar,
+blueprint, inventory, timer, and audit data, copy `data/bot.sqlite3` to the
+mounted Render disk before using the production site. Do not run the local bot
+and the Render bot with the same token at the same time after cutover.
 
 ## GitHub Notes
 

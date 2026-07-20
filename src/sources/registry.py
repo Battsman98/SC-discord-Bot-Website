@@ -36,6 +36,38 @@ class SourceRegistry:
                 return result
         return None
 
+    async def search_ships(
+        self,
+        query: str | None = None,
+        manufacturer: str | None = None,
+        vehicle_type: str | None = None,
+        size: str | None = None,
+        role: str | None = None,
+        status: str | None = None,
+        min_cargo: int | float | None = None,
+        max_cargo: int | float | None = None,
+        limit: int = 24,
+        page: int = 1,
+    ) -> list[ShipResult]:
+        for source in self._sources:
+            search = getattr(source, "search_ships", None)
+            if search is None:
+                continue
+            results = await search(query, manufacturer, vehicle_type, size, role, status, min_cargo, max_cargo, limit, page)
+            if results:
+                return results
+        return []
+
+    async def ship_facets(self) -> dict[str, list[str]]:
+        for source in self._sources:
+            facets = getattr(source, "ship_facets", None)
+            if facets is None:
+                continue
+            result = await facets()
+            if result:
+                return result
+        return {"manufacturers": [], "types": [], "sizes": [], "roles": [], "statuses": []}
+
     async def autocomplete_ships(self, query: str, limit: int = 25) -> list[str]:
         seen: set[str] = set()
         matches: list[str] = []
@@ -224,6 +256,25 @@ class SourceRegistry:
             if result is not None:
                 return result
         return None
+
+    async def lookup_inventory_items(self, query: str, limit: int = 10) -> list[ItemLocatorResult]:
+        seen: set[str] = set()
+        matches: list[ItemLocatorResult] = []
+        for source in self._sources:
+            lookup = getattr(source, "lookup_inventory_items", None)
+            if lookup is None:
+                continue
+            for result in await lookup(query, limit):
+                key = result.name.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                matches.append(result)
+                if len(matches) >= limit:
+                    return matches
+        if matches:
+            return matches
+        return await self.lookup_items(query=query, limit=limit)
 
     async def autocomplete_items(self, query: str, limit: int = 25) -> list[str]:
         seen: set[str] = set()

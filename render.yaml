@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: star-citizen-game-assist
+    runtime: python
+    plan: starter
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/run_render.py
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    disk:
+      name: game-assist-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DATABASE_PATH
+        value: /var/data/bot.sqlite3
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: DISCORD_GUILD_ID
+        sync: false
+      - key: WEB_SESSION_SECRET
+        generateValue: true
+      - key: WEB_ADMIN_TOKEN
+        generateValue: true
+      - key: COMMANDS_CHANNEL_ID
+        sync: false
+      - key: EXEC_STATUS_CHANNEL_ID
+        sync: false
+      - key: EXEC_ADMIN_ROLE_IDS
+        sync: false
+      - key: BOT_ADMIN_ROLE_IDS
+        sync: false
+      - key: BOT_ADMIN_USER_IDS
+        sync: false
+      - key: CZ_TIMERS_CHANNEL_ID
+        sync: false
+      - key: AUDIT_LOG_CHANNEL_ID
+        sync: false
+      - key: COMMAND_CHANNEL_IDS
+        sync: false
+      - key: BOT_COMMAND_PREFIX
+        value: "!"
+      - key: HTTP_TIMEOUT_SECONDS
+        value: "15"
+      - key: CACHE_TTL_SECONDS
+        value: "300"
