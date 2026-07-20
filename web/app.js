@@ -746,8 +746,8 @@ async function importRsiPledgesFromBrowser() {
 function connectorInstallPrompt(message) {
   return `<div class="connector-prompt">
     <div>
-      <strong>RSI connector needed</strong>
-      <p>${escapeHtml(message)} Install the local connector once, then click Update again.</p>
+      <strong>RSI Hangar Importer needed</strong>
+      <p>${escapeHtml(message)} Install the local importer once, then click Import RSI Hangar again.</p>
     </div>
     <div class="connector-actions">
       <a class="button-link" href="/assets/rsi-connector-extension.zip" download>Download connector</a>
@@ -759,7 +759,7 @@ function connectorInstallPrompt(message) {
       <li>Open <code>chrome://extensions</code> or <code>edge://extensions</code>.</li>
       <li>Turn on Developer mode.</li>
       <li>Choose <strong>Load unpacked</strong> and select the unzipped folder.</li>
-      <li>Sign into RSI in this browser, then click Hangar Update again.</li>
+      <li>Sign into RSI in this browser, then click <strong>Import RSI Hangar</strong> again.</li>
     </ol>
   </div>`;
 }

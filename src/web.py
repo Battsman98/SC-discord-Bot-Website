@@ -730,7 +730,13 @@ def _extract_rsi_pledge_ship_names_from_json(page_html: str) -> set[str]:
     for key in ("name", "title", "label"):
         pattern = rf'"{key}"\s*:\s*"([^"]{{2,120}})"'
         for match in re.finditer(pattern, page_html, flags=re.IGNORECASE):
-            cleaned = _clean_rsi_pledge_ship_name(match.group(1).encode("utf-8").decode("unicode_escape", errors="ignore"))
+            raw_value = match.group(1).encode("utf-8").decode("unicode_escape", errors="ignore")
+            # RSI pages contain JSON labels for paints, equipment, flair, currencies,
+            # navigation, and recommendations. Only pledge titles that explicitly
+            # identify a ship or ship-bearing package belong in the hangar import.
+            if not re.match(r"^\s*(?:Standalone Ship|Game Package|Package)\s*(?:[-:]|\s)", raw_value, flags=re.IGNORECASE):
+                continue
+            cleaned = _clean_rsi_pledge_ship_name(raw_value)
             if cleaned:
                 candidates.add(cleaned)
     return candidates

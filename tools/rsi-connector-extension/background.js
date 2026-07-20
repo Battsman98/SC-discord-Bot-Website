@@ -11,7 +11,24 @@ async function rsiHTMLGet(url) {
   return { code: response.status, payload: await response.text() };
 }
 
-chrome.runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {
+const ALLOWED_WEBSITE_ORIGINS = new Set([
+  "https://star-citizen-game-assist.onrender.com",
+  "http://127.0.0.1:8000",
+  "http://localhost:8000"
+]);
+
+chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
+  let senderOrigin = "";
+  try {
+    senderOrigin = new URL(sender.url || "").origin;
+  } catch (_error) {
+    sendResponse(JSON.stringify({ code: 403, error: "Unrecognized website origin." }));
+    return false;
+  }
+  if (!ALLOWED_WEBSITE_ORIGINS.has(senderOrigin)) {
+    sendResponse(JSON.stringify({ code: 403, error: "Website origin is not allowed." }));
+    return false;
+  }
   handleMessage(rawMessage).then((response) => {
     sendResponse(JSON.stringify(response));
   }).catch((error) => {
@@ -23,7 +40,7 @@ chrome.runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {
 async function handleMessage(rawMessage) {
   const message = JSON.parse(rawMessage || "{}");
   if (message.action === "connect") {
-    return { code: 200, version: "0.2.0" };
+    return { code: 200, version: "0.3.1", scope: "ships-and-vehicles-only" };
   }
   if (message.action === "getPledgesPage") {
     const page = Number(message.page || 1);

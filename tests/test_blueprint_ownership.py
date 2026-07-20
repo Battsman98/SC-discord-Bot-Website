@@ -112,6 +112,24 @@ def test_extract_rsi_pledge_ship_names_from_json_payload() -> None:
     }
 
 
+def test_rsi_hangar_import_ignores_non_ship_pledge_items() -> None:
+    page = r'''
+    <script>
+    window.__pledges = [
+      {"title":"Upgrade - Aurora MR to Avenger Titan"},
+      {"name":"Polar Paint Collection"},
+      {"label":"CF-337 Panther Repeater"},
+      {"title":"Standalone Ship - Anvil Arrow with Lifetime Insurance"}
+    ];
+    </script>
+    <section>Upgrade Aurora MR to Avenger Titan</section>
+    <section>Paints Anvil Arrow - Lovestruck Paint</section>
+    <section>Add-Ons Greycat Armor Set</section>
+    '''
+
+    assert _extract_rsi_pledge_ship_names(page) == {"Anvil Arrow"}
+
+
 def test_rsi_import_lookup_candidates_simplify_package_names() -> None:
     assert "Avenger Titan" in _rsi_import_lookup_candidates("Avenger Titan Starter Pack")
 

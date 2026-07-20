@@ -67,15 +67,17 @@ WEB_SESSION_SECRET=replace-with-a-long-random-secret
 
 The website uses the same `DISCORD_GUILD_ID`, `EXEC_ADMIN_ROLE_IDS`, `BOT_ADMIN_ROLE_IDS`, and `BOT_ADMIN_USER_IDS` permission model as the bot. Users must be members of the configured Discord server. If no matching role IDs or user IDs are configured for a permission group, users with Discord's Manage Server permission can use those website actions.
 
-### RSI Pledge Hangar Updates
+### Import RSI Hangar
 
-The Hangar `Update` button can import pledged ships from your RSI account through the optional local connector extension in:
+The Hangar `Import RSI Hangar` button can import pledged ships and vehicles from your RSI account through the optional local importer extension in:
 
 ```text
 tools\rsi-connector-extension
 ```
 
-Install it in Chrome or Edge with `Load unpacked`, sign into RSI in that same browser, then click `Update` beside Hangar. The extension uses your browser's existing RSI session to fetch pledge pages for the local website. It does not ask for or store your RSI password or cookie value.
+Install it in Chrome or Edge with `Load unpacked`, sign into RSI in that same browser, then click `Import RSI Hangar`. The extension uses your browser's existing RSI session to fetch pledge pages for the local website. Only ships and vehicles from standalone pledges and game packages are imported; upgrades, paints, equipment, flair, and other extras are ignored. It does not ask for or store your RSI password or cookie value.
+
+After the extension is installed and the user is signed into RSI, importing is one click from the deployed website. The connector accepts requests only from `https://star-citizen-game-assist.onrender.com` and the documented local development origins.
 
 If the connector is not installed, the website falls back to importing saved RSI pledge HTML files.
 

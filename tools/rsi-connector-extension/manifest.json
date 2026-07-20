@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Game Assist RSI Connector",
-  "version": "0.2.0",
-  "description": "Lets the local Game Assist website update pledged ships from your RSI hangar using your browser session.",
+  "name": "Game Assist RSI Hangar Importer",
+  "version": "0.3.1",
+  "description": "Imports only pledged ships and vehicles from your RSI hangar using your browser session.",
   "host_permissions": [
     "https://robertsspaceindustries.com/*"
   ],
@@ -13,6 +13,7 @@
   "content_scripts": [
     {
       "matches": [
+        "https://star-citizen-game-assist.onrender.com/*",
         "http://127.0.0.1:8000/*",
         "http://localhost:8000/*"
       ],
@@ -22,6 +23,6 @@
     }
   ],
   "action": {
-    "default_title": "Game Assist RSI Connector"
+    "default_title": "Game Assist RSI Hangar Importer"
   }
 }
