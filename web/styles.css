@@ -12,6 +12,9 @@
   --ambient: rgba(228, 154, 24, 0.09);
   --glow: rgba(228, 154, 24, 0.22);
   --panel-tint: rgba(228, 154, 24, 0.035);
+  --control: color-mix(in srgb, var(--surface) 58%, #000);
+  --button-surface: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  --accent-ink: #071014;
   --radius: 8px;
   font-family: Inter, "Segoe UI", Arial, sans-serif;
 }
@@ -84,6 +87,11 @@ body[data-mfd-theme="security"] {
   --bg: #090404; --surface: #1b1010; --surface-2: #2c1919; --line: #804747;
   --text: #fff0ed; --muted: #c0a09c; --accent: #e84e43; --accent-2: #ffb24f;
   --ambient: rgba(232, 78, 67, 0.14); --glow: rgba(232, 78, 67, 0.3); --panel-tint: rgba(232, 78, 67, 0.045);
+}
+
+body[data-mfd-theme] {
+  --control: color-mix(in srgb, var(--surface) 58%, #000);
+  --button-surface: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 
 .topbar {
@@ -166,7 +174,7 @@ input, select, button, .button-link {
   min-height: 40px;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0b0c0d;
+  background: var(--control);
   color: var(--text);
   padding: 9px 11px;
   font: inherit;
@@ -175,8 +183,8 @@ input, select, button, .button-link {
 button, .button-link {
   width: auto;
   cursor: pointer;
-  border-color: rgba(228, 154, 24, 0.58);
-  background: #2b2110;
+  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
+  background: var(--button-surface);
   color: var(--text);
   font-weight: 700;
   text-decoration: none;
@@ -187,7 +195,7 @@ button, .button-link {
 button:hover, .button-link:hover, .tabs button.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #171006;
+  color: var(--accent-ink);
 }
 
 .danger-button,
@@ -347,7 +355,7 @@ button:hover, .button-link:hover, .tabs button.active {
 .overview-options button:focus-visible {
   background: var(--accent);
   border-color: var(--accent);
-  color: #171006;
+  color: var(--accent-ink);
   transform: translateY(-2px);
 }
 
@@ -467,11 +475,11 @@ input:focus, select:focus, textarea:focus, button:focus-visible, .button-link:fo
 .radar {
   position: relative;
   aspect-ratio: 1;
-  border: 1px solid rgba(228, 154, 24, 0.55);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: 50%;
   background:
-    radial-gradient(circle, transparent 0 18%, rgba(228, 154, 24, 0.12) 19% 20%, transparent 21% 42%, rgba(201, 205, 208, 0.14) 43% 44%, transparent 45%),
-    conic-gradient(from 20deg, rgba(228, 154, 24, 0.38), transparent 24%, transparent);
+    radial-gradient(circle, transparent 0 18%, var(--panel-tint) 19% 20%, transparent 21% 42%, color-mix(in srgb, var(--text) 14%, transparent) 43% 44%, transparent 45%),
+    conic-gradient(from 20deg, var(--glow), transparent 24%, transparent);
   overflow: hidden;
 }
 
@@ -512,7 +520,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible, .button-link:fo
 .tool-menu button.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #171006;
+  color: var(--accent-ink);
 }
 
 .tool-panel {
@@ -580,7 +588,7 @@ article.tool-panel.active {
   aspect-ratio: 1;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0b0c0d;
+  background: var(--control);
   overflow: hidden;
 }
 
@@ -654,7 +662,7 @@ article.tool-panel.active {
   max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: #0b0c0d;
+  background: var(--control);
   padding: 6px 8px 6px 12px;
 }
 
@@ -665,7 +673,7 @@ article.tool-panel.active {
   align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0b0c0d;
+  background: var(--control);
   padding: 10px;
 }
 
@@ -777,7 +785,7 @@ article.tool-panel.active {
   resize: vertical;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0b0c0d;
+  background: var(--control);
   color: var(--text);
   padding: 9px 11px;
   font: inherit;
@@ -809,7 +817,7 @@ article.tool-panel.active {
   resize: vertical;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0b0c0d;
+  background: var(--control);
   color: var(--text);
   padding: 9px 11px;
   font: inherit;
@@ -834,7 +842,7 @@ article.tool-panel.active {
   align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0b0c0d;
+  background: var(--control);
   padding: 12px;
   min-width: 0;
 }
@@ -901,7 +909,7 @@ article.tool-panel.active {
   min-height: 96px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0b0c0d;
+  background: var(--control);
   overflow: hidden;
   margin: 10px 0;
 }
@@ -971,7 +979,7 @@ article.tool-panel.active {
   align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0b0c0d;
+  background: var(--control);
   padding: 10px;
   min-width: 0;
 }
@@ -1080,7 +1088,7 @@ article.tool-panel.active {
   grid-column: 1 / -1;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #0b0c0d;
+  background: var(--control);
   padding: 16px;
   display: grid;
   gap: 12px;
@@ -1133,7 +1141,7 @@ article.tool-panel.active {
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0b0c0d;
+  background: var(--control);
   padding: 10px;
 }
 
@@ -1151,7 +1159,7 @@ article.tool-panel.active {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
-  background: #0b0c0d;
+  background: var(--control);
 }
 
 .ocr-preview pre {
@@ -1167,7 +1175,7 @@ article.tool-panel.active {
   gap: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0b0c0d;
+  background: var(--control);
   padding: 10px;
 }
 
@@ -1213,7 +1221,7 @@ article.tool-panel.active {
 
 .scanner-progress li.accepted {
   border-left-color: var(--accent);
-  background: rgba(228, 154, 24, 0.08);
+  background: var(--panel-tint);
 }
 
 .scanner-progress li.review,
@@ -1225,7 +1233,7 @@ article.tool-panel.active {
 .scanner-diagnostics {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0b0c0d;
+  background: var(--control);
   padding: 10px;
 }
 
@@ -1233,7 +1241,7 @@ article.tool-panel.active {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 9px 10px;
-  background: #0b0c0d;
+  background: var(--control);
 }
 
 .scanner-advanced summary,
@@ -1295,7 +1303,7 @@ article.tool-panel.active {
 }
 
 .scanner-diagnostic-row li.accepted {
-  background: rgba(228, 154, 24, 0.09);
+  background: var(--panel-tint);
 }
 
 .scanner-diagnostic-row li.rejected {
