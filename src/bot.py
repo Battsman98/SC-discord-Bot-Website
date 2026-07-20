@@ -2761,6 +2761,9 @@ def build_command_channel_directory_embed(settings: Settings) -> discord.Embed:
     channel_commands: dict[int, list[str]] = {}
     for command_name, channel_id in settings.command_channel_ids.items():
         channel_commands.setdefault(channel_id, []).append(f"/{command_name}")
+    inventory_commands = channel_commands.setdefault(INVENTORY_CHANNEL_ID, [])
+    if "/inventory search" not in inventory_commands:
+        inventory_commands.append("/inventory search")
 
     lines = []
     for channel_id, command_names in sorted(channel_commands.items(), key=lambda item: min(item[1])):

@@ -81,6 +81,7 @@ def test_command_channel_directory_groups_commands_by_channel() -> None:
 
     assert "<#111>: /ship" in embed.description
     assert "<#222>: /commodity, /trade routing" in embed.description
+    assert f"<#{INVENTORY_CHANNEL_ID}>: /inventory search" in embed.description
 
 
 def test_message_embed_matches_existing_embed_payload() -> None:
