@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import AsyncMock
 
 from src.sources.uex import UEXSource
 
@@ -1153,3 +1154,38 @@ def test_filter_items_matches_query_category_section_and_size() -> None:
     assert source._filter_items(items, query="atlas", category="Quantum Drives", section="Systems", size="1") == [
         items[0]
     ]
+
+
+def test_lookup_items_includes_purchase_locations() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._get_buyable_items = AsyncMock(return_value=[{
+        "id": 1959,
+        "name": "Atlas",
+        "section": "Systems",
+        "category": "Quantum Drives",
+        "company_name": "Roberts Space Industries",
+        "size": "1",
+        "slug": "atlas",
+    }])
+    source._fetch_all_item_prices = AsyncMock(return_value=[{
+        "id_item": 1959,
+        "id_terminal": 139,
+        "terminal_name": "Platinum HUR-L5",
+        "price_buy": 84000,
+        "game_version": "4.8.0",
+    }])
+    source._fetch_terminals_by_id = AsyncMock(return_value={
+        "139": {
+            "nickname": "Platinum Bay - HUR-L5",
+            "star_system_name": "Stanton",
+            "planet_name": "Hurston",
+            "space_station_name": "HUR-L5 High Course Station",
+        }
+    })
+
+    results = asyncio.run(source.lookup_items(query="Atlas"))
+
+    assert len(results) == 1
+    assert len(results[0].purchases) == 1
+    assert results[0].purchases[0].price == 84000
+    assert results[0].purchases[0].system == "Stanton"
