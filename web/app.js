@@ -40,7 +40,7 @@ document.querySelectorAll("[data-overview-tab]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.overviewTab));
 });
 
-const homeBackgrounds = ["10", "25", "32", "34"];
+const homeBackgrounds = ["10", "25", "29", "30", "31", "32", "34", "36"];
 const homeBackgroundLayers = Array.from(document.querySelectorAll(".home-background-layer"));
 const homeSlideButtons = Array.from(document.querySelectorAll("[data-home-slide]"));
 const homeCarouselToggle = document.querySelector("[data-home-carousel-toggle]");

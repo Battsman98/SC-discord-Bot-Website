@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260720-home-carousel">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260720-expanded-gallery">
 </head>
 <body>
   <header class="topbar">
@@ -15,12 +15,6 @@
   </header>
 
   <main class="app-shell overview-mode">
-    <div class="home-background" aria-hidden="true">
-      <div class="home-background-layer active"></div>
-      <div class="home-background-layer"></div>
-      <div class="home-background-shade"></div>
-      <img class="community-mark" src="/assets/media/home/made-by-community.png" alt="">
-    </div>
     <nav class="tabs" aria-label="Website sections">
       <button class="active" data-tab="overview">Overview</button>
       <button data-tab="lookup">Ships</button>
@@ -50,12 +44,22 @@
         <button type="button" data-overview-tab="commands"><span>Commands</span><small>Browse the command directory</small></button>
         <button type="button" data-overview-tab="admin"><span>Audit</span><small>Review recent audit events</small></button>
       </nav>
+      <div class="home-background" aria-hidden="true">
+        <div class="home-background-layer active"></div>
+        <div class="home-background-layer"></div>
+        <div class="home-background-shade"></div>
+        <img class="community-mark" src="/assets/media/home/made-by-community.png" alt="">
+      </div>
       <div class="home-carousel-controls" aria-label="Home background controls">
         <div class="home-carousel-dots" role="group" aria-label="Choose background">
           <button type="button" class="active" data-home-slide="0" aria-label="Show background 1" aria-pressed="true"></button>
           <button type="button" data-home-slide="1" aria-label="Show background 2" aria-pressed="false"></button>
           <button type="button" data-home-slide="2" aria-label="Show background 3" aria-pressed="false"></button>
           <button type="button" data-home-slide="3" aria-label="Show background 4" aria-pressed="false"></button>
+          <button type="button" data-home-slide="4" aria-label="Show background 5" aria-pressed="false"></button>
+          <button type="button" data-home-slide="5" aria-label="Show background 6" aria-pressed="false"></button>
+          <button type="button" data-home-slide="6" aria-label="Show background 7" aria-pressed="false"></button>
+          <button type="button" data-home-slide="7" aria-label="Show background 8" aria-pressed="false"></button>
         </div>
         <button type="button" class="home-carousel-toggle" data-home-carousel-toggle aria-label="Pause background rotation">Pause</button>
       </div>
@@ -366,6 +370,6 @@
     <div class="state">Loading...</div>
   </template>
 
-  <script src="/assets/app.js?v=20260720-home-carousel" defer></script>
+  <script src="/assets/app.js?v=20260720-expanded-gallery" defer></script>
 </body>
 </html>
