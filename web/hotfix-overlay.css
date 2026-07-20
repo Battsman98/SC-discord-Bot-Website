@@ -1,0 +1,9 @@
+.hotfix-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(0, 5, 10, 0.78); backdrop-filter: blur(8px); }
+.hotfix-overlay[hidden] { display: none; }
+.hotfix-dialog { position: relative; width: min(440px, 100%); padding: 18px 18px 22px; overflow: hidden; border: 1px solid var(--accent); border-radius: var(--radius); background: linear-gradient(145deg, var(--panel-tint), transparent 48%), var(--surface); box-shadow: 0 0 38px var(--glow), 0 22px 70px rgba(0, 0, 0, 0.7); text-align: center; }
+.hotfix-close { position: absolute; top: 10px; right: 10px; z-index: 1; width: 36px; min-height: 36px; justify-content: center; padding: 0; border-radius: 50%; background: var(--button-surface); color: var(--text); font-size: 1.25rem; line-height: 1; }
+.hotfix-animation { display: block; width: min(330px, 82vw); height: min(330px, 82vw); margin: 0 auto 10px; border: 0; background: #0a1520; }
+.hotfix-message { margin: 0; color: var(--accent-2); font-size: clamp(1rem, 4vw, 1.3rem); font-weight: 800; letter-spacing: 0.055em; text-transform: uppercase; text-shadow: 0 0 14px var(--glow); }
+.hotfix-dismiss-note { margin: 7px 0 0; color: var(--muted); font-size: 0.78rem; }
+@media (max-height: 620px) { .hotfix-animation { width: min(240px, 68vh); height: min(240px, 68vh); } }
+@media (prefers-reduced-motion: reduce) { .hotfix-animation { opacity: 0.88; } }

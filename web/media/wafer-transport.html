@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wafer Transport</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a1520;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: 'Courier New', monospace;
+    }
+    #status {
+      color: #3a8eff;
+      font-size: 11px;
+      margin-top: 10px;
+      letter-spacing: 2px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="status">INITIALIZING</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const SIZE = Math.min(window.innerWidth, window.innerHeight - 40, 580);
+canvas.width = SIZE;
+canvas.height = SIZE;
+const W = SIZE, H = SIZE;
+const cx = W / 2, cy = H / 2;
+
+const N = 12;
+const PENTA_R  = SIZE * 0.340;
+const WAFER_R  = SIZE * 0.030;
+const STATION_R = SIZE * 0.033;
+
+// Station positions (station 0 at top)
+function stationPos(i) {
+  const a = (i * 2 * Math.PI / N) - Math.PI / 2;
+  return { x: cx + PENTA_R * Math.cos(a), y: cy + PENTA_R * Math.sin(a) };
+}
+
+// Timing (seconds)
+const T_HOLD    = 1.2;
+const T_EXTEND  = 0.75; // arm extends carrying wafer to target
+const T_RETRACT = 0.4;  // arm retracts, wafer stays at target
+const T_TOTAL   = T_HOLD + T_EXTEND + T_RETRACT;
+
+let station = 0;
+let t = 0;
+let lastTs = null;
+
+function easeInOut(x) {
+  return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function getPhase() {
+  if (t < T_HOLD) {
+    return { phase: 'hold', armExt: 0, waferFrac: 0 };
+  } else if (t < T_HOLD + T_EXTEND) {
+    const p = easeInOut((t - T_HOLD) / T_EXTEND);
+    return { phase: 'move', armExt: p, waferFrac: p };
+  } else {
+    const p = easeInOut((t - T_HOLD - T_EXTEND) / T_RETRACT);
+    return { phase: 'retract', armExt: 1 - p, waferFrac: 1 };
+  }
+}
+
+// ── draw helpers ─────────────────────────────────────────────────────────────
+
+function drawGrid() {
+  const gs = SIZE / 18;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(15, 45, 75, 0.18)';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x <= W; x += gs) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y <= H; y += gs) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPentagonEdges(activeEdge) {
+  for (let i = 0; i < N; i++) {
+    const a = stationPos(i);
+    const b = stationPos((i + 1) % N);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    if (i === activeEdge) {
+      ctx.strokeStyle = 'rgba(58, 142, 255, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = 'rgba(30, 70, 120, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 7]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
+
+function drawStation(i, active) {
+  const pos = stationPos(i);
+  ctx.save();
+  ctx.translate(pos.x, pos.y);
+
+  // Active outer pulse ring
+  if (active) {
+    ctx.beginPath();
+    ctx.arc(0, 0, STATION_R + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(58, 142, 255, 0.35)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Body
+  ctx.beginPath();
+  ctx.arc(0, 0, STATION_R, 0, Math.PI * 2);
+  ctx.fillStyle = active ? '#162d56' : '#101e38';
+  ctx.fill();
+  ctx.strokeStyle = active ? '#3a8eff' : '#1e3d6e';
+  ctx.lineWidth = active ? 1.8 : 1.2;
+  ctx.stroke();
+
+  // Inner detail ring
+  ctx.beginPath();
+  ctx.arc(0, 0, STATION_R * 0.52, 0, Math.PI * 2);
+  ctx.strokeStyle = active ? 'rgba(58,142,255,0.55)' : 'rgba(30,70,130,0.5)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Cross-hair tick marks
+  const tick = STATION_R * 0.85;
+  const inner = STATION_R * 0.62;
+  for (let a = 0; a < 4; a++) {
+    const ax = Math.cos(a * Math.PI / 2);
+    const ay = Math.sin(a * Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(ax * inner, ay * inner);
+    ctx.lineTo(ax * tick, ay * tick);
+    ctx.strokeStyle = active ? 'rgba(58,142,255,0.5)' : 'rgba(30,70,130,0.4)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+
+  // Label
+  ctx.fillStyle = active ? '#7abfff' : '#3a5a8a';
+  ctx.font = `bold ${SIZE * 0.015}px 'Courier New'`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`R${i + 1}`, 0, 0);
+
+  ctx.restore();
+}
+
+function drawArm(srcPos, tgtPos, ext) {
+  if (ext <= 0.005) return;
+
+  const dx = tgtPos.x - srcPos.x;
+  const dy = tgtPos.y - srcPos.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const nx = dx / dist, ny = dy / dist;
+
+  // Arm starts at station edge, tip reaches toward target
+  const startD = STATION_R + 4;
+  const maxD    = dist - STATION_R - 4;
+  const tipD    = startD + (maxD - startD) * ext;
+
+  const sx = srcPos.x + nx * startD;
+  const sy = srcPos.y + ny * startD;
+  const ex = srcPos.x + nx * tipD;
+  const ey = srcPos.y + ny * tipD;
+
+  ctx.save();
+
+  // Glow layer
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.strokeStyle = 'rgba(58, 142, 255, 0.2)';
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Main arm bar
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.strokeStyle = '#3a8eff';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // End-effector dot
+  ctx.beginPath();
+  ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#8ecfff';
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawWafer(x, y) {
+  ctx.save();
+
+  // Soft glow halo
+  const halo = ctx.createRadialGradient(x, y, 0, x, y, WAFER_R * 2.2);
+  halo.addColorStop(0, 'rgba(180, 210, 255, 0.18)');
+  halo.addColorStop(1, 'rgba(180, 210, 255, 0)');
+  ctx.beginPath();
+  ctx.arc(x, y, WAFER_R * 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = halo;
+  ctx.fill();
+
+  // Wafer body — subtle radial gradient for depth
+  const body = ctx.createRadialGradient(
+    x - WAFER_R * 0.28, y - WAFER_R * 0.28, WAFER_R * 0.05,
+    x, y, WAFER_R
+  );
+  body.addColorStop(0, '#e0eeff');
+  body.addColorStop(0.6, '#b8cfe0');
+  body.addColorStop(1, '#8aaac0');
+  ctx.beginPath();
+  ctx.arc(x, y, WAFER_R, 0, Math.PI * 2);
+  ctx.fillStyle = body;
+  ctx.fill();
+  ctx.strokeStyle = '#7090b0';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Inner concentric detail ring
+  ctx.beginPath();
+  ctx.arc(x, y, WAFER_R * 0.62, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(90, 130, 170, 0.35)';
+  ctx.lineWidth = 0.7;
+  ctx.stroke();
+
+  // Notch (flat) indicator at top
+  ctx.beginPath();
+  ctx.arc(x, y - WAFER_R + 1.5, 2.2, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(70, 100, 140, 0.7)';
+  ctx.fill();
+
+  ctx.restore();
+}
+
+
+// ── main loop ─────────────────────────────────────────────────────────────────
+
+function render(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.1);
+  lastTs = ts;
+
+  t += dt;
+  if (t >= T_TOTAL) {
+    t -= T_TOTAL;
+    station = (station + 1) % N;
+  }
+
+  const { phase, armExt, waferFrac } = getPhase();
+  const next = (station + 1) % N;
+  const srcPos = stationPos(station);
+  const tgtPos = stationPos(next);
+
+  const wx = lerp(srcPos.x, tgtPos.x, waferFrac);
+  const wy = lerp(srcPos.y, tgtPos.y, waferFrac);
+
+  ctx.clearRect(0, 0, W, H);
+
+  drawGrid();
+  drawPentagonEdges(phase !== 'hold' ? station : -1);
+
+  // Stations — highlight source during transfer, target during move/retract
+  for (let i = 0; i < N; i++) {
+    const isSource = i === station;
+    const isTarget = i === next && phase !== 'hold';
+    drawStation(i, isSource || isTarget);
+  }
+
+  if (phase !== 'hold') {
+    drawArm(srcPos, tgtPos, armExt);
+  }
+
+  drawWafer(wx, wy);
+
+  // Status line
+  const statusEl = document.getElementById('status');
+  if (phase === 'hold') {
+    statusEl.textContent = `R${station + 1}  ·  HOLDING`;
+  } else if (phase === 'move') {
+    const pct = Math.round(waferFrac * 100);
+    statusEl.textContent = `R${station + 1} → R${next + 1}  ·  TRANSFER  ${pct}%`;
+  } else {
+    statusEl.textContent = `R${station + 1} → R${next + 1}  ·  RETRACTING`;
+  }
+
+  requestAnimationFrame(render);
+}
+
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
