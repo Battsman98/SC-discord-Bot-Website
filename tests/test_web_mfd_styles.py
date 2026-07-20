@@ -12,6 +12,14 @@ def test_controls_and_boxes_follow_the_active_mfd_theme() -> None:
     assert "border-color: color-mix(in srgb, var(--accent) 58%, transparent);" in CSS
 
 
+def test_overview_uses_an_rsi_cockpit_mfd_palette() -> None:
+    assert 'body[data-mfd-theme="overview"]' in CSS
+    assert "--bg: #03080d;" in CSS
+    assert "--surface: #0b1720;" in CSS
+    assert "--accent: #36bce8;" in CSS
+    assert "--accent-2: #9ce8ff;" in CSS
+
+
 def test_legacy_amber_control_colors_are_not_hard_coded() -> None:
     assert "background: #2b2110;" not in CSS
     assert "border-color: rgba(228, 154, 24, 0.58);" not in CSS

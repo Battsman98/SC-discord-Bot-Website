@@ -35,6 +35,12 @@ body {
   transition: color 180ms ease, background-color 180ms ease;
 }
 
+body[data-mfd-theme="overview"] {
+  --bg: #03080d; --surface: #0b1720; --surface-2: #122735; --line: #315f78;
+  --text: #e7f7ff; --muted: #91afbd; --accent: #36bce8; --accent-2: #9ce8ff;
+  --ambient: rgba(54, 188, 232, 0.13); --glow: rgba(54, 188, 232, 0.28); --panel-tint: rgba(156, 232, 255, 0.04);
+}
+
 body[data-mfd-theme="drake"] {
   --bg: #080704; --surface: #19150d; --surface-2: #292115; --line: #80652e;
   --text: #fff2ca; --muted: #bea976; --accent: #f6a800; --accent-2: #ffd151;
