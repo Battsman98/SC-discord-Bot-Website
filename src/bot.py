@@ -326,11 +326,24 @@ class GameAssistBot(commands.Bot):
                 message = await channel.fetch_message(message_id)
                 if not _message_embed_matches(message, embed) or message.content:
                     await message.edit(content=None, embed=embed, view=view)
+                else:
+                    await message.edit(view=view)
                 logging.info("Updated CZ timers dashboard message %s", message_id)
                 await self.delete_recent_duplicate_embed_messages(channel, "Contested Zone Timers", message.id)
                 return
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                logging.info("Could not update previous CZ timers dashboard; creating a new one")
+                logging.info("Could not update previous CZ timers dashboard; scanning for an existing one")
+
+        existing_message = await self.find_recent_embed_message(channel, "Contested Zone Timers")
+        if existing_message is not None:
+            if not _message_embed_matches(existing_message, embed) or existing_message.content:
+                await existing_message.edit(content=None, embed=embed, view=view)
+            else:
+                await existing_message.edit(view=view)
+            await self.cache.set(cache_key, existing_message.id, 315360000)
+            await self.delete_recent_duplicate_embed_messages(channel, "Contested Zone Timers", existing_message.id)
+            logging.info("Adopted existing CZ timers dashboard message %s", existing_message.id)
+            return
 
         message = await channel.send(embed=embed, view=view)
         await self.cache.set(cache_key, message.id, 315360000)
