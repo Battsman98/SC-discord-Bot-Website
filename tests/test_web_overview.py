@@ -31,7 +31,7 @@ def test_home_page_rotates_official_responsive_fankit_wallpapers() -> None:
     assert 'class="home-background"' in html
     assert 'src="/assets/media/home/made-by-community.png"' in html
     assert '"10", "25", "29", "30", "31", "32", "34", "36"' in javascript
-    assert html.index('class="overview-options"') < html.index('class="home-background"') < html.index('class="overview-details"')
+    assert html.index('class="overview-options"') < html.index('class="home-background"')
     assert 'return "mobile"' in javascript
     assert 'return "tablet"' in javascript
     assert 'return "wide"' in javascript
@@ -57,11 +57,18 @@ def test_overview_exposes_all_primary_destinations() -> None:
         assert f'data-overview-tab="{tab_id}"' in html
 
 
-def test_overview_system_information_is_collapsed_by_default() -> None:
+def test_overview_does_not_expose_internal_system_information() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
-    assert '<details class="overview-details">' in html
-    assert '<summary>System and shared logic</summary>' in html
+    assert "System and shared logic" not in html
+    assert 'id="healthOutput"' not in html
+
+
+def test_home_page_starts_on_a_random_background() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "Math.floor(Math.random() * homeBackgrounds.length)" in javascript
+    assert "showHomeBackground(homeSlideIndex, true)" in javascript
 
 
 def test_destination_selection_reveals_full_navigation() -> None:

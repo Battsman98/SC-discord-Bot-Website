@@ -308,11 +308,6 @@ button:hover, .button-link:hover, .tabs button.active {
   color: #3a290a;
 }
 
-.overview-details {
-  margin-top: 22px;
-  border-top: 1px solid var(--line);
-}
-
 .home-carousel-controls {
   display: flex;
   justify-content: center;
@@ -353,17 +348,6 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .fankit-notice {
   font-size: max(10pt, 0.84rem);
-}
-
-.overview-details > summary {
-  padding: 16px 2px;
-  color: var(--muted);
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.overview-details[open] > summary {
-  color: var(--accent);
 }
 
 .tab-panel {
