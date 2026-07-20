@@ -181,6 +181,80 @@ button:hover, .button-link:hover, .tabs button.active {
   color: var(--muted);
 }
 
+.app-shell.overview-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell.overview-mode .tabs {
+  display: none;
+}
+
+.overview-heading {
+  margin-bottom: 18px;
+}
+
+.overview-heading h2 {
+  margin: 0;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+}
+
+.overview-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overview-options button {
+  min-height: 112px;
+  padding: 18px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+  background: linear-gradient(145deg, rgba(30, 39, 45, 0.98), rgba(20, 37, 31, 0.9));
+  border-color: var(--line);
+}
+
+.overview-options button:hover,
+.overview-options button:focus-visible {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #07110f;
+  transform: translateY(-2px);
+}
+
+.overview-options span {
+  font-size: 1.05rem;
+}
+
+.overview-options small {
+  margin-top: 7px;
+  color: var(--muted);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.overview-options button:hover small,
+.overview-options button:focus-visible small {
+  color: #18342e;
+}
+
+.overview-details {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.overview-details > summary {
+  padding: 16px 2px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.overview-details[open] > summary {
+  color: var(--accent);
+}
+
 .tab-panel {
   display: none;
 }
@@ -1113,6 +1187,10 @@ article.tool-panel.active {
     white-space: nowrap;
   }
 
+  .overview-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .field-row, .two-column .field-row, .inline-form, .inventory-filters {
     grid-template-columns: 1fr;
   }
@@ -1188,6 +1266,14 @@ article.tool-panel.active {
 }
 
 @media (max-width: 680px) {
+  .overview-options {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-options button {
+    min-height: 88px;
+  }
+
   .inventory-card-main,
   .inventory-actions {
     grid-template-columns: 1fr;

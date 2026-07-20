@@ -19,13 +19,25 @@ const outputs = {
   audit: document.querySelector("#auditOutput"),
 };
 
+const appShell = document.querySelector(".app-shell");
+
+function activateTab(tabId) {
+  const panel = document.querySelector(`#${tabId}`);
+  const tabButton = document.querySelector(`.tabs button[data-tab="${tabId}"]`);
+  if (!panel || !tabButton) return;
+  document.querySelectorAll(".tabs button").forEach((item) => item.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach((item) => item.classList.remove("active"));
+  tabButton.classList.add("active");
+  panel.classList.add("active");
+  appShell.classList.toggle("overview-mode", tabId === "overview");
+}
+
 document.querySelectorAll(".tabs button").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach((item) => item.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
-    button.classList.add("active");
-    document.querySelector(`#${button.dataset.tab}`).classList.add("active");
-  });
+  button.addEventListener("click", () => activateTab(button.dataset.tab));
+});
+
+document.querySelectorAll("[data-overview-tab]").forEach((button) => {
+  button.addEventListener("click", () => activateTab(button.dataset.overviewTab));
 });
 
 initToolMenus();

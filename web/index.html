@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Game Assist Control Deck</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260720-overview-cleanup">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260720-overview-navigation">
 </head>
 <body>
   <header class="topbar">
@@ -17,7 +17,7 @@
     </div>
   </header>
 
-  <main class="app-shell">
+  <main class="app-shell overview-mode">
     <nav class="tabs" aria-label="Website sections">
       <button class="active" data-tab="overview">Overview</button>
       <button data-tab="lookup">Ships</button>
@@ -32,21 +32,39 @@
     </nav>
 
     <section id="overview" class="tab-panel active">
-      <div class="dashboard-grid">
-        <article class="panel">
-          <h2>System</h2>
-          <div id="healthOutput" class="metric-grid"></div>
-        </article>
-        <article class="panel visual-panel">
-          <div class="radar" aria-hidden="true">
-            <span></span><span></span><span></span><span></span>
-          </div>
-          <div>
-            <h2>Shared Logic</h2>
-            <p>The website uses the same Python source registry, cache, timers, and command documentation as the Discord bot.</p>
-          </div>
-        </article>
+      <div class="overview-heading">
+        <p class="eyebrow">Choose a destination</p>
+        <h2>What would you like to manage?</h2>
       </div>
+      <nav class="overview-options" aria-label="Overview destinations">
+        <button type="button" data-overview-tab="lookup"><span>Ships</span><small>Search and manage your hangar</small></button>
+        <button type="button" data-overview-tab="trade"><span>Trade</span><small>Find commodities and build routes</small></button>
+        <button type="button" data-overview-tab="mining"><span>Mining</span><small>Locate materials and mining sites</small></button>
+        <button type="button" data-overview-tab="crafting"><span>Blueprints</span><small>Search and manage blueprints</small></button>
+        <button type="button" data-overview-tab="items"><span>Items</span><small>Look up equipment and components</small></button>
+        <button type="button" data-overview-tab="inventory"><span>Inventory</span><small>Track items across locations</small></button>
+        <button type="button" data-overview-tab="timers"><span>Timers</span><small>View event and zone timers</small></button>
+        <button type="button" data-overview-tab="commands"><span>Commands</span><small>Browse the command directory</small></button>
+        <button type="button" data-overview-tab="admin"><span>Audit</span><small>Review recent audit events</small></button>
+      </nav>
+      <details class="overview-details">
+        <summary>System and shared logic</summary>
+        <div class="dashboard-grid">
+          <article class="panel">
+            <h2>System</h2>
+            <div id="healthOutput" class="metric-grid"></div>
+          </article>
+          <article class="panel visual-panel">
+            <div class="radar" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <div>
+              <h2>Shared Logic</h2>
+              <p>The website uses the same Python source registry, cache, timers, and command documentation as the Discord bot.</p>
+            </div>
+          </article>
+        </div>
+      </details>
     </section>
 
     <section id="lookup" class="tab-panel">
@@ -335,6 +353,6 @@
     <div class="state">Loading...</div>
   </template>
 
-  <script src="/assets/app.js?v=20260720-overview-cleanup" defer></script>
+  <script src="/assets/app.js?v=20260720-overview-navigation" defer></script>
 </body>
 </html>
