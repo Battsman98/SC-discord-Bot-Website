@@ -8,7 +8,7 @@ async function rsiHTMLGet(url) {
       "cache-control": "max-age=0"
     }
   });
-  return { code: response.status, payload: await response.text() };
+  return { code: response.status, payload: await response.text(), url: response.url };
 }
 
 function cleanShipName(value) {
@@ -38,6 +38,11 @@ function extractShipCandidates(pageHTML) {
     const cleaned = cleanShipName(match[1]);
     if (cleaned) candidates.add(cleaned);
   }
+  const containedShips = /(?:Contains|Also Contains)\s+([^$<>]{2,120}?)(?=\s+(?:Also Contains|Attributed|Created|Serial|Insurance|Starting Money|Hangar|Downloadable|Contains|$))/gi;
+  for (const match of plainText.matchAll(containedShips)) {
+    const cleaned = cleanShipName(match[1]);
+    if (cleaned) candidates.add(cleaned);
+  }
   return [...candidates];
 }
 
@@ -47,13 +52,27 @@ function pledgePageHasNext(pageHTML, page) {
 
 async function importHangar() {
   const candidates = new Set();
+  let finalURL = "";
+  let firstPageHTML = "";
   for (let page = 1; page <= 25; page += 1) {
-    const response = await rsiHTMLGet(`https://robertsspaceindustries.com/en/account/pledges?page=${page}&product-type=`);
+    const suffix = page > 1 ? `?page=${page}` : "";
+    const response = await rsiHTMLGet(`https://robertsspaceindustries.com/account/pledges${suffix}`);
+    finalURL = response.url || finalURL;
+    if (page === 1) firstPageHTML = response.payload;
     if (response.code !== 200) {
       return { code: response.code, error: "RSI did not return the pledge page. Confirm that you are signed in." };
     }
     for (const name of extractShipCandidates(response.payload)) candidates.add(name);
     if (!pledgePageHasNext(response.payload, page)) break;
+  }
+  if (!candidates.size) {
+    const signedOut = /(?:sign in|log in|login)/i.test(finalURL) || /(?:sign in|log in to your account)/i.test(firstPageHTML);
+    return {
+      code: 422,
+      error: signedOut
+        ? "RSI redirected to sign-in. Sign into RSI in this Chrome profile, then try again."
+        : "RSI returned the hangar page, but no ship records were recognized. Reload the extension and report this message so the parser can be updated."
+    };
   }
   return { code: 200, candidates: [...candidates].sort((a, b) => a.localeCompare(b)) };
 }
@@ -87,7 +106,7 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
 async function handleMessage(rawMessage) {
   const message = JSON.parse(rawMessage || "{}");
   if (message.action === "connect") {
-    return { code: 200, version: "0.4.0", scope: "ships-and-vehicles-only" };
+    return { code: 200, version: "0.4.1", scope: "ships-and-vehicles-only" };
   }
   if (message.action === "importHangar") {
     return await importHangar();
