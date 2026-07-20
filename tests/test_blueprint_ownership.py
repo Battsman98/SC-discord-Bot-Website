@@ -1,6 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
+import src.web as web_module
 from src.cache import SQLiteCache
 from src.web import (
     SHIP_LOANERS,
@@ -11,6 +12,9 @@ from src.web import (
     _inventory_item_from_tooltip_text,
     _inventory_match_confidence,
     _inventory_scanner_accepted_matches,
+    _inventory_scanner_diagnostics,
+    _inventory_scanner_lookups,
+    _match_inventory_scanner_text,
     _normalize_inventory_tooltip_name,
     _inventory_scanner_text_candidates,
     _rsi_import_lookup_candidates,
@@ -621,3 +625,36 @@ def test_inventory_scanner_accepts_only_best_match_per_hover_candidate() -> None
 
     assert len(accepted) == 1
     assert accepted[0][0].name == 'A03 "Canuto" Sniper Rifle'
+
+
+def test_inventory_scanner_reuses_catalog_lookups_for_results_and_diagnostics(monkeypatch) -> None:
+    text = "FS-9 LMG\nWeapon\nSize 1\nEffective Range 100 m"
+    calls: list[str] = []
+
+    async def fake_lookup(candidate: str, limit: int = 5):
+        calls.append(candidate)
+        return [(
+            SimpleNamespace(
+                name="FS-9 LMG",
+                category="Weapons",
+                section="Light machine gun",
+                size="1",
+                source_name="Test catalog",
+                source_url="https://example.test/fs-9",
+            ),
+            1.0 if candidate == "FS-9 LMG" else 0.0,
+        )]
+
+    async def run() -> None:
+        monkeypatch.setattr(web_module, "_inventory_lookup_scored_matches", fake_lookup)
+        lookups = await _inventory_scanner_lookups(text, None)
+        assert len(calls) == len(lookups)
+
+        async def unexpected_lookup(*args, **kwargs):
+            raise AssertionError("cached scanner lookups should be reused")
+
+        monkeypatch.setattr(web_module, "_inventory_lookup_scored_matches", unexpected_lookup)
+        await _match_inventory_scanner_text(text, "Port Tressler", None, 0.72, None, lookups)
+        await _inventory_scanner_diagnostics(text, 0.72, None, lookups)
+
+    asyncio.run(run())

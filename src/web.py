@@ -1,3 +1,4 @@
+import asyncio
 import difflib
 import html
 import re
@@ -1038,6 +1039,7 @@ async def import_inventory_from_text(
 ) -> dict[str, Any]:
     del user
     if request.scanner_mode:
+        scanner_lookups = await _inventory_scanner_lookups(request.text, request.exclude_words)
         return {
             "ocr_available": True,
             "ocr_text": request.text,
@@ -1047,11 +1049,13 @@ async def import_inventory_from_text(
                 request.default_category,
                 request.min_score,
                 request.exclude_words,
+                scanner_lookups,
             ),
             "diagnostics": await _inventory_scanner_diagnostics(
                 request.text,
                 request.min_score,
                 request.exclude_words,
+                scanner_lookups,
             ),
         }
     return {
@@ -1081,6 +1085,7 @@ async def import_inventory_from_images(
     del user
     ocr_text, ocr_error = await _ocr_blueprint_images(files)
     if scanner_mode:
+        scanner_lookups = await _inventory_scanner_lookups(ocr_text, exclude_words) if ocr_text.strip() else {}
         return {
             "ocr_available": ocr_error is None,
             "ocr_error": ocr_error,
@@ -1091,11 +1096,13 @@ async def import_inventory_from_images(
                 default_category,
                 min_score,
                 exclude_words,
+                scanner_lookups,
             ) if ocr_text.strip() else [],
             "diagnostics": await _inventory_scanner_diagnostics(
                 ocr_text,
                 min_score,
                 exclude_words,
+                scanner_lookups,
             ) if ocr_text.strip() else {"candidates": [], "rejected_lines": []},
         }
     return {
@@ -1398,6 +1405,7 @@ async def _match_inventory_scanner_text(
     default_category: str | None,
     min_score: float,
     exclude_words: str | None,
+    scanner_lookups: dict[str, list[tuple[Any, float]]] | None = None,
 ) -> list[dict[str, Any]]:
     location = (default_location or "").strip() or "Unknown location"
     category = (default_category or "").strip() or None
@@ -1406,7 +1414,7 @@ async def _match_inventory_scanner_text(
 
     for candidate in _inventory_scanner_text_candidates(text, exclude):
         for result, confidence in _inventory_scanner_accepted_matches(
-            await _inventory_lookup_scored_matches(candidate, 5),
+            scanner_lookups[candidate] if scanner_lookups is not None else await _inventory_lookup_scored_matches(candidate, 5),
             min_score,
         ):
             existing = matches.get(result.name)
@@ -1461,6 +1469,7 @@ async def _inventory_scanner_diagnostics(
     text: str,
     min_score: float,
     exclude_words: str | None,
+    scanner_lookups: dict[str, list[tuple[Any, float]]] | None = None,
 ) -> dict[str, Any]:
     exclude = {_normalize_text(word) for word in re.split(r"[,;\n]+", exclude_words or "") if word.strip()}
     raw_lines = [_clean_inventory_ocr_line(line) for line in re.split(r"[\r\n]+", text)]
@@ -1470,7 +1479,7 @@ async def _inventory_scanner_diagnostics(
 
     for candidate in candidate_values[:30]:
         try:
-            results = await _inventory_lookup_scored_matches(candidate, 5)
+            results = scanner_lookups[candidate] if scanner_lookups is not None else await _inventory_lookup_scored_matches(candidate, 5)
         except Exception as exc:
             candidates.append(
                 {
@@ -1521,6 +1530,26 @@ async def _inventory_scanner_diagnostics(
         "candidates": candidates,
         "rejected_lines": rejected_lines[:40],
     }
+
+
+async def _inventory_scanner_lookups(
+    text: str,
+    exclude_words: str | None,
+) -> dict[str, list[tuple[Any, float]]]:
+    """Resolve each OCR candidate once for both matching and diagnostics.
+
+    Catalog lookups are network-bound. A small concurrency limit keeps a scan
+    inside reverse-proxy timeouts without flooding the upstream data source.
+    """
+    exclude = {_normalize_text(word) for word in re.split(r"[,;\n]+", exclude_words or "") if word.strip()}
+    candidates = _inventory_scanner_text_candidates(text, exclude)
+    semaphore = asyncio.Semaphore(4)
+
+    async def lookup(candidate: str) -> tuple[str, list[tuple[Any, float]]]:
+        async with semaphore:
+            return candidate, await _inventory_lookup_scored_matches(candidate, 5)
+
+    return dict(await asyncio.gather(*(lookup(candidate) for candidate in candidates)))
 
 
 async def _inventory_lookup_scored_matches(candidate: str, limit: int = 5) -> list[tuple[Any, float]]:
