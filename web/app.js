@@ -40,7 +40,10 @@ document.querySelectorAll("[data-overview-tab]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.overviewTab));
 });
 
-const homeBackgrounds = ["10", "25", "29", "30", "31", "32", "34", "36"];
+const homeBackgrounds = [
+  "10", "25", "29", "30", "31", "32", "34", "36",
+  "user-01", "user-02", "user-03", "user-04", "user-05", "user-06", "user-07", "user-08", "user-09",
+];
 const homeBackgroundLayers = Array.from(document.querySelectorAll(".home-background-layer"));
 const homeSlideButtons = Array.from(document.querySelectorAll("[data-home-slide]"));
 const homeCarouselToggle = document.querySelector("[data-home-carousel-toggle]");
@@ -57,7 +60,9 @@ function homeBackgroundSize() {
 }
 
 function homeBackgroundUrl(index) {
-  return `/assets/media/home/sc-${homeBackgrounds[index]}-${homeBackgroundSize()}.jpg`;
+  const background = homeBackgrounds[index];
+  if (background.startsWith("user-")) return `/assets/media/home/${background}.webp`;
+  return `/assets/media/home/sc-${background}-${homeBackgroundSize()}.jpg`;
 }
 
 function updateHomeSlideControls() {
