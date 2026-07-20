@@ -258,18 +258,55 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .app-shell.overview-mode {
   grid-template-columns: minmax(0, 1fr);
-  min-height: clamp(680px, calc(100dvh - 190px), 1100px);
+  gap: 10px;
+  min-height: calc(100dvh - 190px);
+  padding-top: 14px;
 }
 
 .app-shell.overview-mode .tabs {
+  position: static;
+  display: flex;
+  grid-column: 1;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.app-shell.overview-mode .tabs button {
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.app-shell.overview-mode #overview {
+  grid-column: 1;
+}
+
+.app-shell.overview-mode .overview-heading {
+  margin: 2px 0 4px;
+}
+
+.app-shell.overview-mode .overview-heading h2 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.app-shell.overview-mode .overview-heading p {
+  display: none;
+}
+
+.app-shell.overview-mode .overview-options {
   display: none;
 }
 
 .home-background {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  margin-top: 22px;
+  aspect-ratio: 16 / 7;
+  margin-top: 8px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1378,11 +1415,11 @@ article.tool-panel.active {
   }
 
   .app-shell.overview-mode {
-    min-height: clamp(760px, calc(100dvh - 210px), 1250px);
+    min-height: calc(100dvh - 210px);
   }
 
   .home-background {
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 16 / 9;
   }
 
   .field-row, .two-column .field-row, .inline-form, .inventory-filters {
@@ -1462,7 +1499,7 @@ article.tool-panel.active {
 @media (max-width: 680px) {
   .app-shell.overview-mode {
     min-height: calc(100dvh - 180px);
-    padding-bottom: 96px;
+    padding-bottom: 48px;
   }
 
   .overview-options {
@@ -1478,7 +1515,7 @@ article.tool-panel.active {
   }
 
   .home-background {
-    aspect-ratio: 4 / 5;
+    aspect-ratio: 4 / 3;
   }
 
   .home-background-shade {

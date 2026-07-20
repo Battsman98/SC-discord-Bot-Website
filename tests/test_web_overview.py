@@ -30,7 +30,7 @@ def test_home_page_rotates_official_responsive_fankit_wallpapers() -> None:
 
     assert 'class="home-background"' in html
     assert 'src="/assets/media/home/made-by-community.png"' in html
-    assert '"10", "25", "29", "30", "31", "32", "34", "36"' in javascript
+    assert '"25", "29", "30", "32", "34", "36"' in javascript
     assert html.index('class="overview-options"') < html.index('class="home-background"')
     assert 'return "mobile"' in javascript
     assert 'return "tablet"' in javascript
@@ -41,6 +41,21 @@ def test_home_page_rotates_official_responsive_fankit_wallpapers() -> None:
             assert (WEB_DIR / "media" / "home" / f"sc-{image_id}-{size}.jpg").is_file()
     for image_id in range(1, 10):
         assert (WEB_DIR / "media" / "home" / f"user-{image_id:02}.webp").is_file()
+    for image_id in range(1, 8):
+        assert (WEB_DIR / "media" / "home" / f"gallery-{image_id:02}.webp").is_file()
+
+
+def test_home_page_uses_twenty_curated_images_and_compact_navigation() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    background_block = javascript.split("const homeBackgrounds = [", 1)[1].split("];", 1)[0]
+    assert background_block.count('"') // 2 == 20
+    assert len([line for line in html.splitlines() if "data-home-slide=" in line]) == 20
+    assert ".app-shell.overview-mode .tabs" in css
+    assert ".app-shell.overview-mode .overview-options" in css
+    assert "aspect-ratio: 16 / 7;" in css
 
 
 def test_fankit_trademark_notice_is_visible_on_the_home_page() -> None:
