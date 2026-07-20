@@ -6,6 +6,7 @@ This is an unofficial fan-made extension. It is not affiliated with, endorsed by
 
 It only runs on:
 
+- `https://sccompanion.org/*`
 - `https://star-citizen-game-assist.onrender.com/*`
 - `http://127.0.0.1:8000/*`
 - `http://localhost:8000/*`
@@ -26,5 +27,5 @@ using your existing browser RSI login session. It does not ask for, display, sto
    `C:\Users\1121b\OneDrive\Documents\Website\tools\rsi-connector-extension`
 
 5. Sign into RSI in the same browser.
-6. Open [Star Citizen Game Assist](https://star-citizen-game-assist.onrender.com/).
+6. Open [SC Companion](https://sccompanion.org/).
 7. Click `Ships`, then `Import RSI Hangar`.

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Game Assist RSI Hangar Importer",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Imports only pledged ships and vehicles from your RSI hangar using your browser session.",
   "host_permissions": [
     "https://robertsspaceindustries.com/*"
@@ -19,6 +19,7 @@
   "content_scripts": [
     {
       "matches": [
+        "https://sccompanion.org/*",
         "https://star-citizen-game-assist.onrender.com/*",
         "http://127.0.0.1:8000/*",
         "http://localhost:8000/*"

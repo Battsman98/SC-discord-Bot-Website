@@ -77,7 +77,7 @@ tools\rsi-connector-extension
 
 Install it in Chrome or Edge with `Load unpacked`, sign into RSI in that same browser, then click `Import RSI Hangar`. The extension uses your browser's existing RSI session to fetch pledge pages for the local website. Only ships and vehicles from standalone pledges and game packages are imported; upgrades, paints, equipment, flair, and other extras are ignored. It does not ask for or store your RSI password or cookie value.
 
-After the extension is installed and the user is signed into RSI, importing is one click from the deployed website. The connector accepts requests only from `https://star-citizen-game-assist.onrender.com` and the documented local development origins.
+After the extension is installed and the user is signed into RSI, importing is one click from the deployed website. The connector accepts requests only from `https://sccompanion.org`, the Render service origin, and the documented local development origins.
 
 Game Assist and its RSI Hangar Importer are unofficial fan-made projects. They are not affiliated with, endorsed by, sponsored by, or authorized by Cloud Imperium Games or Roberts Space Industries, and they do not claim authorization from either company.
 
