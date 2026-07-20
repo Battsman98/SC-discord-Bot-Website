@@ -11,6 +11,53 @@ async function rsiHTMLGet(url) {
   return { code: response.status, payload: await response.text() };
 }
 
+function cleanShipName(value) {
+  let name = String(value || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  name = name.replace(/^(?:Standalone Ship|Game Package|Package|Ship)\s*[-:]?\s*/i, "");
+  name = name.replace(/\b(?:with Lifetime Insurance|Lifetime Insurance|Warbond|Best In Show|BIS|ILW|IAE|LTI)\b.*$/i, "").trim();
+  if (name.length < 2 || name.length > 72 || name.split(" ").length > 10) return null;
+  const blocked = /\b(?:upgrade|paint|skin|flair|poster|plushie|figurine|gift card|coupon|currency|insurance|hangar|downloadable|weapon|armor)\b/i;
+  return blocked.test(name) ? null : name;
+}
+
+function extractShipCandidates(pageHTML) {
+  const candidates = new Set();
+  const titled = /["'](?:name|title|label)["']\s*:\s*["']((?:Standalone Ship|Game Package|Package)\s*(?:[-:]|\s)[^"']{2,120})["']/gi;
+  for (const match of pageHTML.matchAll(titled)) {
+    const cleaned = cleanShipName(match[1]);
+    if (cleaned) candidates.add(cleaned);
+  }
+  const shipLinks = /\/pledge\/ships\/[^"'<> ]+\/([^"'<>?#]+)/gi;
+  for (const match of pageHTML.matchAll(shipLinks)) {
+    const cleaned = cleanShipName(decodeURIComponent(match[1]));
+    if (cleaned) candidates.add(cleaned);
+  }
+  const plainText = pageHTML.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  const blocks = /(?:Standalone Ship|Game Package|Package)\s*[-:]?\s*([^$<>]{2,120}?)(?=\s+(?:Attributed|Created|Serial|Insurance|Contains|$))/gi;
+  for (const match of plainText.matchAll(blocks)) {
+    const cleaned = cleanShipName(match[1]);
+    if (cleaned) candidates.add(cleaned);
+  }
+  return [...candidates];
+}
+
+function pledgePageHasNext(pageHTML, page) {
+  return pageHTML.includes(`page=${page + 1}`) || pageHTML.includes(`>${page + 1}<`);
+}
+
+async function importHangar() {
+  const candidates = new Set();
+  for (let page = 1; page <= 25; page += 1) {
+    const response = await rsiHTMLGet(`https://robertsspaceindustries.com/en/account/pledges?page=${page}&product-type=`);
+    if (response.code !== 200) {
+      return { code: response.code, error: "RSI did not return the pledge page. Confirm that you are signed in." };
+    }
+    for (const name of extractShipCandidates(response.payload)) candidates.add(name);
+    if (!pledgePageHasNext(response.payload, page)) break;
+  }
+  return { code: 200, candidates: [...candidates].sort((a, b) => a.localeCompare(b)) };
+}
+
 const ALLOWED_WEBSITE_ORIGINS = new Set([
   "https://star-citizen-game-assist.onrender.com",
   "http://127.0.0.1:8000",
@@ -40,14 +87,10 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
 async function handleMessage(rawMessage) {
   const message = JSON.parse(rawMessage || "{}");
   if (message.action === "connect") {
-    return { code: 200, version: "0.3.1", scope: "ships-and-vehicles-only" };
+    return { code: 200, version: "0.4.0", scope: "ships-and-vehicles-only" };
   }
-  if (message.action === "getPledgesPage") {
-    const page = Number(message.page || 1);
-    if (!Number.isInteger(page) || page < 1 || page > 25) {
-      return { code: 400, error: "Invalid pledge page." };
-    }
-    return await rsiHTMLGet(`https://robertsspaceindustries.com/en/account/pledges?page=${page}&product-type=`);
+  if (message.action === "importHangar") {
+    return await importHangar();
   }
   return { code: 400, error: "Unknown action." };
 }

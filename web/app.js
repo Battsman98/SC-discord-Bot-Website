@@ -724,17 +724,13 @@ async function importRsiPledgesFromBrowser() {
   try {
     const connected = await rsiConnect({ action: "connect" }, 1200);
     if (connected.code !== 200) throw new Error("RSI browser connector is not available.");
-    const pages = [];
-    for (let page = 1; page <= 25; page += 1) {
-      outputs.savedShips.innerHTML = stateMessage(`Reading RSI pledge page ${page}...`);
-      const response = await rsiConnect({ action: "getPledgesPage", page }, 20000);
-      if (response.code !== 200 || !response.payload) break;
-      pages.push(response.payload);
-      if (!rsiPledgePageHasNext(response.payload, page)) break;
-    }
-    if (!pages.length) throw new Error("No RSI pledge pages were returned. Make sure you are signed into RSI in this browser.");
+    outputs.savedShips.innerHTML = stateMessage("Reading ships and vehicles from RSI...");
+    const response = await rsiConnect({ action: "importHangar" }, 60000);
+    if (response.code !== 200) throw new Error(response.error || "RSI hangar import failed.");
+    const candidates = Array.isArray(response.candidates) ? response.candidates : [];
+    if (!candidates.length) throw new Error("No ships or vehicles were found. Make sure you are signed into RSI in this browser.");
     outputs.savedShips.innerHTML = stateMessage("Updating pledged ships...");
-    const result = await api("/api/me/ships/import/rsi", { method: "POST", body: { pages } });
+    const result = await api("/api/me/ships/import/rsi", { method: "POST", body: { candidates } });
     await loadSavedShips({ quiet: true });
     showRsiImportResult(result);
   } catch (error) {

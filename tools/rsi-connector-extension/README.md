@@ -2,6 +2,8 @@
 
 This optional local browser extension lets the Game Assist website import ships and vehicles from your RSI pledge hangar without downloading HTML files manually. The website rejects upgrades, CCUs, paints, equipment, flair, and other non-vehicle extras.
 
+This is an unofficial fan-made extension. It is not affiliated with, endorsed by, sponsored by, or authorized by Cloud Imperium Games or Roberts Space Industries, and it does not claim authorization from either company.
+
 It only runs on:
 
 - `https://star-citizen-game-assist.onrender.com/*`

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Game Assist RSI Hangar Importer",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Imports only pledged ships and vehicles from your RSI hangar using your browser session.",
   "host_permissions": [
     "https://robertsspaceindustries.com/*"
@@ -9,6 +9,12 @@
   "permissions": [],
   "background": {
     "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "content_scripts": [
     {
@@ -23,6 +29,11 @@
     }
   ],
   "action": {
-    "default_title": "Game Assist RSI Hangar Importer"
+    "default_title": "Game Assist RSI Hangar Importer",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
   }
 }

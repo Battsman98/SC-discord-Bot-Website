@@ -79,6 +79,8 @@ Install it in Chrome or Edge with `Load unpacked`, sign into RSI in that same br
 
 After the extension is installed and the user is signed into RSI, importing is one click from the deployed website. The connector accepts requests only from `https://star-citizen-game-assist.onrender.com` and the documented local development origins.
 
+Game Assist and its RSI Hangar Importer are unofficial fan-made projects. They are not affiliated with, endorsed by, sponsored by, or authorized by Cloud Imperium Games or Roberts Space Industries, and they do not claim authorization from either company.
+
 If the connector is not installed, the website falls back to importing saved RSI pledge HTML files.
 
 ## Local Setup

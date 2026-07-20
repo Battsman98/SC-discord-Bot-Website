@@ -207,7 +207,8 @@ class ShipOwnershipRequest(BaseModel):
 
 
 class RsiPledgeImportRequest(BaseModel):
-    pages: list[str] = Field(min_length=1)
+    pages: list[str] = Field(default_factory=list)
+    candidates: list[str] = Field(default_factory=list)
 
 
 class InventoryItemRequest(BaseModel):
@@ -565,9 +566,15 @@ async def save_my_ship(request: ShipOwnershipRequest, user=Depends(require_user)
 async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(require_user)) -> dict[str, Any]:
     imported: list[str] = []
     skipped: list[str] = []
-    candidates: set[str] = set()
+    candidates: set[str] = {
+        cleaned
+        for value in request.candidates[:500]
+        if (cleaned := _clean_rsi_pledge_ship_name(value))
+    }
     for page in request.pages:
         candidates.update(_extract_rsi_pledge_ship_names(page))
+    if not candidates:
+        raise HTTPException(status_code=400, detail="No ship or vehicle candidates were supplied.")
     for candidate in sorted(candidates, key=str.lower):
         detail = await _resolve_imported_ship(candidate)
         if detail is None:
