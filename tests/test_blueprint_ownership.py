@@ -647,7 +647,8 @@ def test_inventory_scanner_reuses_catalog_lookups_for_results_and_diagnostics(mo
 
     async def run() -> None:
         monkeypatch.setattr(web_module, "_inventory_lookup_scored_matches", fake_lookup)
-        lookups = await _inventory_scanner_lookups(text, None)
+        lookups = await _inventory_scanner_lookups(text, None, candidate_limit=1)
+        assert len(lookups) == 1
         assert len(calls) == len(lookups)
 
         async def unexpected_lookup(*args, **kwargs):

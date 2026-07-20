@@ -100,3 +100,10 @@ def test_each_tool_page_has_a_manufacturer_mfd_theme() -> None:
         assert f'body[data-mfd-theme="{theme}"]' in css
     assert "document.body.dataset.mfdTheme = mfdTheme.theme" in javascript
     assert "panel.dataset.mfdLabel = mfdTheme.label" in javascript
+
+
+def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'canvas.toBlob(resolve, "image/webp", 0.82)' in javascript
+    assert 'if (options.liveScan) params.set("live_scan", "true")' in javascript

@@ -1520,7 +1520,7 @@ async function captureInventoryScannerCrop() {
   const sy = Math.round(crop.y * sourceHeight);
   const sw = Math.round(crop.width * sourceWidth);
   const sh = Math.round(crop.height * sourceHeight);
-  const maxWidth = 720;
+  const maxWidth = 640;
   const scale = Math.min(1, maxWidth / Math.max(1, sw));
   const targetWidth = Math.max(1, Math.round(sw * scale));
   const targetHeight = Math.max(1, Math.round(sh * scale));
@@ -1530,8 +1530,9 @@ async function captureInventoryScannerCrop() {
   const context = canvas.getContext("2d");
   context.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   const hash = imageAverageHash(canvas);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-  return { file: new File([blob], "inventory-tooltip.png", { type: "image/png" }), hash };
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+  if (!blob) throw new Error("Could not encode the inventory capture.");
+  return { file: new File([blob], "inventory-tooltip.webp", { type: "image/webp" }), hash };
 }
 
 function inventoryScannerTextHeightRatio() {
@@ -1637,6 +1638,7 @@ async function submitInventoryImages(files, options = {}) {
   if (category) params.set("default_category", category);
   if (options.scannerMode) {
     params.set("scanner_mode", "true");
+    if (options.liveScan) params.set("live_scan", "true");
     params.set("min_score", String(Number(document.querySelector("#inventoryScannerMinScore")?.value || 0.72)));
     const excludeWords = document.querySelector("#inventoryScannerExcludeWords")?.value.trim();
     if (excludeWords) params.set("exclude_words", excludeWords);

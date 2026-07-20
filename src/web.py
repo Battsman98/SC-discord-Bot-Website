@@ -1078,6 +1078,7 @@ async def import_inventory_from_images(
     default_location: str | None = None,
     default_category: str | None = None,
     scanner_mode: bool = False,
+    live_scan: bool = False,
     min_score: float = Query(default=0.72, ge=0, le=1),
     exclude_words: str | None = None,
     user=Depends(require_user),
@@ -1085,7 +1086,11 @@ async def import_inventory_from_images(
     del user
     ocr_text, ocr_error = await _ocr_blueprint_images(files)
     if scanner_mode:
-        scanner_lookups = await _inventory_scanner_lookups(ocr_text, exclude_words) if ocr_text.strip() else {}
+        scanner_lookups = await _inventory_scanner_lookups(
+            ocr_text,
+            exclude_words,
+            candidate_limit=8 if live_scan else None,
+        ) if ocr_text.strip() else {}
         return {
             "ocr_available": ocr_error is None,
             "ocr_error": ocr_error,
@@ -1098,7 +1103,7 @@ async def import_inventory_from_images(
                 exclude_words,
                 scanner_lookups,
             ) if ocr_text.strip() else [],
-            "diagnostics": await _inventory_scanner_diagnostics(
+            "diagnostics": None if live_scan else await _inventory_scanner_diagnostics(
                 ocr_text,
                 min_score,
                 exclude_words,
@@ -1414,7 +1419,7 @@ async def _match_inventory_scanner_text(
 
     for candidate in _inventory_scanner_text_candidates(text, exclude):
         for result, confidence in _inventory_scanner_accepted_matches(
-            scanner_lookups[candidate] if scanner_lookups is not None else await _inventory_lookup_scored_matches(candidate, 5),
+            scanner_lookups.get(candidate, []) if scanner_lookups is not None else await _inventory_lookup_scored_matches(candidate, 5),
             min_score,
         ):
             existing = matches.get(result.name)
@@ -1479,7 +1484,7 @@ async def _inventory_scanner_diagnostics(
 
     for candidate in candidate_values[:30]:
         try:
-            results = scanner_lookups[candidate] if scanner_lookups is not None else await _inventory_lookup_scored_matches(candidate, 5)
+            results = scanner_lookups.get(candidate, []) if scanner_lookups is not None else await _inventory_lookup_scored_matches(candidate, 5)
         except Exception as exc:
             candidates.append(
                 {
@@ -1535,6 +1540,7 @@ async def _inventory_scanner_diagnostics(
 async def _inventory_scanner_lookups(
     text: str,
     exclude_words: str | None,
+    candidate_limit: int | None = None,
 ) -> dict[str, list[tuple[Any, float]]]:
     """Resolve each OCR candidate once for both matching and diagnostics.
 
@@ -1543,6 +1549,8 @@ async def _inventory_scanner_lookups(
     """
     exclude = {_normalize_text(word) for word in re.split(r"[,;\n]+", exclude_words or "") if word.strip()}
     candidates = _inventory_scanner_text_candidates(text, exclude)
+    if candidate_limit is not None:
+        candidates = candidates[:max(1, candidate_limit)]
     semaphore = asyncio.Semaphore(4)
 
     async def lookup(candidate: str) -> tuple[str, list[tuple[Any, float]]]:
