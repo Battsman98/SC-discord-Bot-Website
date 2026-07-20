@@ -76,3 +76,27 @@ def test_destination_selection_reveals_full_navigation() -> None:
 
     assert 'appShell.classList.toggle("overview-mode", tabId === "overview")' in javascript
     assert 'document.querySelectorAll("[data-overview-tab]")' in javascript
+
+
+def test_each_tool_page_has_a_manufacturer_mfd_theme() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert 'data-mfd-theme="overview"' in html
+    expected = {
+        "lookup": ("drake", "DRAKE INTERPLANETARY"),
+        "trade": ("grey-market", "GREY MARKET EXCHANGE"),
+        "mining": ("argo", "ARGO ASTRONAUTICS"),
+        "crafting": ("anvil", "ANVIL AEROSPACE"),
+        "items": ("origin", "ORIGIN JUMPWORKS"),
+        "inventory": ("crusader", "CRUSADER INDUSTRIES"),
+        "timers": ("misc", "MISC INDUSTRIAL"),
+        "commands": ("aegis", "AEGIS DYNAMICS"),
+        "admin": ("security", "SECURITY AUDIT"),
+    }
+    for tab_id, (theme, label) in expected.items():
+        assert f'{tab_id}: {{ theme: "{theme}", label: "{label}" }}' in javascript
+        assert f'body[data-mfd-theme="{theme}"]' in css
+    assert "document.body.dataset.mfdTheme = mfdTheme.theme" in javascript
+    assert "panel.dataset.mfdLabel = mfdTheme.label" in javascript
