@@ -52,6 +52,9 @@ def test_format_interaction_options_flattens_subcommand_options() -> None:
 def test_command_channel_directory_groups_commands_by_channel() -> None:
     settings = Settings(
         discord_token="token",
+        discord_client_id="",
+        discord_client_secret="",
+        discord_redirect_uri="http://127.0.0.1:8000/auth/discord/callback",
         discord_guild_id=123,
         commands_channel_id=456,
         exec_status_channel_id=None,

@@ -34,8 +34,70 @@ class SQLiteCache:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_blueprints (
+                user_id INTEGER NOT NULL,
+                blueprint_name TEXT NOT NULL,
+                category TEXT,
+                source_name TEXT,
+                source_url TEXT,
+                saved_at INTEGER NOT NULL,
+                PRIMARY KEY (user_id, blueprint_name)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_ships (
+                user_id INTEGER NOT NULL,
+                ship_name TEXT NOT NULL,
+                ownership_type TEXT NOT NULL,
+                manufacturer TEXT,
+                role TEXT,
+                source_name TEXT,
+                source_url TEXT,
+                image_url TEXT,
+                notes TEXT,
+                loaner_for TEXT,
+                saved_at INTEGER NOT NULL,
+                PRIMARY KEY (user_id, ship_name)
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_inventory_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                item_name TEXT NOT NULL,
+                category TEXT,
+                location TEXT NOT NULL,
+                quantity REAL NOT NULL DEFAULT 1,
+                quality REAL,
+                item_type TEXT,
+                item_size TEXT,
+                volume_scu REAL,
+                notes TEXT,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        cls._ensure_column(connection, "user_ships", "image_url", "TEXT")
+        cls._ensure_column(connection, "user_ships", "notes", "TEXT")
+        cls._ensure_column(connection, "user_ships", "loaner_for", "TEXT")
+        cls._ensure_column(connection, "user_inventory_items", "quality", "REAL")
+        cls._ensure_column(connection, "user_inventory_items", "item_type", "TEXT")
+        cls._ensure_column(connection, "user_inventory_items", "item_size", "TEXT")
+        cls._ensure_column(connection, "user_inventory_items", "volume_scu", "REAL")
         connection.commit()
         return cls(connection)
+
+    @staticmethod
+    def _ensure_column(connection: sqlite3.Connection, table: str, column: str, column_type: str) -> None:
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
 
     async def get(self, cache_key: str) -> Any | None:
         row = self._connection.execute(
@@ -113,6 +175,360 @@ class SQLiteCache:
             }
             for row in rows
         ]
+
+    async def user_blueprints(self, user_id: int) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            """
+            SELECT blueprint_name, category, source_name, source_url, saved_at
+            FROM user_blueprints
+            WHERE user_id = ?
+            ORDER BY blueprint_name COLLATE NOCASE
+            """,
+            (user_id,),
+        ).fetchall()
+        return [
+            {
+                "name": row[0],
+                "category": row[1],
+                "source_name": row[2],
+                "source_url": row[3],
+                "saved_at": row[4],
+            }
+            for row in rows
+        ]
+
+    async def save_user_blueprint(
+        self,
+        user_id: int,
+        blueprint_name: str,
+        category: str | None,
+        source_name: str | None,
+        source_url: str | None,
+    ) -> None:
+        now = int(time.time())
+        self._connection.execute(
+            """
+            INSERT INTO user_blueprints (user_id, blueprint_name, category, source_name, source_url, saved_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, blueprint_name) DO UPDATE SET
+                category = excluded.category,
+                source_name = excluded.source_name,
+                source_url = excluded.source_url,
+                saved_at = excluded.saved_at
+            """,
+            (user_id, blueprint_name, category, source_name, source_url, now),
+        )
+        self._connection.commit()
+
+    async def delete_user_blueprint(self, user_id: int, blueprint_name: str) -> None:
+        self._connection.execute(
+            "DELETE FROM user_blueprints WHERE user_id = ? AND blueprint_name = ?",
+            (user_id, blueprint_name),
+        )
+        self._connection.commit()
+
+    async def user_ships(self, user_id: int) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            """
+            SELECT ship_name, ownership_type, manufacturer, role, source_name, source_url, image_url, notes, loaner_for, saved_at
+            FROM user_ships
+            WHERE user_id = ?
+            ORDER BY loaner_for IS NOT NULL, ship_name COLLATE NOCASE
+            """,
+            (user_id,),
+        ).fetchall()
+        return [
+            {
+                "name": row[0],
+                "ownership_type": row[1],
+                "manufacturer": row[2],
+                "role": row[3],
+                "source_name": row[4],
+                "source_url": row[5],
+                "image_url": row[6],
+                "notes": row[7],
+                "loaner_for": row[8],
+                "saved_at": row[9],
+            }
+            for row in rows
+        ]
+
+    async def save_user_ship(
+        self,
+        user_id: int,
+        ship_name: str,
+        ownership_type: str,
+        manufacturer: str | None,
+        role: str | None,
+        source_name: str | None,
+        source_url: str | None,
+        image_url: str | None = None,
+        notes: str | None = None,
+        loaner_for: str | None = None,
+    ) -> None:
+        now = int(time.time())
+        self._connection.execute(
+            """
+            INSERT INTO user_ships (
+                user_id, ship_name, ownership_type, manufacturer, role, source_name, source_url,
+                image_url, notes, loaner_for, saved_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, ship_name) DO UPDATE SET
+                ownership_type = excluded.ownership_type,
+                manufacturer = excluded.manufacturer,
+                role = excluded.role,
+                source_name = excluded.source_name,
+                source_url = excluded.source_url,
+                image_url = excluded.image_url,
+                notes = excluded.notes,
+                loaner_for = excluded.loaner_for,
+                saved_at = excluded.saved_at
+            """,
+            (user_id, ship_name, ownership_type, manufacturer, role, source_name, source_url, image_url, notes, loaner_for, now),
+        )
+        self._connection.commit()
+
+    async def delete_user_ship(self, user_id: int, ship_name: str) -> None:
+        self._connection.execute(
+            "DELETE FROM user_ships WHERE user_id = ? AND ship_name = ?",
+            (user_id, ship_name),
+        )
+        self._connection.commit()
+
+    async def delete_user_loaners_for_ship(self, user_id: int, ship_name: str) -> None:
+        self._connection.execute(
+            "DELETE FROM user_ships WHERE user_id = ? AND loaner_for = ?",
+            (user_id, ship_name),
+        )
+        self._connection.commit()
+
+    async def user_inventory_items(
+        self,
+        user_id: int,
+        location: str | None = None,
+        category: str | None = None,
+        query: str | None = None,
+        sort_by: str = "name",
+    ) -> list[dict[str, Any]]:
+        clauses = ["user_id = ?"]
+        values: list[Any] = [user_id]
+        if location:
+            clauses.append("location = ?")
+            values.append(location)
+        if category:
+            clauses.append("category = ?")
+            values.append(category)
+        if query:
+            clauses.append("(item_name LIKE ? OR notes LIKE ?)")
+            pattern = f"%{query}%"
+            values.extend([pattern, pattern])
+
+        order_by = {
+            "location": "location COLLATE NOCASE, category COLLATE NOCASE, item_name COLLATE NOCASE",
+            "category": "category COLLATE NOCASE, item_name COLLATE NOCASE, location COLLATE NOCASE",
+            "quantity": "quantity DESC, item_name COLLATE NOCASE",
+            "updated": "updated_at DESC, item_name COLLATE NOCASE",
+            "name": "item_name COLLATE NOCASE, location COLLATE NOCASE",
+        }.get(sort_by, "item_name COLLATE NOCASE, location COLLATE NOCASE")
+
+        rows = self._connection.execute(
+            f"""
+            SELECT id, item_name, category, location, quantity, quality, item_type, item_size, volume_scu, notes, updated_at
+            FROM user_inventory_items
+            WHERE {" AND ".join(clauses)}
+            ORDER BY {order_by}
+            """,
+            values,
+        ).fetchall()
+        return [
+            {
+                "id": row[0],
+                "name": row[1],
+                "category": row[2],
+                "location": row[3],
+                "quantity": row[4],
+                "quality": row[5],
+                "item_type": row[6],
+                "item_size": row[7],
+                "volume_scu": row[8],
+                "notes": row[9],
+                "updated_at": row[10],
+            }
+            for row in rows
+        ]
+
+    async def save_user_inventory_item(
+        self,
+        user_id: int,
+        item_name: str,
+        category: str | None,
+        location: str,
+        quantity: float,
+        quality: float | None = None,
+        item_type: str | None = None,
+        item_size: str | None = None,
+        volume_scu: float | None = None,
+        notes: str | None = None,
+    ) -> int:
+        now = int(time.time())
+        cursor = self._connection.execute(
+            """
+            INSERT INTO user_inventory_items (
+                user_id, item_name, category, location, quantity, quality, item_type, item_size, volume_scu, notes, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, item_name, category, location, quantity, quality, item_type, item_size, volume_scu, notes, now),
+        )
+        self._connection.commit()
+        return int(cursor.lastrowid)
+
+    async def update_user_inventory_item(
+        self,
+        user_id: int,
+        item_id: int,
+        item_name: str,
+        category: str | None,
+        location: str,
+        quantity: float,
+        quality: float | None = None,
+        item_type: str | None = None,
+        item_size: str | None = None,
+        volume_scu: float | None = None,
+        notes: str | None = None,
+    ) -> bool:
+        now = int(time.time())
+        cursor = self._connection.execute(
+            """
+            UPDATE user_inventory_items
+            SET item_name = ?, category = ?, location = ?, quantity = ?, quality = ?, item_type = ?, item_size = ?, volume_scu = ?,
+                notes = ?, updated_at = ?
+            WHERE user_id = ? AND id = ?
+            """,
+            (item_name, category, location, quantity, quality, item_type, item_size, volume_scu, notes, now, user_id, item_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
+    async def merge_user_inventory_duplicates(self, user_id: int) -> int:
+        rows = self._connection.execute(
+            """
+            SELECT id, item_name, category, location, quantity, quality, item_type, item_size, volume_scu, notes
+            FROM user_inventory_items
+            WHERE user_id = ?
+            ORDER BY updated_at DESC, id ASC
+            """,
+            (user_id,),
+        ).fetchall()
+        groups: dict[tuple[str, str], list[Any]] = {}
+        for row in rows:
+            key = (self._inventory_merge_key(row[1]), self._inventory_merge_key(row[3]))
+            if not key[0] or not key[1]:
+                continue
+            groups.setdefault(key, []).append(row)
+
+        removed = 0
+        now = int(time.time())
+        for group in groups.values():
+            if len(group) < 2:
+                continue
+            keeper = group[0]
+            duplicates = group[1:]
+            quantity = max(float(row[4] or 0) for row in group)
+            quality = next((row[5] for row in group if row[5] is not None), None)
+            category = next((row[2] for row in group if row[2]), None)
+            item_type = next((row[6] for row in group if row[6]), None)
+            item_size = next((row[7] for row in group if row[7]), None)
+            volume_scu = next((row[8] for row in group if row[8] is not None), None)
+            notes = self._merge_inventory_notes(row[9] for row in group)
+            self._connection.execute(
+                """
+                UPDATE user_inventory_items
+                SET category = ?, quantity = ?, quality = ?, item_type = ?, item_size = ?, volume_scu = ?, notes = ?, updated_at = ?
+                WHERE user_id = ? AND id = ?
+                """,
+                (category, quantity, quality, item_type, item_size, volume_scu, notes, now, user_id, keeper[0]),
+            )
+            duplicate_ids = [row[0] for row in duplicates]
+            placeholders = ",".join("?" for _ in duplicate_ids)
+            self._connection.execute(
+                f"DELETE FROM user_inventory_items WHERE user_id = ? AND id IN ({placeholders})",
+                [user_id, *duplicate_ids],
+            )
+            removed += len(duplicate_ids)
+        self._connection.commit()
+        return removed
+
+    def _inventory_merge_key(self, value: str | None) -> str:
+        return " ".join("".join(char.lower() if char.isalnum() else " " for char in str(value or "")).split())
+
+    def _merge_inventory_notes(self, values) -> str | None:
+        notes: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            for line in str(value or "").splitlines():
+                cleaned = line.strip()
+                if not cleaned or cleaned in seen:
+                    continue
+                seen.add(cleaned)
+                notes.append(cleaned)
+        return "\n".join(notes) if notes else None
+
+    async def transfer_user_inventory_item(self, user_id: int, item_id: int, location: str) -> bool:
+        cursor = self._connection.execute(
+            """
+            UPDATE user_inventory_items
+            SET location = ?, updated_at = ?
+            WHERE user_id = ? AND id = ?
+            """,
+            (location, int(time.time()), user_id, item_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
+    async def delete_user_inventory_item(self, user_id: int, item_id: int) -> bool:
+        cursor = self._connection.execute(
+            "DELETE FROM user_inventory_items WHERE user_id = ? AND id = ?",
+            (user_id, item_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
+    async def clear_user_inventory_items(self, user_id: int, location: str | None = None) -> int:
+        if location:
+            cursor = self._connection.execute(
+                """
+                DELETE FROM user_inventory_items
+                WHERE user_id = ? AND LOWER(TRIM(location)) = LOWER(TRIM(?))
+                """,
+                (user_id, location),
+            )
+        else:
+            cursor = self._connection.execute(
+                "DELETE FROM user_inventory_items WHERE user_id = ?",
+                (user_id,),
+            )
+        self._connection.commit()
+        return cursor.rowcount
+
+    async def user_inventory_facets(self, user_id: int) -> dict[str, list[str]]:
+        def values_for(column: str) -> list[str]:
+            rows = self._connection.execute(
+                f"""
+                SELECT DISTINCT {column}
+                FROM user_inventory_items
+                WHERE user_id = ? AND {column} IS NOT NULL AND TRIM({column}) != ''
+                ORDER BY {column} COLLATE NOCASE
+                """,
+                (user_id,),
+            ).fetchall()
+            return [row[0] for row in rows]
+
+        return {
+            "locations": values_for("location"),
+            "categories": values_for("category"),
+        }
 
     async def close(self) -> None:
         self._connection.close()

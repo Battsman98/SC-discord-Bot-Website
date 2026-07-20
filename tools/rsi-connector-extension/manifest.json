@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Game Assist RSI Connector",
+  "version": "0.2.0",
+  "description": "Lets the local Game Assist website update pledged ships from your RSI hangar using your browser session.",
+  "host_permissions": [
+    "https://robertsspaceindustries.com/*"
+  ],
+  "permissions": [],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://127.0.0.1:8000/*",
+        "http://localhost:8000/*"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
+  "action": {
+    "default_title": "Game Assist RSI Connector"
+  }
+}

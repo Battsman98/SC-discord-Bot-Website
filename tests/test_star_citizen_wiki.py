@@ -1,6 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
+from src.sources.base import ShipResult
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 
 
@@ -31,6 +32,37 @@ def test_parse_result_returns_none_for_no_results() -> None:
     result = source._parse_result("<html><body>No results found</body></html>", "nope", "https://example.com")
 
     assert result is None
+
+
+def test_parse_item_result_maps_fs9_to_personal_weapon_primary() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+
+    result = source._parse_item_result(
+        {
+            "uuid": "6f1674b1-fb58-4661-9114-f418862751d2",
+            "slug": "fs-9-lmg",
+            "name": "FS-9 LMG",
+            "classification": "FPS.Weapon.Medium",
+            "type": "WeaponPersonal",
+            "type_label": "FPS Weapon",
+            "sub_type": "Medium",
+            "sub_type_label": "Medium",
+            "size": 4,
+            "description_data": [
+                {"name": "Item Type", "value": "LMG"},
+                {"name": "Manufacturer", "value": "Behring"},
+            ],
+            "manufacturer": {"name": "Behring Applied Technology"},
+            "web_url": "https://api.star-citizen.wiki/items/fs-9-lmg",
+        }
+    )
+
+    assert result is not None
+    assert result.name == "FS-9 LMG"
+    assert result.category == "Personal Weapons"
+    assert result.section == "Primary"
+    assert result.size == "4"
+    assert result.company_name == "Behring Applied Technology"
 
 
 def test_parse_ship_result_includes_pledge_and_purchase_data() -> None:
@@ -155,3 +187,282 @@ def test_lookup_ship_retries_with_canonical_name() -> None:
     assert result.name == "Argo RAFT"
     assert requested_urls[0].endswith("/argo%20raft")
     assert requested_urls[1].endswith("/Argo%20RAFT")
+
+
+def test_fetch_pledge_price_caches_daily_vehicle_prices() -> None:
+    class FakeCache:
+        def __init__(self) -> None:
+            self.values = {}
+            self.ttls = {}
+
+        async def get(self, key: str):
+            return self.values.get(key)
+
+        async def set(self, key: str, value, ttl: int) -> None:
+            self.values[key] = value
+            self.ttls[key] = ttl
+
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._cache = FakeCache()
+    calls = []
+
+    async def fake_fetch_json(url: str):
+        calls.append(url)
+        return {
+            "data": [
+                {
+                    "vehicle_name": "Drake Cutlass Black",
+                    "price": 110,
+                    "on_sale": 1,
+                    "currency": "USD",
+                }
+            ]
+        }
+
+    source._fetch_json = fake_fetch_json
+
+    result = asyncio.run(source._fetch_pledge_price({"game_name": "Drake Cutlass Black"}))
+
+    assert result is not None
+    assert result["price"] == 110
+    assert source._cache.ttls["uex:vehicles-prices:v1"] == 86400
+    assert len(calls) == 1
+
+    result = asyncio.run(source._fetch_pledge_price({"game_name": "Drake Cutlass Black"}))
+
+    assert result is not None
+    assert len(calls) == 1
+
+
+def test_fetch_rsi_pledge_status_uses_graphql_stock() -> None:
+    class FakeCache:
+        def __init__(self) -> None:
+            self.values = {}
+            self.ttls = {}
+
+        async def get(self, key: str):
+            return self.values.get(key)
+
+        async def set(self, key: str, value, ttl: int) -> None:
+            self.values[key] = value
+            self.ttls[key] = ttl
+
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._cache = FakeCache()
+    calls = []
+
+    async def fake_post_graphql(query: str, variables: dict):
+        calls.append(variables)
+        return {
+            "data": {
+                "store": {
+                    "search": {
+                        "resources": [
+                            {
+                                "title": "Cutlass Black",
+                                "msrp": 11000,
+                                "upgrades": [
+                                    {"stock": {"available": True, "backOrder": False}},
+                                ],
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+    source._post_rsi_graphql = fake_post_graphql
+
+    result = asyncio.run(source._fetch_rsi_pledge_status({"name": "Cutlass Black"}))
+
+    assert result is not None
+    assert result["on_sale"] is True
+    assert result["price"] == 110
+    assert source._cache.ttls["rsi:pledge-status:v1:cutlass black"] == 86400
+    assert calls == [{"query": {"ships": {"name": "Cutlass Black"}}}]
+
+
+def test_fetch_rsi_pledge_status_marks_no_stock_unavailable() -> None:
+    class FakeCache:
+        async def get(self, key: str):
+            return None
+
+        async def set(self, key: str, value, ttl: int) -> None:
+            return None
+
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._cache = FakeCache()
+
+    async def fake_post_graphql(query: str, variables: dict):
+        return {
+            "data": {
+                "store": {
+                    "search": {
+                        "resources": [
+                            {
+                                "title": "Galaxy",
+                                "msrp": 38000,
+                                "upgrades": None,
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+    source._post_rsi_graphql = fake_post_graphql
+
+    result = asyncio.run(source._fetch_rsi_pledge_status({"name": "Galaxy"}))
+
+    assert result is not None
+    assert result["on_sale"] is False
+    assert result["price"] == 380
+
+
+def test_search_ships_filters_by_type_size_and_cargo() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._ship_summaries = [
+        ShipResult(
+            name="Drake Cutlass Black",
+            manufacturer="Drake Interplanetary",
+            career="Transporter",
+            role="Medium Freight",
+            vehicle_type="multi",
+            size="medium",
+            status="flight-ready",
+            cargo_capacity=46,
+            crew="1-3",
+            length=None,
+            beam=None,
+            height=None,
+            description=None,
+            pledge=None,
+            purchases=[],
+            source_url="https://example.test/cutlass",
+            source_name="Star Citizen Wiki",
+        ),
+        ShipResult(
+            name="Anvil Arrow",
+            manufacturer="Anvil Aerospace",
+            career="Combat",
+            role="Light Fighter",
+            vehicle_type="fighter",
+            size="small",
+            status="flight-ready",
+            cargo_capacity=0,
+            crew="1",
+            length=None,
+            beam=None,
+            height=None,
+            description=None,
+            pledge=None,
+            purchases=[],
+            source_url="https://example.test/arrow",
+            source_name="Star Citizen Wiki",
+        ),
+    ]
+
+    matches = asyncio.run(
+        source.search_ships(
+            query="freight",
+            manufacturer="drake",
+            vehicle_type="multi",
+            size="medium",
+            role=None,
+            status="flight",
+            min_cargo=40,
+            max_cargo=50,
+        )
+    )
+
+    assert [ship.name for ship in matches] == ["Drake Cutlass Black"]
+
+
+def test_ship_facets_collects_dropdown_options() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._ship_summaries = [
+        ShipResult(
+            name="Drake Cutlass Black",
+            manufacturer="Drake Interplanetary",
+            career="Transporter",
+            role="Medium Freight",
+            vehicle_type="multi",
+            size="medium",
+            status="flight-ready",
+            cargo_capacity=46,
+            crew="1-3",
+            length=None,
+            beam=None,
+            height=None,
+            description=None,
+            pledge=None,
+            purchases=[],
+            source_url="https://example.test/cutlass",
+            source_name="Star Citizen Wiki",
+        )
+    ]
+
+    facets = asyncio.run(source.ship_facets())
+
+    assert facets["manufacturers"] == ["Drake Interplanetary"]
+    assert facets["types"] == ["multi"]
+    assert facets["sizes"] == ["medium"]
+    assert facets["roles"] == ["Transporter / Medium Freight"]
+    assert facets["statuses"] == ["flight-ready"]
+
+
+def test_rsi_ship_search_candidates_strip_manufacturer_prefixes() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+
+    assert source._rsi_ship_search_candidates("RSI Galaxy") == ["RSI Galaxy", "Galaxy"]
+    assert source._rsi_ship_search_candidates("Anvil Arrow") == ["Anvil Arrow", "Arrow"]
+
+
+def test_search_ships_falls_back_to_rsi_store() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._ship_summaries = []
+    calls = []
+
+    async def fake_post_graphql(query: str, variables: dict):
+        calls.append(variables)
+        if variables == {"query": {"ships": {"name": "Galaxy"}}}:
+            return {
+                "data": {
+                    "store": {
+                        "search": {
+                            "resources": [
+                                {
+                                    "title": "Galaxy",
+                                    "url": "/pledge/ships/galaxy/Galaxy",
+                                    "msrp": 38000,
+                                    "focus": "Modular",
+                                    "productionStatus": "in-concept",
+                                    "type": "multi",
+                                    "manufacturer": {"name": "Roberts Space Industries"},
+                                    "media": {
+                                        "thumbnail": {
+                                            "storeSmall": "https://example.test/galaxy.jpg",
+                                        }
+                                    },
+                                    "upgrades": None,
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        return {"data": {"store": {"search": {"resources": []}}}}
+
+    source._post_rsi_graphql = fake_post_graphql
+
+    matches = asyncio.run(source.search_ships(query="RSI Galaxy"))
+
+    assert [ship.name for ship in matches] == ["Galaxy"]
+    assert matches[0].manufacturer == "Roberts Space Industries"
+    assert matches[0].image_url == "https://example.test/galaxy.jpg"
+    assert matches[0].pledge is not None
+    assert matches[0].pledge.is_on_sale is False
+    assert calls == [
+        {"query": {"ships": {"name": "RSI Galaxy"}}},
+        {"query": {"ships": {"name": "Galaxy"}}},
+    ]

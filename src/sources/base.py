@@ -47,6 +47,7 @@ class ShipResult:
     purchases: list[ShipPurchase]
     source_url: str
     source_name: str
+    image_url: str | None = None
 
 
 @dataclass(frozen=True)

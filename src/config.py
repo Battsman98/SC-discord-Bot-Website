@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 @dataclass(frozen=True)
 class Settings:
     discord_token: str
+    discord_client_id: str
+    discord_client_secret: str
+    discord_redirect_uri: str
     discord_guild_id: int | None
     commands_channel_id: int | None
     exec_status_channel_id: int | None
@@ -20,17 +23,27 @@ class Settings:
     database_path: str
     http_timeout_seconds: int
     cache_ttl_seconds: int
+    web_admin_token: str = ""
+    web_session_secret: str = ""
 
     @classmethod
-    def from_env(cls, load_env_file: bool = True) -> "Settings":
+    def from_env(cls, load_env_file: bool = True, require_discord_token: bool = True) -> "Settings":
         if load_env_file:
             load_dotenv()
 
         discord_token = os.getenv("DISCORD_TOKEN", "").strip()
-        if not discord_token or discord_token == "replace-with-your-discord-bot-token":
+        if require_discord_token and (
+            not discord_token or discord_token == "replace-with-your-discord-bot-token"
+        ):
             raise RuntimeError("DISCORD_TOKEN is required. Add it to your .env file.")
 
         guild_id = os.getenv("DISCORD_GUILD_ID", "").strip()
+        discord_client_id = os.getenv("DISCORD_CLIENT_ID", "").strip()
+        discord_client_secret = os.getenv("DISCORD_CLIENT_SECRET", "").strip()
+        discord_redirect_uri = os.getenv(
+            "DISCORD_REDIRECT_URI",
+            "http://127.0.0.1:8000/auth/discord/callback",
+        ).strip()
         commands_channel_id = os.getenv("COMMANDS_CHANNEL_ID", "").strip()
         exec_status_channel_id = os.getenv("EXEC_STATUS_CHANNEL_ID", "").strip()
         cz_timers_channel_id = os.getenv("CZ_TIMERS_CHANNEL_ID", "").strip()
@@ -53,6 +66,9 @@ class Settings:
 
         return cls(
             discord_token=discord_token,
+            discord_client_id=discord_client_id,
+            discord_client_secret=discord_client_secret,
+            discord_redirect_uri=discord_redirect_uri,
             discord_guild_id=int(guild_id) if guild_id else None,
             commands_channel_id=int(commands_channel_id) if commands_channel_id else None,
             exec_status_channel_id=int(exec_status_channel_id) if exec_status_channel_id else None,
@@ -66,6 +82,8 @@ class Settings:
             database_path=os.getenv("DATABASE_PATH", "data/bot.sqlite3"),
             http_timeout_seconds=int(os.getenv("HTTP_TIMEOUT_SECONDS", "15")),
             cache_ttl_seconds=int(os.getenv("CACHE_TTL_SECONDS", "300")),
+            web_admin_token=os.getenv("WEB_ADMIN_TOKEN", "").strip(),
+            web_session_secret=os.getenv("WEB_SESSION_SECRET", "").strip(),
         )
 
 
