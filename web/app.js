@@ -618,6 +618,7 @@ async function loadMe() {
 
 function setAdminVisibility(canManageAdmin) {
   document.querySelectorAll("[data-admin-only]").forEach((element) => element.remove());
+  document.querySelector(".tabs")?.classList.toggle("without-audit", !canManageAdmin);
   if (!canManageAdmin) {
     if (document.querySelector("#admin.tab-panel.active")) activateTab("overview");
     return;

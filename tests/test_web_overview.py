@@ -86,6 +86,9 @@ def test_audit_navigation_is_revealed_only_for_authorized_users() -> None:
     assert "if (currentUser.can_manage_admin) await loadAudit();" in javascript
     assert '\nloadAudit();\n' not in javascript
     assert 'document.querySelectorAll("[data-admin-only]").forEach((element) => element.remove())' in javascript
+    assert 'classList.toggle("without-audit", !canManageAdmin)' in javascript
+    assert ".app-shell.overview-mode .tabs.without-audit" in css
+    assert "justify-content: space-between;" in css
 
 
 def test_overview_does_not_expose_internal_system_information() -> None:
