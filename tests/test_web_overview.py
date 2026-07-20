@@ -4,6 +4,16 @@ from pathlib import Path
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 
+def test_home_page_uses_companion_branding_and_guidance() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert '<h1 class="companion-title">Star Citizen Companion</h1>' in html
+    assert "Game Assist Control Deck" not in html
+    assert "Star Citizen Discord Companion" not in html
+    assert "Welcome to your home page" in html
+    assert "Select a destination below to get started." in html
+
+
 def test_overview_exposes_all_primary_destinations() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
