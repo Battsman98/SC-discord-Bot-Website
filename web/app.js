@@ -2,7 +2,6 @@ const userPanel = document.querySelector("#userPanel");
 const loadingTemplate = document.querySelector("#loadingTemplate");
 
 const outputs = {
-  health: document.querySelector("#healthOutput"),
   lookup: document.querySelector("#lookupOutput"),
   savedShips: document.querySelector("#savedShipsOutput"),
   trade: document.querySelector("#tradeOutput"),
@@ -48,7 +47,7 @@ const homeBackgroundLayers = Array.from(document.querySelectorAll(".home-backgro
 const homeSlideButtons = Array.from(document.querySelectorAll("[data-home-slide]"));
 const homeCarouselToggle = document.querySelector("[data-home-carousel-toggle]");
 const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-let homeSlideIndex = 0;
+let homeSlideIndex = Math.floor(Math.random() * homeBackgrounds.length);
 let homeLayerIndex = 0;
 let homeCarouselTimer = null;
 let homeCarouselPaused = reduceMotionQuery.matches;
@@ -117,7 +116,7 @@ window.addEventListener("resize", () => {
   homeResizeTimer = window.setTimeout(() => showHomeBackground(homeSlideIndex, true), 150);
 });
 
-showHomeBackground(0, true);
+showHomeBackground(homeSlideIndex, true);
 updateHomeSlideControls();
 restartHomeCarousel();
 
@@ -566,18 +565,6 @@ function renderTrade(route) {
     ["Legs", route.legs.map((leg) => `${escapeHtml(leg.commodity_name)}: ${escapeHtml(leg.buy_terminal)} to ${escapeHtml(leg.sell_terminal)}, ${money(leg.profit)} profit`).join("<br>")],
     ["Empty return", route.requires_empty_return_to_start ? "Required" : "No"],
   ]);
-}
-
-async function loadHealth() {
-  try {
-    const health = await api("/api/health");
-    outputs.health.innerHTML = [
-      metric("Status", health.status),
-      metric("Discord auth", health.discord_auth_enabled ? "Enabled" : "Needs setup"),
-    ].join("");
-  } catch (error) {
-    outputs.health.innerHTML = errorMessage(error.message);
-  }
 }
 
 async function loadMe() {
@@ -2167,7 +2154,6 @@ function cssEscape(value) {
   return String(value).replace(/["\\]/g, "\\$&");
 }
 
-loadHealth();
 loadMe();
 loadShipFacets();
 loadTimers();
