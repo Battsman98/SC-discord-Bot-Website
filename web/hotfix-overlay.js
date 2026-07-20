@@ -55,7 +55,7 @@
   window.fetch = async (...args) => {
     try {
       const response = await originalFetch(...args);
-      if (Date.now() <= userAttemptUntil && response.status >= 500) showPotentialHotfix();
+      if (Date.now() <= userAttemptUntil && !response.ok) showPotentialHotfix();
       return response;
     } catch (error) {
       if (Date.now() <= userAttemptUntil) showPotentialHotfix();
