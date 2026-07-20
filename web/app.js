@@ -586,6 +586,7 @@ function renderTrade(route) {
 async function loadMe() {
   try {
     currentUser = await api("/api/me");
+    setAdminVisibility(Boolean(currentUser.authenticated && currentUser.can_manage_admin));
     if (!currentUser.authenticated) {
       userPanel.innerHTML = `<div class="user-row">
         <span>${currentUser.discord_auth_enabled ? "Not signed in" : "Discord OAuth needs setup"}</span>
@@ -608,8 +609,29 @@ async function loadMe() {
     await loadSavedShips();
     await loadSavedBlueprints();
     await loadInventory();
+    if (currentUser.can_manage_admin) await loadAudit();
   } catch (error) {
+    setAdminVisibility(false);
     userPanel.innerHTML = `<span>${escapeHtml(error.message)}</span>`;
+  }
+}
+
+function setAdminVisibility(canManageAdmin) {
+  document.querySelectorAll("[data-admin-only]").forEach((element) => element.remove());
+  if (!canManageAdmin) {
+    if (document.querySelector("#admin.tab-panel.active")) activateTab("overview");
+    return;
+  }
+
+  const tabButton = document.querySelector("#auditTabTemplate")?.content.firstElementChild.cloneNode(true);
+  const overviewButton = document.querySelector("#auditOverviewTemplate")?.content.firstElementChild.cloneNode(true);
+  if (tabButton) {
+    tabButton.addEventListener("click", () => activateTab("admin"));
+    document.querySelector(".tabs")?.append(tabButton);
+  }
+  if (overviewButton) {
+    overviewButton.addEventListener("click", () => activateTab("admin"));
+    document.querySelector(".overview-options")?.append(overviewButton);
   }
 }
 
@@ -2176,7 +2198,6 @@ loadMe();
 loadShipFacets();
 loadTimers();
 loadCommands();
-loadAudit();
 setInterval(loadTimers, 60_000);
 
 async function loadShipFacets() {

@@ -72,6 +72,22 @@ def test_overview_exposes_all_primary_destinations() -> None:
         assert f'data-overview-tab="{tab_id}"' in html
 
 
+def test_audit_navigation_is_revealed_only_for_authorized_users() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    tabs_markup = html.split('<nav class="tabs"', 1)[1].split("</nav>", 1)[0]
+    overview_markup = html.split('<nav class="overview-options"', 1)[1].split("</nav>", 1)[0]
+    assert 'data-tab="admin"' not in tabs_markup
+    assert 'data-overview-tab="admin"' not in overview_markup
+    assert html.count("data-admin-only") == 2
+    assert "setAdminVisibility(Boolean(currentUser.authenticated && currentUser.can_manage_admin))" in javascript
+    assert "if (currentUser.can_manage_admin) await loadAudit();" in javascript
+    assert '\nloadAudit();\n' not in javascript
+    assert 'document.querySelectorAll("[data-admin-only]").forEach((element) => element.remove())' in javascript
+
+
 def test_overview_does_not_expose_internal_system_information() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
 

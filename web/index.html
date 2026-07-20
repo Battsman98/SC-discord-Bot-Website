@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260720-rsi-overview">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260720-audit-permissions-v2">
 </head>
 <body data-mfd-theme="overview">
   <header class="topbar">
@@ -25,7 +25,6 @@
       <button data-tab="inventory">Inventory</button>
       <button data-tab="timers">Timers</button>
       <button data-tab="commands">Commands</button>
-      <button data-tab="admin">Audit</button>
     </nav>
 
     <section id="overview" class="tab-panel active">
@@ -42,7 +41,6 @@
         <button type="button" data-overview-tab="inventory"><span>Inventory</span><small>Track items across locations</small></button>
         <button type="button" data-overview-tab="timers"><span>Timers</span><small>View event and zone timers</small></button>
         <button type="button" data-overview-tab="commands"><span>Commands</span><small>Browse the command directory</small></button>
-        <button type="button" data-overview-tab="admin"><span>Audit</span><small>Review recent audit events</small></button>
       </nav>
       <div class="home-background" aria-hidden="true">
         <div class="home-background-layer active"></div>
@@ -364,6 +362,13 @@
     <div class="state">Loading...</div>
   </template>
 
-  <script src="/assets/app.js?v=20260720-compact-overview" defer></script>
+  <template id="auditTabTemplate">
+    <button data-tab="admin" data-admin-only>Audit</button>
+  </template>
+  <template id="auditOverviewTemplate">
+    <button type="button" data-overview-tab="admin" data-admin-only><span>Audit</span><small>Review recent audit events</small></button>
+  </template>
+
+  <script src="/assets/app.js?v=20260720-audit-permissions-v2" defer></script>
 </body>
 </html>
