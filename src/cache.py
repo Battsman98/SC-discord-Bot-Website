@@ -310,15 +310,23 @@ class SQLiteCache:
         category: str | None = None,
         query: str | None = None,
         sort_by: str = "name",
+        item_type: str | None = None,
+        item_size: str | None = None,
     ) -> list[dict[str, Any]]:
         clauses = ["user_id = ?"]
         values: list[Any] = [user_id]
         if location:
-            clauses.append("location = ?")
+            clauses.append("LOWER(TRIM(location)) = LOWER(TRIM(?))")
             values.append(location)
         if category:
-            clauses.append("category = ?")
+            clauses.append("LOWER(TRIM(category)) = LOWER(TRIM(?))")
             values.append(category)
+        if item_type:
+            clauses.append("LOWER(TRIM(item_type)) = LOWER(TRIM(?))")
+            values.append(item_type)
+        if item_size:
+            clauses.append("LOWER(TRIM(item_size)) = LOWER(TRIM(?))")
+            values.append(item_size)
         if query:
             clauses.append("(item_name LIKE ? OR notes LIKE ?)")
             pattern = f"%{query}%"
@@ -528,6 +536,8 @@ class SQLiteCache:
         return {
             "locations": values_for("location"),
             "categories": values_for("category"),
+            "item_types": values_for("item_type"),
+            "item_sizes": values_for("item_size"),
         }
 
     async def close(self) -> None:

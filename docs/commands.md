@@ -299,6 +299,32 @@ Examples:
 /item search section:Vehicle Weapons category:Guns
 ```
 
+## `/inventory search`
+
+Searches the inventory saved through the website for the Discord account running the command. Results are ephemeral, so only the requesting user can see their inventory.
+
+The bot creates or reuses a dedicated `#inventory-search` channel when it starts. Use the command there.
+
+| Option | Required | Description |
+|---|---:|---|
+| `item` | No | Item name or notes to search. |
+| `station` | No | Exact station or inventory location. |
+| `category` | No | Exact inventory category. |
+| `item_type` | No | Exact item type. |
+| `size` | No | Exact item size. |
+| `sort_by` | No | Sort by name, station, category, quantity, or update time. |
+
+Station, category, item type, size, and item name provide suggestions from the requesting user's website inventory.
+
+Examples:
+
+```text
+/inventory search station:Everus Harbor
+/inventory search item:FS-9
+/inventory search category:Personal Weapons item_type:Attachments
+/inventory search size:1 sort_by:Station
+```
+
 ## `/exec`
 
 Shows the current Executive Hangar clock.

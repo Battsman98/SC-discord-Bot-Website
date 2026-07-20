@@ -234,6 +234,8 @@ def test_user_inventory_round_trip_and_transfer(tmp_path) -> None:
         assert await cache.user_inventory_facets(42) == {
             "locations": ["Everus Harbor"],
             "categories": ["Weapons"],
+            "item_types": [],
+            "item_sizes": [],
         }
 
         assert await cache.transfer_user_inventory_item(42, item_id, "Seraphim Station")
@@ -242,6 +244,47 @@ def test_user_inventory_round_trip_and_transfer(tmp_path) -> None:
 
         assert await cache.delete_user_inventory_item(42, item_id)
         assert await cache.user_inventory_items(42) == []
+        await cache.close()
+
+    asyncio.run(run())
+
+
+def test_user_inventory_filters_type_size_and_case_insensitive_station(tmp_path) -> None:
+    async def run() -> None:
+        cache = await SQLiteCache.create(str(tmp_path / "bot.sqlite3"))
+        await cache.save_user_inventory_item(
+            user_id=42,
+            item_name="250-E Laser Pointer",
+            category="Personal Weapons",
+            location="Everus Harbor",
+            quantity=3,
+            item_type="Attachments",
+            item_size="1",
+        )
+        await cache.save_user_inventory_item(
+            user_id=42,
+            item_name="FS-9 LMG",
+            category="Personal Weapons",
+            location="Port Tressler",
+            quantity=1,
+            item_type="Weapons",
+            item_size="2",
+        )
+
+        matches = await cache.user_inventory_items(
+            42,
+            location=" everus harbor ",
+            category="personal weapons",
+            item_type="attachments",
+            item_size="1",
+        )
+        assert [item["name"] for item in matches] == ["250-E Laser Pointer"]
+        assert await cache.user_inventory_facets(42) == {
+            "locations": ["Everus Harbor", "Port Tressler"],
+            "categories": ["Personal Weapons"],
+            "item_types": ["Attachments", "Weapons"],
+            "item_sizes": ["1", "2"],
+        }
         await cache.close()
 
     asyncio.run(run())

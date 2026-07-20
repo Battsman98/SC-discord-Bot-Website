@@ -3,10 +3,12 @@ from types import SimpleNamespace
 import discord
 
 from src.bot import (
+    build_inventory_search_embed,
     build_command_channel_directory_embed,
     _format_interaction_options,
     _interaction_command_name,
     _message_embed_matches,
+    inventory_group,
 )
 from src.config import Settings
 
@@ -88,3 +90,29 @@ def test_message_embed_matches_existing_embed_payload() -> None:
 
     changed_embed = discord.Embed(title="Discord Bot Commands - /mining", description="Updated help")
     assert not _message_embed_matches(message, changed_embed)
+
+
+def test_inventory_search_command_is_registered() -> None:
+    assert inventory_group.get_command("search") is not None
+
+
+def test_inventory_search_embed_shows_station_and_item_metadata() -> None:
+    embed = build_inventory_search_embed(
+        [
+            {
+                "name": "250-E Laser Pointer",
+                "location": "Everus Harbor",
+                "quantity": 3,
+                "category": "Personal Weapons",
+                "item_type": "Attachments",
+                "item_size": "1",
+            }
+        ],
+        station="Everus Harbor",
+        item_type="Attachments",
+    )
+
+    assert "Station: Everus Harbor" in embed.description
+    assert "250-E Laser Pointer" in embed.description
+    assert "Personal Weapons / Attachments / Size 1" in embed.description
+    assert "Showing 1 of 1 matching item" in embed.footer.text

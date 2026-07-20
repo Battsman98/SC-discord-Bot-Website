@@ -45,6 +45,8 @@ CZ_TIMER_DEFINITIONS = {
     "red_keycard": ("Red Keycards", 30 * 60),
     "timer_door": ("Timer Doors", 20 * 60),
 }
+INVENTORY_CHANNEL_CACHE_KEY = "discord:inventory-search-channel-id"
+INVENTORY_CHANNEL_NAME = "inventory-search"
 
 
 class GameAssistCommandTree(app_commands.CommandTree):
@@ -57,6 +59,8 @@ class GameAssistCommandTree(app_commands.CommandTree):
         allowed_channel_id = bot.settings.command_channel_ids.get(command_name)
         if allowed_channel_id is None and command_name == "item search":
             allowed_channel_id = bot.settings.command_channel_ids.get("item locator")
+        if command_name == "inventory search" and bot.inventory_channel_id:
+            allowed_channel_id = bot.inventory_channel_id
         if allowed_channel_id and interaction.channel_id != allowed_channel_id:
             await bot.log_audit_event(
                 "Command Blocked",
@@ -103,6 +107,7 @@ class GameAssistBot(commands.Bot):
         self.sources = sources
         self.started_at_unix = int(discord.utils.utcnow().timestamp())
         self._commands_reference_synced = False
+        self.inventory_channel_id: int | None = None
         self._exec_status_task: asyncio.Task | None = None
         self._cz_timers_task: asyncio.Task | None = None
 
@@ -116,6 +121,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(miningadd_command)
         self.tree.add_command(blueprint_command)
         self.tree.add_command(item_group)
+        self.tree.add_command(inventory_group)
         self.tree.add_command(exec_command)
         self.tree.add_command(execset_command)
         self.tree.add_command(execclear_command)
@@ -138,6 +144,7 @@ class GameAssistBot(commands.Bot):
             return
 
         self._commands_reference_synced = True
+        await self.ensure_inventory_search_channel()
         await self.sync_commands_reference_message()
         await self.sync_exec_status_message()
         await self.sync_cz_timers_message()
@@ -146,6 +153,48 @@ class GameAssistBot(commands.Bot):
             self._exec_status_task = asyncio.create_task(self._exec_status_loop())
         if self.settings.cz_timers_channel_id and self._cz_timers_task is None:
             self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
+
+    async def ensure_inventory_search_channel(self) -> None:
+        if not self.settings.discord_guild_id:
+            logging.warning("Cannot create the inventory search channel without DISCORD_GUILD_ID")
+            return
+
+        cached_channel_id = await self.cache.get(INVENTORY_CHANNEL_CACHE_KEY)
+        if isinstance(cached_channel_id, int):
+            channel = self.get_channel(cached_channel_id)
+            if channel is None:
+                try:
+                    channel = await self.fetch_channel(cached_channel_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    channel = None
+            if isinstance(channel, discord.TextChannel):
+                self.inventory_channel_id = channel.id
+                return
+
+        try:
+            guild = self.get_guild(self.settings.discord_guild_id)
+            if guild is None:
+                guild = await self.fetch_guild(self.settings.discord_guild_id)
+            channels = await guild.fetch_channels()
+            channel = next(
+                (
+                    candidate
+                    for candidate in channels
+                    if isinstance(candidate, discord.TextChannel) and candidate.name == INVENTORY_CHANNEL_NAME
+                ),
+                None,
+            )
+            if channel is None:
+                channel = await guild.create_text_channel(
+                    INVENTORY_CHANNEL_NAME,
+                    topic="Search your website inventory with /inventory search. Results are private.",
+                    reason="Dedicated website inventory search channel",
+                )
+                logging.info("Created Discord inventory search channel %s", channel.id)
+            self.inventory_channel_id = channel.id
+            await self.cache.set(INVENTORY_CHANNEL_CACHE_KEY, channel.id, 315360000)
+        except (discord.Forbidden, discord.HTTPException):
+            logging.exception("Could not create or locate the Discord inventory search channel")
 
     async def _exec_status_loop(self) -> None:
         while not self.is_closed():
@@ -1460,6 +1509,98 @@ class ItemLocatorSelectView(discord.ui.View):
         )
 
 
+inventory_group = app_commands.Group(name="inventory", description="Search your website inventory.")
+
+
+@inventory_group.command(name="search", description="Search the inventory saved through the website.")
+@app_commands.describe(
+    item="Item name or notes to search.",
+    station="Station or inventory location.",
+    category="Inventory category.",
+    item_type="Item type.",
+    size="Item size.",
+    sort_by="How to order the results.",
+)
+@app_commands.choices(
+    sort_by=[
+        app_commands.Choice(name="Item name", value="name"),
+        app_commands.Choice(name="Station", value="location"),
+        app_commands.Choice(name="Category", value="category"),
+        app_commands.Choice(name="Quantity", value="quantity"),
+        app_commands.Choice(name="Recently updated", value="updated"),
+    ]
+)
+async def inventory_search_command(
+    interaction: discord.Interaction,
+    item: str | None = None,
+    station: str | None = None,
+    category: str | None = None,
+    item_type: str | None = None,
+    size: str | None = None,
+    sort_by: app_commands.Choice[str] | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    results = await bot.cache.user_inventory_items(
+        interaction.user.id,
+        location=station,
+        category=category,
+        query=item,
+        sort_by=sort_by.value if sort_by else "name",
+        item_type=item_type,
+        item_size=size,
+    )
+    if not results:
+        await interaction.followup.send(
+            "No items in your website inventory matched those filters. Sign into the website with this Discord account to add inventory.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.followup.send(
+        embed=build_inventory_search_embed(results, item, station, category, item_type, size),
+        ephemeral=True,
+    )
+
+
+@inventory_search_command.autocomplete("item")
+@inventory_search_command.autocomplete("station")
+@inventory_search_command.autocomplete("category")
+@inventory_search_command.autocomplete("item_type")
+@inventory_search_command.autocomplete("size")
+async def inventory_search_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+
+    focused = _focused_option_name(interaction)
+    if focused == "item":
+        inventory = await bot.cache.user_inventory_items(interaction.user.id)
+        values = sorted({str(row["name"]) for row in inventory if row.get("name")}, key=str.casefold)
+    else:
+        facets = await bot.cache.user_inventory_facets(interaction.user.id)
+        values = facets.get(
+            {
+                "station": "locations",
+                "category": "categories",
+                "item_type": "item_types",
+                "size": "item_sizes",
+            }.get(focused, ""),
+            [],
+        )
+
+    normalized = current.strip().casefold()
+    matches = [value for value in values if not normalized or normalized in value.casefold()]
+    return [app_commands.Choice(name=value[:100], value=value[:100]) for value in matches[:25]]
+
+
 trade_group = app_commands.Group(name="trade", description="Trade planning tools.")
 
 
@@ -2357,6 +2498,51 @@ def build_item_locator_embed(
     )
     embed.add_field(name="Purchase Locations", value=_format_item_purchase_locations(result.purchases), inline=False)
     embed.set_footer(text=f"Source: {result.source_name}")
+    return embed
+
+
+def build_inventory_search_embed(
+    results: list[dict],
+    item: str | None = None,
+    station: str | None = None,
+    category: str | None = None,
+    item_type: str | None = None,
+    size: str | None = None,
+) -> discord.Embed:
+    filters = [
+        _line("Item", item),
+        _line("Station", station),
+        _line("Category", category),
+        _line("Type", item_type),
+        _line("Size", size),
+    ]
+    filter_text = "\n".join(line for line in filters if line)
+    lines: list[str] = []
+    shown = 0
+    for row in results:
+        name = discord.utils.escape_markdown(str(row.get("name") or "Unknown item"))
+        location = discord.utils.escape_markdown(str(row.get("location") or "Unknown location"))
+        details = [row.get("category"), row.get("item_type")]
+        if row.get("item_size"):
+            details.append(f"Size {row['item_size']}")
+        detail_text = " / ".join(discord.utils.escape_markdown(str(value)) for value in details if value)
+        line = f"**{name}** × {_format_number(row.get('quantity'))} — {location}"
+        if detail_text:
+            line = f"{line}\n{detail_text}"
+        candidate = "\n".join([*lines, line])
+        if len(candidate) > 3600:
+            break
+        lines.append(line)
+        shown += 1
+
+    description_parts = [filter_text, "\n".join(lines)]
+    embed = discord.Embed(
+        title="Your Website Inventory",
+        description="\n\n".join(part for part in description_parts if part),
+        color=discord.Color.blurple(),
+    )
+    footer = f"Showing {shown} of {len(results)} matching item{'s' if len(results) != 1 else ''}. Results are private to you."
+    embed.set_footer(text=footer)
     return embed
 
 
