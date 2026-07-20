@@ -24,6 +24,26 @@ def test_site_uses_gunmetal_and_amber_palette() -> None:
     assert "--accent-2: #ffc247;" in css
 
 
+def test_home_page_rotates_official_responsive_fankit_wallpapers() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'class="home-background"' in html
+    assert 'src="/assets/media/home/made-by-community.png"' in html
+    assert 'const homeBackgrounds = ["10", "25", "32", "34"]' in javascript
+    assert 'return "mobile"' in javascript
+    assert 'return "tablet"' in javascript
+    assert 'return "wide"' in javascript
+    assert "prefers-reduced-motion: reduce" in javascript
+
+
+def test_fankit_trademark_notice_is_visible_on_the_home_page() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert "This site is not endorsed by or affiliated with the Cloud Imperium or Roberts Space Industries group of companies." in html
+    assert "Star Citizen®, Squadron 42®, Roberts Space Industries®, and Cloud Imperium®" in html
+
+
 def test_overview_exposes_all_primary_destinations() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
 

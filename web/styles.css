@@ -20,6 +20,8 @@
 body {
   min-height: 100vh;
   margin: 0;
+  display: flex;
+  flex-direction: column;
   color: var(--text);
   background:
     linear-gradient(120deg, rgba(228, 154, 24, 0.09), transparent 34%),
@@ -149,6 +151,8 @@ button:hover, .button-link:hover, .tabs button.active {
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 22px;
   padding: 22px clamp(16px, 4vw, 48px) 48px;
+  width: 100%;
+  flex: 1;
 }
 
 .site-footer {
@@ -187,14 +191,68 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .app-shell.overview-mode {
   grid-template-columns: minmax(0, 1fr);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: clamp(680px, calc(100dvh - 190px), 1100px);
 }
 
 .app-shell.overview-mode .tabs {
   display: none;
 }
 
+.home-background {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #050505;
+}
+
+.app-shell:not(.overview-mode) .home-background {
+  display: none;
+}
+
+.home-background-layer,
+.home-background-shade {
+  position: absolute;
+  inset: 0;
+}
+
+.home-background-layer {
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+  transform: scale(1.01);
+  transition: opacity 1.2s ease;
+}
+
+.home-background-layer.active {
+  opacity: 1;
+}
+
+.home-background-shade {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.42) 52%, rgba(0, 0, 0, 0.62)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.74));
+}
+
+.community-mark {
+  position: absolute;
+  right: clamp(14px, 2vw, 30px);
+  bottom: clamp(14px, 2vw, 30px);
+  width: clamp(96px, 10vw, 150px);
+  height: auto;
+  opacity: 0.65;
+}
+
+#overview {
+  width: min(100%, 1600px);
+  margin-inline: auto;
+}
+
 .overview-heading {
   margin-bottom: 18px;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
 }
 
 .overview-heading h2 {
@@ -221,8 +279,10 @@ button:hover, .button-link:hover, .tabs button.active {
   align-items: flex-start;
   justify-content: center;
   text-align: left;
-  background: linear-gradient(145deg, rgba(45, 48, 51, 0.98), rgba(20, 20, 20, 0.96));
+  background: linear-gradient(145deg, rgba(45, 48, 51, 0.9), rgba(12, 12, 12, 0.88));
   border-color: var(--line);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
 .overview-options button:hover,
@@ -252,6 +312,46 @@ button:hover, .button-link:hover, .tabs button.active {
 .overview-details {
   margin-top: 22px;
   border-top: 1px solid var(--line);
+}
+
+.home-carousel-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.home-carousel-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.home-carousel-dots button {
+  width: 11px;
+  min-height: 11px;
+  height: 11px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: rgba(232, 233, 233, 0.75);
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.home-carousel-dots button.active,
+.home-carousel-dots button:hover {
+  background: var(--accent);
+  border-color: var(--accent-2);
+}
+
+.home-carousel-toggle {
+  min-height: 30px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 0.75rem;
+}
+
+.fankit-notice {
+  font-size: max(10pt, 0.84rem);
 }
 
 .overview-details > summary {
@@ -1201,6 +1301,10 @@ article.tool-panel.active {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .app-shell.overview-mode {
+    min-height: clamp(760px, calc(100dvh - 210px), 1250px);
+  }
+
   .field-row, .two-column .field-row, .inline-form, .inventory-filters {
     grid-template-columns: 1fr;
   }
@@ -1276,12 +1380,29 @@ article.tool-panel.active {
 }
 
 @media (max-width: 680px) {
+  .app-shell.overview-mode {
+    min-height: calc(100dvh - 180px);
+    padding-bottom: 96px;
+  }
+
   .overview-options {
     grid-template-columns: 1fr;
   }
 
   .overview-options button {
     min-height: 88px;
+  }
+
+  .community-mark {
+    width: 92px;
+  }
+
+  .home-background-shade {
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.48), rgba(0, 0, 0, 0.82));
+  }
+
+  .home-carousel-controls {
+    justify-content: flex-start;
   }
 
   .inventory-card-main,
@@ -1291,5 +1412,11 @@ article.tool-panel.active {
 
   .inventory-actions button {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-background-layer {
+    transition: none;
   }
 }

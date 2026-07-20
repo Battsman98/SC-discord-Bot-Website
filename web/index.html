@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260720-rsi-palette">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260720-home-carousel">
 </head>
 <body>
   <header class="topbar">
@@ -15,6 +15,12 @@
   </header>
 
   <main class="app-shell overview-mode">
+    <div class="home-background" aria-hidden="true">
+      <div class="home-background-layer active"></div>
+      <div class="home-background-layer"></div>
+      <div class="home-background-shade"></div>
+      <img class="community-mark" src="/assets/media/home/made-by-community.png" alt="">
+    </div>
     <nav class="tabs" aria-label="Website sections">
       <button class="active" data-tab="overview">Overview</button>
       <button data-tab="lookup">Ships</button>
@@ -44,6 +50,15 @@
         <button type="button" data-overview-tab="commands"><span>Commands</span><small>Browse the command directory</small></button>
         <button type="button" data-overview-tab="admin"><span>Audit</span><small>Review recent audit events</small></button>
       </nav>
+      <div class="home-carousel-controls" aria-label="Home background controls">
+        <div class="home-carousel-dots" role="group" aria-label="Choose background">
+          <button type="button" class="active" data-home-slide="0" aria-label="Show background 1" aria-pressed="true"></button>
+          <button type="button" data-home-slide="1" aria-label="Show background 2" aria-pressed="false"></button>
+          <button type="button" data-home-slide="2" aria-label="Show background 3" aria-pressed="false"></button>
+          <button type="button" data-home-slide="3" aria-label="Show background 4" aria-pressed="false"></button>
+        </div>
+        <button type="button" class="home-carousel-toggle" data-home-carousel-toggle aria-label="Pause background rotation">Pause</button>
+      </div>
       <details class="overview-details">
         <summary>System and shared logic</summary>
         <div class="dashboard-grid">
@@ -343,6 +358,7 @@
 
   <footer class="site-footer">
     <p>This is an unofficial Star Citizen fan site, not affiliated with the Cloud Imperium group of companies. All content on this site not authored by its host or users are property of their respective owners.</p>
+    <p class="fankit-notice">This site is not endorsed by or affiliated with the Cloud Imperium or Roberts Space Industries group of companies. All game content and materials are copyright Cloud Imperium Rights LLC and Cloud Imperium Rights Ltd. Star Citizen®, Squadron 42®, Roberts Space Industries®, and Cloud Imperium® are registered trademarks of Cloud Imperium Rights LLC. All rights reserved.</p>
     <a href="https://robertsspaceindustries.com/" target="_blank" rel="noopener noreferrer">Visit the official Roberts Space Industries website</a>
   </footer>
 
@@ -350,6 +366,6 @@
     <div class="state">Loading...</div>
   </template>
 
-  <script src="/assets/app.js?v=20260720-home-copy" defer></script>
+  <script src="/assets/app.js?v=20260720-home-carousel" defer></script>
 </body>
 </html>
