@@ -30,7 +30,7 @@ def test_home_page_rotates_official_responsive_fankit_wallpapers() -> None:
 
     assert 'class="home-background"' in html
     assert 'src="/assets/media/home/made-by-community.png"' in html
-    assert 'const homeBackgrounds = ["10", "25", "29", "30", "31", "32", "34", "36"]' in javascript
+    assert '"10", "25", "29", "30", "31", "32", "34", "36"' in javascript
     assert html.index('class="overview-options"') < html.index('class="home-background"') < html.index('class="overview-details"')
     assert 'return "mobile"' in javascript
     assert 'return "tablet"' in javascript
@@ -39,6 +39,8 @@ def test_home_page_rotates_official_responsive_fankit_wallpapers() -> None:
     for image_id in ("10", "25", "29", "30", "31", "32", "34", "36"):
         for size in ("wide", "tablet", "mobile"):
             assert (WEB_DIR / "media" / "home" / f"sc-{image_id}-{size}.jpg").is_file()
+    for image_id in range(1, 10):
+        assert (WEB_DIR / "media" / "home" / f"user-{image_id:02}.webp").is_file()
 
 
 def test_fankit_trademark_notice_is_visible_on_the_home_page() -> None:
