@@ -303,7 +303,7 @@ Examples:
 
 Searches the inventory saved through the website for the Discord account running the command. Results are ephemeral, so only the requesting user can see their inventory.
 
-The bot creates or reuses a dedicated `#inventory-search` channel when it starts. Use the command there.
+The command can only be used in Discord channel `1528623944947597383`. Attempts elsewhere are blocked with a link to the correct channel.
 
 | Option | Required | Description |
 |---|---:|---|

@@ -45,8 +45,7 @@ CZ_TIMER_DEFINITIONS = {
     "red_keycard": ("Red Keycards", 30 * 60),
     "timer_door": ("Timer Doors", 20 * 60),
 }
-INVENTORY_CHANNEL_CACHE_KEY = "discord:inventory-search-channel-id"
-INVENTORY_CHANNEL_NAME = "inventory-search"
+INVENTORY_CHANNEL_ID = 1528623944947597383
 
 
 class GameAssistCommandTree(app_commands.CommandTree):
@@ -107,7 +106,7 @@ class GameAssistBot(commands.Bot):
         self.sources = sources
         self.started_at_unix = int(discord.utils.utcnow().timestamp())
         self._commands_reference_synced = False
-        self.inventory_channel_id: int | None = None
+        self.inventory_channel_id: int = INVENTORY_CHANNEL_ID
         self._exec_status_task: asyncio.Task | None = None
         self._cz_timers_task: asyncio.Task | None = None
 
@@ -155,46 +154,17 @@ class GameAssistBot(commands.Bot):
             self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
 
     async def ensure_inventory_search_channel(self) -> None:
-        if not self.settings.discord_guild_id:
-            logging.warning("Cannot create the inventory search channel without DISCORD_GUILD_ID")
-            return
-
-        cached_channel_id = await self.cache.get(INVENTORY_CHANNEL_CACHE_KEY)
-        if isinstance(cached_channel_id, int):
-            channel = self.get_channel(cached_channel_id)
-            if channel is None:
-                try:
-                    channel = await self.fetch_channel(cached_channel_id)
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    channel = None
-            if isinstance(channel, discord.TextChannel):
-                self.inventory_channel_id = channel.id
-                return
-
         try:
-            guild = self.get_guild(self.settings.discord_guild_id)
-            if guild is None:
-                guild = await self.fetch_guild(self.settings.discord_guild_id)
-            channels = await guild.fetch_channels()
-            channel = next(
-                (
-                    candidate
-                    for candidate in channels
-                    if isinstance(candidate, discord.TextChannel) and candidate.name == INVENTORY_CHANNEL_NAME
-                ),
-                None,
-            )
-            if channel is None:
-                channel = await guild.create_text_channel(
-                    INVENTORY_CHANNEL_NAME,
-                    topic="Search your website inventory with /inventory search. Results are private.",
-                    reason="Dedicated website inventory search channel",
-                )
-                logging.info("Created Discord inventory search channel %s", channel.id)
-            self.inventory_channel_id = channel.id
-            await self.cache.set(INVENTORY_CHANNEL_CACHE_KEY, channel.id, 315360000)
-        except (discord.Forbidden, discord.HTTPException):
-            logging.exception("Could not create or locate the Discord inventory search channel")
+            channel = self.get_channel(INVENTORY_CHANNEL_ID) or await self.fetch_channel(INVENTORY_CHANNEL_ID)
+            if not isinstance(channel, discord.TextChannel):
+                logging.error("INVENTORY_CHANNEL_ID %s is not a Discord text channel", INVENTORY_CHANNEL_ID)
+                return
+            if self.settings.discord_guild_id and channel.guild.id != self.settings.discord_guild_id:
+                logging.error("INVENTORY_CHANNEL_ID %s is not in the configured guild", INVENTORY_CHANNEL_ID)
+                return
+            logging.info("Inventory search restricted to Discord channel %s", INVENTORY_CHANNEL_ID)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.exception("Could not access inventory search channel %s", INVENTORY_CHANNEL_ID)
 
     async def _exec_status_loop(self) -> None:
         while not self.is_closed():
