@@ -1,13 +1,13 @@
 :root {
   color-scheme: dark;
-  --bg: #0d1114;
-  --surface: #151b20;
-  --surface-2: #1e272d;
-  --line: #31404a;
-  --text: #ecf2f4;
-  --muted: #9baab1;
-  --accent: #43d2b5;
-  --accent-2: #f3b36a;
+  --bg: #050505;
+  --surface: #17191b;
+  --surface-2: #292d30;
+  --line: #555a5e;
+  --text: #e8e9e9;
+  --muted: #a9adb0;
+  --accent: #e49a18;
+  --accent-2: #ffc247;
   --danger: #f06d6d;
   --radius: 8px;
   font-family: Inter, "Segoe UI", Arial, sans-serif;
@@ -22,8 +22,8 @@ body {
   margin: 0;
   color: var(--text);
   background:
-    linear-gradient(120deg, rgba(67, 210, 181, 0.08), transparent 34%),
-    linear-gradient(180deg, #10161a 0%, var(--bg) 36%, #090c0e 100%);
+    linear-gradient(120deg, rgba(228, 154, 24, 0.09), transparent 34%),
+    linear-gradient(180deg, #111214 0%, var(--bg) 36%, #000 100%);
 }
 
 .topbar {
@@ -33,7 +33,7 @@ body {
   gap: 20px;
   padding: 24px clamp(16px, 4vw, 48px) 18px;
   border-bottom: 1px solid var(--line);
-  background: rgba(13, 17, 20, 0.82);
+  background: rgba(5, 5, 5, 0.88);
   position: sticky;
   top: 0;
   z-index: 3;
@@ -105,7 +105,7 @@ input, select, button, .button-link {
   min-height: 40px;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0e1418;
+  background: #0b0c0d;
   color: var(--text);
   padding: 9px 11px;
   font: inherit;
@@ -114,8 +114,8 @@ input, select, button, .button-link {
 button, .button-link {
   width: auto;
   cursor: pointer;
-  border-color: rgba(67, 210, 181, 0.5);
-  background: #14251f;
+  border-color: rgba(228, 154, 24, 0.58);
+  background: #2b2110;
   color: var(--text);
   font-weight: 700;
   text-decoration: none;
@@ -126,7 +126,7 @@ button, .button-link {
 button:hover, .button-link:hover, .tabs button.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #07110f;
+  color: #171006;
 }
 
 .danger-button,
@@ -155,7 +155,7 @@ button:hover, .button-link:hover, .tabs button.active {
   padding: 20px clamp(16px, 4vw, 48px) 28px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  background: rgba(13, 17, 20, 0.82);
+  background: rgba(5, 5, 5, 0.88);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -221,7 +221,7 @@ button:hover, .button-link:hover, .tabs button.active {
   align-items: flex-start;
   justify-content: center;
   text-align: left;
-  background: linear-gradient(145deg, rgba(30, 39, 45, 0.98), rgba(20, 37, 31, 0.9));
+  background: linear-gradient(145deg, rgba(45, 48, 51, 0.98), rgba(20, 20, 20, 0.96));
   border-color: var(--line);
 }
 
@@ -229,7 +229,7 @@ button:hover, .button-link:hover, .tabs button.active {
 .overview-options button:focus-visible {
   background: var(--accent);
   border-color: var(--accent);
-  color: #07110f;
+  color: #171006;
   transform: translateY(-2px);
 }
 
@@ -246,7 +246,7 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .overview-options button:hover small,
 .overview-options button:focus-visible small {
-  color: #18342e;
+  color: #3a290a;
 }
 
 .overview-details {
@@ -281,7 +281,7 @@ button:hover, .button-link:hover, .tabs button.active {
 }
 
 .panel {
-  background: rgba(21, 27, 32, 0.92);
+  background: rgba(23, 25, 27, 0.94);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 18px;
@@ -299,11 +299,11 @@ button:hover, .button-link:hover, .tabs button.active {
 .radar {
   position: relative;
   aspect-ratio: 1;
-  border: 1px solid rgba(67, 210, 181, 0.5);
+  border: 1px solid rgba(228, 154, 24, 0.55);
   border-radius: 50%;
   background:
-    radial-gradient(circle, transparent 0 18%, rgba(67, 210, 181, 0.1) 19% 20%, transparent 21% 42%, rgba(243, 179, 106, 0.12) 43% 44%, transparent 45%),
-    conic-gradient(from 20deg, rgba(67, 210, 181, 0.32), transparent 24%, transparent);
+    radial-gradient(circle, transparent 0 18%, rgba(228, 154, 24, 0.12) 19% 20%, transparent 21% 42%, rgba(201, 205, 208, 0.14) 43% 44%, transparent 45%),
+    conic-gradient(from 20deg, rgba(228, 154, 24, 0.38), transparent 24%, transparent);
   overflow: hidden;
 }
 
@@ -344,7 +344,7 @@ button:hover, .button-link:hover, .tabs button.active {
 .tool-menu button.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #07110f;
+  color: #171006;
 }
 
 .tool-panel {
@@ -412,7 +412,7 @@ article.tool-panel.active {
   aspect-ratio: 1;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0e1418;
+  background: #0b0c0d;
   overflow: hidden;
 }
 
@@ -486,7 +486,7 @@ article.tool-panel.active {
   max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: #0e1418;
+  background: #0b0c0d;
   padding: 6px 8px 6px 12px;
 }
 
@@ -497,7 +497,7 @@ article.tool-panel.active {
   align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0e1418;
+  background: #0b0c0d;
   padding: 10px;
 }
 
@@ -609,7 +609,7 @@ article.tool-panel.active {
   resize: vertical;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0e1418;
+  background: #0b0c0d;
   color: var(--text);
   padding: 9px 11px;
   font: inherit;
@@ -641,7 +641,7 @@ article.tool-panel.active {
   resize: vertical;
   border-radius: 6px;
   border: 1px solid var(--line);
-  background: #0e1418;
+  background: #0b0c0d;
   color: var(--text);
   padding: 9px 11px;
   font: inherit;
@@ -666,7 +666,7 @@ article.tool-panel.active {
   align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0e1418;
+  background: #0b0c0d;
   padding: 12px;
   min-width: 0;
 }
@@ -733,7 +733,7 @@ article.tool-panel.active {
   min-height: 96px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0e1418;
+  background: #0b0c0d;
   overflow: hidden;
   margin: 10px 0;
 }
@@ -803,7 +803,7 @@ article.tool-panel.active {
   align-items: start;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0e1418;
+  background: #0b0c0d;
   padding: 10px;
   min-width: 0;
 }
@@ -912,7 +912,7 @@ article.tool-panel.active {
   grid-column: 1 / -1;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #0e1418;
+  background: #0b0c0d;
   padding: 16px;
   display: grid;
   gap: 12px;
@@ -965,7 +965,7 @@ article.tool-panel.active {
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0e1418;
+  background: #0b0c0d;
   padding: 10px;
 }
 
@@ -983,7 +983,7 @@ article.tool-panel.active {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
-  background: #0e1418;
+  background: #0b0c0d;
 }
 
 .ocr-preview pre {
@@ -999,7 +999,7 @@ article.tool-panel.active {
   gap: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0e1418;
+  background: #0b0c0d;
   padding: 10px;
 }
 
@@ -1045,7 +1045,7 @@ article.tool-panel.active {
 
 .scanner-progress li.accepted {
   border-left-color: var(--accent);
-  background: rgba(67, 210, 181, 0.07);
+  background: rgba(228, 154, 24, 0.08);
 }
 
 .scanner-progress li.review,
@@ -1057,7 +1057,7 @@ article.tool-panel.active {
 .scanner-diagnostics {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #0e1418;
+  background: #0b0c0d;
   padding: 10px;
 }
 
@@ -1065,7 +1065,7 @@ article.tool-panel.active {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 9px 10px;
-  background: #0e1418;
+  background: #0b0c0d;
 }
 
 .scanner-advanced summary,
@@ -1127,7 +1127,7 @@ article.tool-panel.active {
 }
 
 .scanner-diagnostic-row li.accepted {
-  background: rgba(67, 210, 181, 0.08);
+  background: rgba(228, 154, 24, 0.09);
 }
 
 .scanner-diagnostic-row li.rejected {

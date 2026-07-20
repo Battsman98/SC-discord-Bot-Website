@@ -14,6 +14,16 @@ def test_home_page_uses_companion_branding_and_guidance() -> None:
     assert "Select a destination below to get started." in html
 
 
+def test_site_uses_gunmetal_and_amber_palette() -> None:
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert "--bg: #050505;" in css
+    assert "--surface: #17191b;" in css
+    assert "--text: #e8e9e9;" in css
+    assert "--accent: #e49a18;" in css
+    assert "--accent-2: #ffc247;" in css
+
+
 def test_overview_exposes_all_primary_destinations() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
