@@ -40,6 +40,82 @@ document.querySelectorAll("[data-overview-tab]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.overviewTab));
 });
 
+const homeBackgrounds = ["10", "25", "32", "34"];
+const homeBackgroundLayers = Array.from(document.querySelectorAll(".home-background-layer"));
+const homeSlideButtons = Array.from(document.querySelectorAll("[data-home-slide]"));
+const homeCarouselToggle = document.querySelector("[data-home-carousel-toggle]");
+const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+let homeSlideIndex = 0;
+let homeLayerIndex = 0;
+let homeCarouselTimer = null;
+let homeCarouselPaused = reduceMotionQuery.matches;
+
+function homeBackgroundSize() {
+  if (window.matchMedia("(max-width: 680px)").matches) return "mobile";
+  if (window.matchMedia("(max-width: 1200px)").matches) return "tablet";
+  return "wide";
+}
+
+function homeBackgroundUrl(index) {
+  return `/assets/media/home/sc-${homeBackgrounds[index]}-${homeBackgroundSize()}.jpg`;
+}
+
+function updateHomeSlideControls() {
+  homeSlideButtons.forEach((button, index) => {
+    const active = index === homeSlideIndex;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  if (!homeCarouselToggle) return;
+  homeCarouselToggle.textContent = homeCarouselPaused ? "Play" : "Pause";
+  homeCarouselToggle.setAttribute("aria-label", `${homeCarouselPaused ? "Resume" : "Pause"} background rotation`);
+}
+
+function showHomeBackground(index, immediate = false) {
+  if (!homeBackgroundLayers.length) return;
+  homeSlideIndex = (index + homeBackgrounds.length) % homeBackgrounds.length;
+  const nextLayerIndex = immediate ? homeLayerIndex : 1 - homeLayerIndex;
+  const nextLayer = homeBackgroundLayers[nextLayerIndex];
+  const image = new Image();
+  image.addEventListener("load", () => {
+    nextLayer.style.backgroundImage = `url("${image.src}")`;
+    homeBackgroundLayers.forEach((layer, layerIndex) => layer.classList.toggle("active", layerIndex === nextLayerIndex));
+    homeLayerIndex = nextLayerIndex;
+    updateHomeSlideControls();
+  }, { once: true });
+  image.src = homeBackgroundUrl(homeSlideIndex);
+}
+
+function restartHomeCarousel() {
+  window.clearInterval(homeCarouselTimer);
+  homeCarouselTimer = null;
+  if (homeCarouselPaused || reduceMotionQuery.matches) return;
+  homeCarouselTimer = window.setInterval(() => showHomeBackground(homeSlideIndex + 1), 10000);
+}
+
+homeSlideButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    showHomeBackground(Number(button.dataset.homeSlide));
+    restartHomeCarousel();
+  });
+});
+
+homeCarouselToggle?.addEventListener("click", () => {
+  homeCarouselPaused = !homeCarouselPaused;
+  updateHomeSlideControls();
+  restartHomeCarousel();
+});
+
+let homeResizeTimer = null;
+window.addEventListener("resize", () => {
+  window.clearTimeout(homeResizeTimer);
+  homeResizeTimer = window.setTimeout(() => showHomeBackground(homeSlideIndex, true), 150);
+});
+
+showHomeBackground(0, true);
+updateHomeSlideControls();
+restartHomeCarousel();
+
 initToolMenus();
 
 document.querySelectorAll("form[data-action]").forEach((form) => {
