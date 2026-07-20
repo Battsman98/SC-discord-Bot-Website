@@ -53,3 +53,5 @@ services:
         value: "15"
       - key: CACHE_TTL_SECONDS
         value: "300"
+      - key: MAINTENANCE_RESTART_SECONDS
+        value: "86400"
