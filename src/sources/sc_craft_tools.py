@@ -1,4 +1,6 @@
+import json
 import time
+from pathlib import Path
 from urllib.parse import urlencode
 
 import aiohttp
@@ -18,6 +20,7 @@ class SCCraftToolsSource:
         self._session = session
         self._config: dict | None = None
         self._config_expires_at = 0.0
+        self._snapshot: dict | None = None
 
     async def lookup(self, query: str):
         return None
@@ -117,6 +120,9 @@ class SCCraftToolsSource:
             if isinstance(payload_rows, list):
                 rows.extend(row for row in payload_rows if isinstance(row, dict))
 
+        if not rows:
+            rows = self._snapshot_rows(params)
+
         missions = config.get("missions") if isinstance(config, dict) else {}
         results = [
             self._parse_blueprint(row, missions if isinstance(missions, dict) else {})
@@ -132,6 +138,41 @@ class SCCraftToolsSource:
                 self._settings.cache_ttl_seconds,
             )
         return results
+
+    def _snapshot_rows(self, params: dict) -> list[dict]:
+        if self._snapshot is None:
+            path = Path(__file__).resolve().parents[2] / "data" / "blueprints_snapshot.json"
+            try:
+                self._snapshot = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                self._snapshot = {}
+        rows = self._snapshot.get("items") if isinstance(self._snapshot, dict) else []
+        if not isinstance(rows, list):
+            return []
+
+        def contains(value: object, query: object) -> bool:
+            return self._normalize(query) in self._normalize(value)
+
+        matches = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if params.get("search") and not contains(row.get("name"), params["search"]):
+                continue
+            if params.get("category") and not contains(row.get("category"), params["category"]):
+                continue
+            ingredients = row.get("ingredients") if isinstance(row.get("ingredients"), list) else []
+            if params.get("resource") and not any(contains(item.get("name"), params["resource"]) for item in ingredients if isinstance(item, dict)):
+                continue
+            missions = row.get("missions") if isinstance(row.get("missions"), list) else []
+            if params.get("mission_type") and not any(contains(item.get("mission_type"), params["mission_type"]) for item in missions if isinstance(item, dict)):
+                continue
+            if params.get("contractor") and not any(contains(item.get("contractor"), params["contractor"]) for item in missions if isinstance(item, dict)):
+                continue
+            if params.get("location") and not any(contains(item.get("locations"), params["location"]) for item in missions if isinstance(item, dict)):
+                continue
+            matches.append(row)
+        return matches
 
     async def autocomplete_blueprints(self, query: str, limit: int = 25) -> list[str]:
         if not query.strip():
@@ -261,13 +302,14 @@ class SCCraftToolsSource:
         if not isinstance(details, dict):
             details = {}
         min_standing = details.get("min_standing") if isinstance(details.get("min_standing"), dict) else {}
+        row_min_standing = row.get("min_standing") if isinstance(row.get("min_standing"), dict) else {}
         return BlueprintMission(
             name=str(row.get("name") or details.get("name") or "Unknown mission"),
-            contractor=self._string_or_none(details.get("contractor")),
-            mission_type=self._string_or_none(details.get("mission_type")),
-            locations=self._string_or_none(details.get("locations")),
-            min_standing_name=self._string_or_none(min_standing.get("name")),
-            min_standing_reputation=self._number_or_none(min_standing.get("reputation")),
+            contractor=self._string_or_none(details.get("contractor") or row.get("contractor")),
+            mission_type=self._string_or_none(details.get("mission_type") or row.get("mission_type")),
+            locations=self._string_or_none(details.get("locations") or row.get("locations")),
+            min_standing_name=self._string_or_none(min_standing.get("name") or row_min_standing.get("name")),
+            min_standing_reputation=self._number_or_none(min_standing.get("reputation") if min_standing.get("reputation") is not None else row_min_standing.get("reputation")),
             drop_chance=self._number_or_none(row.get("drop_chance")),
         )
 
