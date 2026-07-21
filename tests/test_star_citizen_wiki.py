@@ -260,6 +260,7 @@ def test_fetch_rsi_pledge_status_uses_graphql_stock() -> None:
                         "resources": [
                             {
                                 "title": "Cutlass Black",
+                                "url": "/pledge/ships/drake-cutlass/Cutlass-Black",
                                 "msrp": 11000,
                                 "upgrades": [
                                     {"stock": {"available": True, "backOrder": False}},
@@ -278,7 +279,8 @@ def test_fetch_rsi_pledge_status_uses_graphql_stock() -> None:
     assert result is not None
     assert result["on_sale"] is True
     assert result["price"] == 110
-    assert source._cache.ttls["rsi:pledge-status:v1:cutlass black"] == 86400
+    assert result["pledge_url"] == "https://robertsspaceindustries.com/pledge/ships/drake-cutlass/Cutlass-Black"
+    assert source._cache.ttls["rsi:pledge-status:v2:cutlass black"] == 86400
     assert calls == [{"query": {"ships": {"name": "Cutlass Black"}}}]
 
 
@@ -317,6 +319,27 @@ def test_fetch_rsi_pledge_status_marks_no_stock_unavailable() -> None:
     assert result is not None
     assert result["on_sale"] is False
     assert result["price"] == 380
+
+
+def test_parse_ship_result_uses_rsi_url_when_wiki_pledge_link_is_missing() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+
+    ship = source._parse_ship_result(
+        {
+            "game_name": "Aegis Javelin",
+            "manufacturer": {"name": "Aegis Dynamics"},
+            "msrp": 3000,
+        },
+        {
+            "price": 3000,
+            "on_sale": False,
+            "pledge_url": "https://robertsspaceindustries.com/pledge/ships/aegis-javelin/Javelin",
+        },
+    )
+
+    assert ship.pledge is not None
+    assert ship.pledge.is_on_sale is False
+    assert ship.pledge.pledge_url == "https://robertsspaceindustries.com/pledge/ships/aegis-javelin/Javelin"
 
 
 def test_search_ships_filters_by_type_size_and_cargo() -> None:

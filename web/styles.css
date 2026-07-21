@@ -808,7 +808,8 @@ article.tool-panel.active {
   inset: 0;
   border: 0;
   border-radius: 0;
-  background: rgb(0 0 0 / 0.76);
+  background: rgb(0 0 0 / 0.42) !important;
+  backdrop-filter: blur(1px);
   cursor: default;
 }
 

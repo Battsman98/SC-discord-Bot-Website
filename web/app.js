@@ -394,11 +394,11 @@ function renderShip(ship) {
   ];
   const pledge = [
     ["Availability", pledgeAvailability(ship.pledge)],
-    ["Pledge price", ship.pledge ? `${ship.pledge.price || "Unknown"} ${ship.pledge.currency}` : "No pledge data"],
+    ["Pledge price", ship.pledge?.price ? `${ship.pledge.price} ${ship.pledge.currency}` : "Not published"],
     ["Warbond", ship.pledge?.warbond_price ? `${ship.pledge.warbond_price} ${ship.pledge.currency}` : null],
     ["Package", ship.pledge?.package_price ? `${ship.pledge.package_price} ${ship.pledge.currency}` : null],
-    ["Pledge link", ship.pledge?.pledge_url ? link(ship.pledge.pledge_url, "Open pledge page") : null],
-    ["Availability check", "Updates daily from UEX pledge-store price data"],
+    ["Ship page", ship.pledge?.pledge_url ? link(ship.pledge.pledge_url, "Open official RSI ship page") : null],
+    ["Availability check", "Updates daily from RSI and UEX pledge-store data"],
   ];
   const purchases = [
     ["In-game purchase", ship.purchases?.map((item) => `${number(item.price)} aUEC at ${escapeHtml(item.terminal_name)}`).join("<br>")],

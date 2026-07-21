@@ -98,6 +98,21 @@ def test_overview_does_not_expose_internal_system_information() -> None:
     assert 'id="healthOutput"' not in html
 
 
+def test_ship_search_results_are_contained_inside_ship_search_panel() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    ship_form_start = html.index('data-action="ship"')
+    ship_form_end = html.index("</form>", ship_form_start)
+    lookup_output = html.index('id="lookupOutput"')
+
+    assert ship_form_start < lookup_output < ship_form_end
+
+
+def test_hangar_modal_keeps_other_ships_visible() -> None:
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert "background: rgb(0 0 0 / 0.42) !important;" in css
+
+
 def test_home_page_starts_on_a_random_background() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 

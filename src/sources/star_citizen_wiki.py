@@ -70,7 +70,7 @@ class StarCitizenWikiSource:
         if not normalized_query:
             return None
 
-        cache_key = f"star-citizen-wiki:ship:v4:{normalized_query.lower()}"
+        cache_key = f"star-citizen-wiki:ship:v5:{normalized_query.lower()}"
         cached = await self._cache.get(cache_key)
         if cached:
             return self._ship_from_cache(cached)
@@ -155,14 +155,26 @@ class StarCitizenWikiSource:
             matches = await self._search_rsi_ships(str(query or ""))
 
         start = max(0, (page - 1) * limit)
-        return await self._enrich_ship_results(matches[start : start + limit])
+        return await self._enrich_ship_results(
+            matches[start : start + limit],
+            include_pledge=bool(filters["query"]),
+        )
 
-    async def _enrich_ship_results(self, ships: list[ShipResult]) -> list[ShipResult]:
+    async def _enrich_ship_results(
+        self,
+        ships: list[ShipResult],
+        include_pledge: bool = False,
+    ) -> list[ShipResult]:
         if not hasattr(self, "_cache"):
             return ships
         enriched = []
         for ship in ships:
-            if ship.image_url:
+            pledge_needs_detail = include_pledge and (
+                ship.pledge is None
+                or ship.pledge.is_on_sale is None
+                or not ship.pledge.pledge_url
+            )
+            if ship.image_url and not pledge_needs_detail:
                 enriched.append(ship)
                 continue
             detail = await self.lookup_ship(ship.name)
@@ -566,7 +578,7 @@ class StarCitizenWikiSource:
         if not ship_name:
             return None
 
-        cache_key = f"rsi:pledge-status:v1:{self._normalize_name(ship_name)}"
+        cache_key = f"rsi:pledge-status:v2:{self._normalize_name(ship_name)}"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, dict):
             return cached
@@ -578,6 +590,7 @@ class StarCitizenWikiSource:
               resources {
                 ... on RSIShip {
                   title
+                  url
                   msrp
                   productionStatus
                   upgrades {
@@ -629,6 +642,13 @@ class StarCitizenWikiSource:
             "rsi_checked": True,
             "rsi_stock": stocks,
         }
+        relative_url = preferred.get("url")
+        if isinstance(relative_url, str) and relative_url.strip():
+            status["pledge_url"] = (
+                f"https://robertsspaceindustries.com{relative_url}"
+                if relative_url.startswith("/")
+                else relative_url
+            )
         if msrp is not None:
             status["price"] = float(msrp) / 100
 
@@ -754,7 +774,7 @@ class StarCitizenWikiSource:
                 price=pledge_data.get("price") or data.get("msrp"),
                 currency=str(pledge_data.get("currency") or "USD"),
                 is_on_sale=bool(pledge_data.get("on_sale")) or bool(pledge_data.get("on_sale_package")),
-                pledge_url=pledge_url,
+                pledge_url=pledge_data.get("pledge_url") or pledge_url,
                 warbond_price=pledge_data.get("price_warbond") or None,
                 package_price=pledge_data.get("price_package") or None,
             )
