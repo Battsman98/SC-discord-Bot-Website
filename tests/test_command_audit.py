@@ -1,10 +1,13 @@
+import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import discord
 
 from src.bot import (
     build_inventory_search_embed,
     build_command_channel_directory_embed,
+    GameAssistBot,
     INVENTORY_CHANNEL_ID,
     _format_interaction_options,
     _interaction_command_name,
@@ -119,3 +122,33 @@ def test_inventory_search_embed_shows_station_and_item_metadata() -> None:
     assert "250-E Laser Pointer" in embed.description
     assert "Personal Weapons / Attachments / Size 1" in embed.description
     assert "Showing 1 of 1 matching item" in embed.footer.text
+
+
+def test_autocomplete_skips_synchronous_command_auditing() -> None:
+    settings = Settings(
+        discord_token="token",
+        discord_client_id="",
+        discord_client_secret="",
+        discord_redirect_uri="http://127.0.0.1:8000/auth/discord/callback",
+        discord_guild_id=123,
+        commands_channel_id=None,
+        exec_status_channel_id=None,
+        exec_admin_role_ids=(),
+        bot_admin_role_ids=(),
+        bot_admin_user_ids=(),
+        cz_timers_channel_id=None,
+        audit_log_channel_id=456,
+        command_channel_ids={},
+        command_prefix="!",
+        database_path="data/test.sqlite3",
+        http_timeout_seconds=15,
+        cache_ttl_seconds=300,
+    )
+    cache = SimpleNamespace(close=AsyncMock())
+    sources = SimpleNamespace(close=AsyncMock())
+    bot = GameAssistBot(settings, cache, sources)
+    bot.log_audit_event = AsyncMock()
+    interaction = SimpleNamespace(type=discord.InteractionType.autocomplete)
+
+    assert asyncio.run(bot.tree.interaction_check(interaction))
+    bot.log_audit_event.assert_not_awaited()
