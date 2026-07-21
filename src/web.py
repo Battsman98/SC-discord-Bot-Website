@@ -486,7 +486,15 @@ async def my_ships(user=Depends(require_user)) -> list[dict[str, Any]]:
     for ship in ships:
         display_name = _ship_display_name(str(ship.get("name") or ""))
         display_loaner_for = _ship_display_name(str(ship.get("loaner_for") or "")) if ship.get("loaner_for") else None
-        if display_name and (display_name != ship.get("name") or display_loaner_for != ship.get("loaner_for")):
+        cleaned_notes = _clean_redundant_loaner_note(
+            ship.get("notes"),
+            display_loaner_for,
+        ) if ship.get("ownership_type") == "loaner" else ship.get("notes")
+        if display_name and (
+            display_name != ship.get("name")
+            or display_loaner_for != ship.get("loaner_for")
+            or cleaned_notes != ship.get("notes")
+        ):
             await state().cache.save_user_ship(
                 user.id,
                 display_name,
@@ -496,12 +504,14 @@ async def my_ships(user=Depends(require_user)) -> list[dict[str, Any]]:
                 ship.get("source_name"),
                 ship.get("source_url"),
                 ship.get("image_url"),
-                ship.get("notes"),
+                cleaned_notes,
                 display_loaner_for,
             )
-            await state().cache.delete_user_ship(user.id, str(ship.get("name")))
+            if display_name != ship.get("name"):
+                await state().cache.delete_user_ship(user.id, str(ship.get("name")))
             ship["name"] = display_name
             ship["loaner_for"] = display_loaner_for
+            ship["notes"] = cleaned_notes
             repaired = True
         if not _ship_image_needs_refresh(ship.get("image_url")) and ship.get("manufacturer") and _has_ship_basic_info(ship.get("role")):
             if ship.get("ownership_type") == "pledged":
@@ -672,11 +682,11 @@ async def _sync_auto_loaners(
             _ship_display_name(loaner.name if loaner else loaner_display_name),
             "loaner",
             loaner.manufacturer if loaner else None,
-            "Automatic loaner",
+            _ship_basic_info(loaner) if loaner else None,
             loaner.source_name if loaner else "RSI Loaner Ship Matrix",
             loaner.source_url if loaner else "https://support.robertsspaceindustries.com/hc/en-us/articles/360003093114-Loaner-Ship-Matrix",
             loaner.image_url if loaner else None,
-            f"Loaner for {ship_name}",
+            None,
             ship_name,
         )
         changed = True
@@ -685,6 +695,15 @@ async def _sync_auto_loaners(
 
 def _normalize_text(value: object) -> str:
     return " ".join(str(value or "").lower().replace("-", " ").split())
+
+
+def _clean_redundant_loaner_note(notes: object, loaner_for: str | None) -> str | None:
+    value = str(notes or "").strip()
+    if not value:
+        return None
+    if loaner_for and _normalize_text(value) == _normalize_text(f"Loaner for {loaner_for}"):
+        return None
+    return value
 
 
 def _extract_rsi_pledge_ship_names(page_html: str) -> set[str]:

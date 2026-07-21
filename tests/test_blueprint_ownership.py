@@ -5,6 +5,7 @@ import src.web as web_module
 from src.cache import SQLiteCache
 from src.web import (
     SHIP_LOANERS,
+    _clean_redundant_loaner_note,
     _blueprint_match_confidence,
     _blueprint_text_candidates,
     _extract_rsi_pledge_ship_names,
@@ -21,6 +22,7 @@ from src.web import (
     _ship_display_name,
     _ship_image_needs_refresh,
     _ship_is_in_concept,
+    _ship_basic_info,
 )
 
 
@@ -51,6 +53,25 @@ def test_auto_loaners_require_in_concept_status() -> None:
     assert _ship_is_in_concept("In Concept")
     assert not _ship_is_in_concept("flight-ready")
     assert not _ship_is_in_concept(None)
+
+
+def test_loaner_uses_the_same_ship_specs_as_other_ownership_types() -> None:
+    detail = SimpleNamespace(
+        career="Exploration",
+        role="Expedition",
+        vehicle_type="multi",
+        size="large",
+        status="flight-ready",
+        cargo_capacity=456,
+    )
+
+    assert _ship_basic_info(detail) == "Exploration / Expedition | multi | large | flight-ready | 456 SCU"
+
+
+def test_generated_loaner_note_is_removed_but_user_notes_are_preserved() -> None:
+    assert _clean_redundant_loaner_note("Loaner for Galaxy", "Galaxy") is None
+    assert _clean_redundant_loaner_note("  loaner FOR RSI-Galaxy  ", "RSI Galaxy") is None
+    assert _clean_redundant_loaner_note("Keep the medical loadout", "Galaxy") == "Keep the medical loadout"
 
 
 def test_extract_rsi_pledge_ship_names_from_saved_page() -> None:

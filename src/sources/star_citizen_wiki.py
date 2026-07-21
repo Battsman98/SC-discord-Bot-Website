@@ -1,3 +1,4 @@
+from dataclasses import replace
 from urllib.parse import quote
 
 import aiohttp
@@ -97,7 +98,7 @@ class StarCitizenWikiSource:
         if not result.image_url:
             rsi_result = await self._lookup_rsi_ship(normalized_query)
             if rsi_result and rsi_result.image_url:
-                result.image_url = rsi_result.image_url
+                result = replace(result, image_url=rsi_result.image_url)
         await self._cache.set(cache_key, self._ship_to_cache(result), self._settings.cache_ttl_seconds)
         return result
 
