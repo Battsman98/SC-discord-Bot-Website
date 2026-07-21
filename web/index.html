@@ -172,6 +172,43 @@
         </form>
       </div>
       <div id="miningOutput" class="results"></div>
+      <article class="panel industry-resources" aria-labelledby="industry-resources-title">
+        <div class="panel-heading">
+          <div>
+            <p class="resource-eyebrow">SC Companion operations desk</p>
+            <h2 id="industry-resources-title">Industry Operations</h2>
+          </div>
+          <span class="resource-status">Built in · No external account</span>
+        </div>
+        <p>Turn a completed run into fair payouts, track when refinery work is ready, and prepare a clear crew briefing without leaving SC Companion.</p>
+        <div class="resource-grid">
+          <form class="resource-card form" data-action="industrySplit">
+            <div class="resource-card-heading"><h3>Crew Payout</h3><span>Calculator</span></div>
+            <p>Subtract shared costs and divide the remaining payout evenly.</p>
+            <div class="field-row"><input name="gross" type="number" min="0" step="1" placeholder="Gross payout (aUEC)" aria-label="Gross payout in aUEC" required><input name="expenses" type="number" min="0" step="1" value="0" placeholder="Shared expenses" aria-label="Shared expenses in aUEC"></div>
+            <input name="crew" placeholder="Crew names, separated by commas" aria-label="Crew names separated by commas" required>
+            <button type="submit">Calculate Split</button>
+            <div id="industrySplitOutput" class="mini-output" aria-live="polite"></div>
+          </form>
+          <form class="resource-card form" data-action="refineryTimer">
+            <div class="resource-card-heading"><h3>Refinery Completion</h3><span>Timer</span></div>
+            <p>Turn an in-game duration into a local completion time and Discord timestamp.</p>
+            <input name="job" placeholder="Job label or refinery" aria-label="Refinery job label" required>
+            <div class="field-row"><input name="hours" type="number" min="0" max="999" value="0" placeholder="Hours" aria-label="Hours remaining"><input name="minutes" type="number" min="0" max="59" value="30" placeholder="Minutes" aria-label="Minutes remaining"></div>
+            <button type="submit">Set Completion</button>
+            <div id="refineryTimerOutput" class="mini-output" aria-live="polite"></div>
+          </form>
+          <form class="resource-card form resource-card-wide" data-action="operationBrief">
+            <div class="resource-card-heading"><h3>Operation Brief</h3><span>Discord ready</span></div>
+            <p>Build a concise post your crew can paste directly into Discord.</p>
+            <div class="field-row"><input name="operation" placeholder="Operation name" aria-label="Operation name" required><input name="location" placeholder="Rally point or location" aria-label="Rally point or location" required></div>
+            <div class="field-row"><input name="objective" placeholder="Mining or salvage objective" aria-label="Operation objective" required><input name="crew" placeholder="Assigned crew or open roles" aria-label="Assigned crew or open roles"></div>
+            <textarea name="notes" rows="3" placeholder="Equipment, route, communications, or safety notes" aria-label="Operation notes"></textarea>
+            <button type="submit">Build Brief</button>
+            <div id="operationBriefOutput" class="mini-output" aria-live="polite"></div>
+          </form>
+        </div>
+      </article>
     </section>
 
     <section id="crafting" class="tab-panel">
@@ -379,6 +416,9 @@
             <h3>Mining</h3>
             <p><strong>Mining Locator</strong> searches for a material and lists matching planets, moons, Lagrange points, or points of interest. Add a system or location filter when you know where you want to operate.</p>
             <p><strong>Update Material Location</strong> lets authorized community members report a useful location. Choose the correct location type and enter its in-game name carefully. Community additions appear in future mining results.</p>
+            <p><strong>Industry Operations</strong> keeps three common crew tasks together. Use <strong>Crew Payout</strong> after selling cargo to subtract shared expenses and divide the net amount evenly. Names earlier in the list receive any indivisible one-aUEC remainder.</p>
+            <p>Use <strong>Refinery Completion</strong> with the remaining duration shown in game. SC Companion converts it to your local completion time and provides a Discord timestamp that displays correctly for every crew member's time zone.</p>
+            <p>Use <strong>Operation Brief</strong> before launch to assemble the objective, rally point, crew or open roles, and important notes. Copy the finished brief into Discord. The same workflows are available through <code>/industry split</code>, <code>/industry refinery</code>, and <code>/industry brief</code>.</p>
           </section>
 
           <section id="guide-blueprints" class="guide-section">

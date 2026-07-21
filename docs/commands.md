@@ -150,6 +150,52 @@ Examples:
 
 Multiple-material searches show only the shared rock signatures for the searched materials.
 
+## `/industry split`
+
+Subtracts shared operation expenses and divides the net payout evenly across comma-separated crew names. Any indivisible remainder is assigned one aUEC at a time in listed order.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `gross` | Yes | Total operation payout in aUEC. |
+| `crew` | Yes | Crew names separated by commas. |
+| `expenses` | No | Shared fuel, repair, rental, or other agreed expenses. |
+
+Example: `/industry split gross:750000 crew:Alex, Sam, Jordan expenses:30000`
+
+## `/industry refinery`
+
+Turns the remaining hours and minutes for a refinery job into Discord absolute and relative completion timestamps.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `job` | Yes | A recognizable job label or refinery name. |
+| `hours` | No | Whole hours remaining, from 0 through 999. |
+| `minutes` | No | Additional minutes remaining, from 0 through 59. |
+
+Example: `/industry refinery job:ARC-L1 Quantainium hours:14 minutes:30`
+
+## `/industry brief`
+
+Creates a structured mining or salvage operation post with an objective, rally point, crew or open roles, and optional notes.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `operation` | Yes | Operation name used as the post title. |
+| `location` | Yes | Rally point or operating location. |
+| `objective` | Yes | Mining or salvage objective. |
+| `crew` | No | Assigned crew members or open roles. |
+| `notes` | No | Equipment, route, communications, or safety details. |
+
+Example: `/industry brief operation:Friday Night Mining location:ARC-L1 objective:Quantainium crew:MOLE pilot and two laser operators`
+
+All `/industry` responses are private to the user so the result can be checked before sharing.
+
 ## `/miningadd`
 
 Adds a community-reported mining location for a material. Added locations appear in future `/mining` results with `(Community)` next to the location.

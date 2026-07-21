@@ -1701,6 +1701,78 @@ body.hangar-modal-open {
   color: var(--accent-2);
 }
 
+.industry-resources {
+  margin-top: 18px;
+}
+
+.resource-eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent-2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.resource-status {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.resource-card {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 7px;
+  background: var(--panel-tint);
+  padding: 16px;
+}
+
+.resource-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.resource-card-heading h3 {
+  margin: 0;
+}
+
+.resource-card-heading span {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: var(--accent-2);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.resource-card-wide {
+  grid-column: 1 / -1;
+}
+
+.mini-output {
+  min-height: 0;
+  margin-top: 12px;
+}
+
+.mini-output:not(:empty) {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.operation-brief {
+  white-space: pre-wrap;
+}
+
 @media (max-width: 1200px) {
   .topbar, .app-shell, .dashboard-grid, .two-column, .visual-panel {
     display: block;
@@ -1743,6 +1815,14 @@ body.hangar-modal-open {
 
   .field-row, .two-column .field-row, .inline-form, .inventory-filters {
     grid-template-columns: 1fr;
+  }
+
+  .resource-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .resource-card-wide {
+    grid-column: auto;
   }
 
   .result-card dl, .metric-grid, .timer-row {

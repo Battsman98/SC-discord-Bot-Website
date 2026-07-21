@@ -144,6 +144,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(ship_command)
         self.tree.add_command(commodity_command)
         self.tree.add_command(mining_command)
+        self.tree.add_command(industry_group)
         self.tree.add_command(miningadd_command)
         self.tree.add_command(blueprint_command)
         self.tree.add_command(item_group)
@@ -775,6 +776,86 @@ async def mining_planet_autocomplete(
         app_commands.Choice(name=name[:100], value=name[:100])
         for name in names[:25]
     ]
+
+
+industry_group = app_commands.Group(name="industry", description="Mining and salvage operation planning tools.")
+
+
+@industry_group.command(name="split", description="Divide an operation payout evenly after shared expenses.")
+@app_commands.describe(
+    gross="Total operation payout in aUEC.",
+    crew="Comma-separated crew names.",
+    expenses="Shared operation expenses in aUEC.",
+)
+async def industry_split_command(
+    interaction: discord.Interaction,
+    gross: int,
+    crew: str,
+    expenses: int = 0,
+) -> None:
+    names = [name.strip() for name in crew.split(",") if name.strip()]
+    if gross < 0 or expenses < 0 or expenses > gross:
+        await interaction.response.send_message(
+            "Gross and expenses cannot be negative, and expenses cannot exceed gross.", ephemeral=True
+        )
+        return
+    if not names:
+        await interaction.response.send_message("Add at least one crew member.", ephemeral=True)
+        return
+    net = gross - expenses
+    base_share, remainder = divmod(net, len(names))
+    payouts = [f"**{name}** — {base_share + (1 if index < remainder else 0):,} aUEC" for index, name in enumerate(names)]
+    embed = discord.Embed(title="Industry Crew Payout", color=discord.Color.orange())
+    embed.description = "\n".join(payouts)
+    embed.add_field(name="Gross", value=f"{gross:,} aUEC")
+    embed.add_field(name="Expenses", value=f"{expenses:,} aUEC")
+    embed.add_field(name="Net", value=f"{net:,} aUEC")
+    embed.set_footer(text="Any indivisible remainder is assigned one aUEC at a time in listed order.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@industry_group.command(name="refinery", description="Calculate a refinery job's completion time.")
+@app_commands.describe(job="Job label or refinery.", hours="Whole hours remaining.", minutes="Additional minutes remaining.")
+async def industry_refinery_command(
+    interaction: discord.Interaction,
+    job: str,
+    hours: app_commands.Range[int, 0, 999] = 0,
+    minutes: app_commands.Range[int, 0, 59] = 0,
+) -> None:
+    if hours == 0 and minutes == 0:
+        await interaction.response.send_message("The refinery duration must be longer than zero.", ephemeral=True)
+        return
+    completion_unix = int(discord.utils.utcnow().timestamp()) + ((hours * 60 + minutes) * 60)
+    embed = discord.Embed(title="Refinery Completion", color=discord.Color.orange())
+    embed.add_field(name="Job", value=job, inline=False)
+    embed.add_field(name="Completes", value=f"<t:{completion_unix}:F> (<t:{completion_unix}:R>)", inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@industry_group.command(name="brief", description="Create a Discord-ready mining or salvage operation brief.")
+@app_commands.describe(
+    operation="Operation name.",
+    location="Rally point or operating location.",
+    objective="Mining or salvage objective.",
+    crew="Assigned crew or open roles.",
+    notes="Equipment, route, communications, or safety notes.",
+)
+async def industry_brief_command(
+    interaction: discord.Interaction,
+    operation: str,
+    location: str,
+    objective: str,
+    crew: str | None = None,
+    notes: str | None = None,
+) -> None:
+    embed = discord.Embed(title=operation, description=objective, color=discord.Color.orange())
+    embed.add_field(name="Rally Point", value=location, inline=False)
+    if crew:
+        embed.add_field(name="Crew / Open Roles", value=crew, inline=False)
+    if notes:
+        embed.add_field(name="Notes", value=notes, inline=False)
+    embed.set_footer(text="Prepared with SC Companion Industry Operations")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 @app_commands.command(name="miningadd", description="Add a community-reported mining location for a material.")
