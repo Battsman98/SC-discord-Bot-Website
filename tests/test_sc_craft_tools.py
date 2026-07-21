@@ -152,3 +152,19 @@ def test_blueprint_cache_round_trip() -> None:
     cached = source._blueprint_from_cache(source._blueprint_to_cache(result))
 
     assert cached == result
+
+
+def test_active_data_version_tracks_live_and_ptu_patches() -> None:
+    source = SCCraftToolsSource.__new__(SCCraftToolsSource)
+
+    version = source._active_data_version(
+        {
+            "versions": [
+                {"version": "LIVE-4.9.0-12232306", "active": 1},
+                {"version": "PTU-4.9.1-12240000", "active": 1},
+                {"version": "LIVE-4.8.0-12030094", "active": 0},
+            ]
+        }
+    )
+
+    assert version == "LIVE-4.9.0-12232306,PTU-4.9.1-12240000"

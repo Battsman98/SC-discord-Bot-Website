@@ -1,3 +1,4 @@
+import time
 from urllib.parse import urlencode
 
 import aiohttp
@@ -16,6 +17,7 @@ class SCCraftToolsSource:
         self._cache = cache
         self._session = session
         self._config: dict | None = None
+        self._config_expires_at = 0.0
 
     async def lookup(self, query: str):
         return None
@@ -83,10 +85,18 @@ class SCCraftToolsSource:
         if location:
             params["location"] = location
 
-        cache_key = f"sc-craft:blueprints:v5:{urlencode(params, doseq=True)}"
+        # Tie cached searches to the provider's active game data.  A patch can add
+        # blueprints for a query that previously returned no rows, so a static
+        # cache namespace can otherwise hide new content after the provider has
+        # already updated.
+        config = await self._get_config()
+        data_version = self._active_data_version(config)
+        cache_key = f"sc-craft:blueprints:v6:{data_version}:{urlencode(params, doseq=True)}"
         cached = await self._cache.get(cache_key)
-        if isinstance(cached, list):
+        if isinstance(cached, list) and cached:
             return [self._blueprint_from_cache(row) for row in cached if isinstance(row, dict)]
+        if cached == []:
+            await self._cache.delete(cache_key)
 
         payloads = []
         payload = await self._fetch_json(f"{self.base_url}/api/blueprints?{urlencode(params)}")
@@ -107,18 +117,20 @@ class SCCraftToolsSource:
             if isinstance(payload_rows, list):
                 rows.extend(row for row in payload_rows if isinstance(row, dict))
 
-        config = await self._get_config()
         missions = config.get("missions") if isinstance(config, dict) else {}
         results = [
             self._parse_blueprint(row, missions if isinstance(missions, dict) else {})
             for row in rows
             if isinstance(row, dict)
         ]
-        await self._cache.set(
-            cache_key,
-            [self._blueprint_to_cache(result) for result in results],
-            self._settings.cache_ttl_seconds,
-        )
+        # Never negative-cache blueprint searches.  New patch data may arrive at
+        # any time, and retrying an empty lookup is inexpensive and self-healing.
+        if results:
+            await self._cache.set(
+                cache_key,
+                [self._blueprint_to_cache(result) for result in results],
+                self._settings.cache_ttl_seconds,
+            )
         return results
 
     async def autocomplete_blueprints(self, query: str, limit: int = 25) -> list[str]:
@@ -166,18 +178,34 @@ class SCCraftToolsSource:
         }.get(filter_name, filter_name)
 
     async def _get_config(self) -> dict:
-        if self._config is not None:
+        if self._config is not None and (
+            not hasattr(self, "_config_expires_at") or time.monotonic() < self._config_expires_at
+        ):
             return self._config
 
-        cached = await self._cache.get("sc-craft:config:v1")
+        cached = await self._cache.get("sc-craft:config:v2")
         if isinstance(cached, dict):
             self._config = cached
+            self._config_expires_at = time.monotonic() + 5 * 60
             return self._config
 
         payload = await self._fetch_json(f"{self.base_url}/api/config")
         self._config = payload if isinstance(payload, dict) else {}
-        await self._cache.set("sc-craft:config:v1", self._config, 6 * 60 * 60)
+        self._config_expires_at = time.monotonic() + 5 * 60
+        if self._config:
+            await self._cache.set("sc-craft:config:v2", self._config, 5 * 60)
         return self._config
+
+    def _active_data_version(self, config: dict) -> str:
+        versions = config.get("versions") if isinstance(config, dict) else []
+        active = []
+        for row in versions if isinstance(versions, list) else []:
+            if not isinstance(row, dict) or not row.get("active"):
+                continue
+            version = self._string_or_none(row.get("version"))
+            if version:
+                active.append(version)
+        return ",".join(sorted(active)) or "unknown"
 
     async def _fetch_json(self, url: str) -> dict | None:
         try:
