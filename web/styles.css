@@ -728,6 +728,10 @@ article.tool-panel.active {
   min-width: 0;
 }
 
+#savedShipsOutput {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
 .hangar-image-button {
   display: block;
   width: 100%;
@@ -784,10 +788,32 @@ article.tool-panel.active {
 }
 
 .hangar-card.expanded {
-  grid-column: 1 / -1;
+  position: fixed;
+  z-index: 1001;
+  top: 50%;
+  left: 50%;
+  width: min(920px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  transform: translate(-50%, -50%);
   grid-template-columns: minmax(320px, 44%) minmax(0, 1fr);
   gap: 18px;
   padding: 14px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.72);
+}
+
+.hangar-modal-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgb(0 0 0 / 0.76);
+  cursor: default;
+}
+
+body.hangar-modal-open {
+  overflow: hidden;
 }
 
 .hangar-card.expanded > .hangar-name {
@@ -1521,7 +1547,7 @@ article.tool-panel.active {
   }
 
   .saved-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   }
 
   .hangar-card {

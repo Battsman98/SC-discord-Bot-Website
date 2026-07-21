@@ -638,6 +638,7 @@ function setAdminVisibility(canManageAdmin) {
 }
 
 async function loadSavedShips(options = {}) {
+  closeHangarModal();
   if (!currentUser.authenticated) {
     savedShipTypes = new Map();
     outputs.savedShips.innerHTML = stateMessage("Log in with Discord to save ships to your account.");
@@ -1999,18 +2000,44 @@ function toggleHangarCard(target, name) {
   const card = target.querySelector(`[data-hangar-card="${cssEscape(name)}"]`);
   if (!card) return;
   const willExpand = !card.classList.contains("expanded");
-  target.querySelectorAll(".hangar-card.expanded").forEach((item) => setHangarCardExpanded(item, false));
+  closeHangarModal();
   setHangarCardExpanded(card, willExpand);
-  if (willExpand) card.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (willExpand) {
+    const backdrop = document.createElement("button");
+    backdrop.type = "button";
+    backdrop.className = "hangar-modal-backdrop";
+    backdrop.setAttribute("aria-label", "Close ship details");
+    backdrop.addEventListener("click", closeHangarModal);
+    document.body.append(backdrop);
+    document.body.classList.add("hangar-modal-open");
+  }
 }
 
 function collapseHangarCard(target, name) {
   const card = target.querySelector(`[data-hangar-card="${cssEscape(name)}"]`);
   if (card) setHangarCardExpanded(card, false);
+  closeHangarModal();
 }
+
+function closeHangarModal() {
+  document.querySelectorAll(".hangar-card.expanded").forEach((card) => setHangarCardExpanded(card, false));
+  document.querySelectorAll(".hangar-modal-backdrop").forEach((backdrop) => backdrop.remove());
+  document.body.classList.remove("hangar-modal-open");
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.querySelector(".hangar-card.expanded")) closeHangarModal();
+});
 
 function setHangarCardExpanded(card, expanded) {
   card.classList.toggle("expanded", expanded);
+  if (expanded) {
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+  } else {
+    card.removeAttribute("role");
+    card.removeAttribute("aria-modal");
+  }
   card.querySelector("[data-hangar-expand]")?.setAttribute("aria-expanded", String(expanded));
   if (!expanded) card.querySelector(".ship-manage-menu")?.classList.remove("active");
 }
