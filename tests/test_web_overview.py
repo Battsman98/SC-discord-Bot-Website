@@ -10,8 +10,9 @@ def test_home_page_uses_companion_branding_and_guidance() -> None:
     assert '<h1 class="companion-title">Star Citizen Companion</h1>' in html
     assert "Game Assist Control Deck" not in html
     assert "Star Citizen Discord Companion" not in html
-    assert "Welcome to your home page" in html
-    assert "Select a destination below to get started." in html
+    assert "Your Star Citizen companion" in html
+    assert "Plan your next session, organize what you own" in html
+    assert "Choose a destination below, or open the Guide" in html
 
 
 def test_site_uses_gunmetal_and_amber_palette() -> None:
@@ -68,8 +69,21 @@ def test_fankit_trademark_notice_is_visible_on_the_home_page() -> None:
 def test_overview_exposes_all_primary_destinations() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
-    for tab_id in ("lookup", "trade", "mining", "crafting", "items", "inventory", "timers", "commands", "admin"):
+    for tab_id in ("lookup", "trade", "mining", "crafting", "items", "inventory", "timers", "admin"):
         assert f'data-overview-tab="{tab_id}"' in html
+
+    assert 'data-overview-tab="guide"' in html
+
+
+def test_guide_replaces_discord_commands_on_the_website() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert '<button data-tab="guide">Guide</button>' in html
+    assert '<section id="guide" class="tab-panel">' in html
+    assert "Website Guide" in html
+    assert 'data-tab="commands"' not in html
+    assert 'data-overview-tab="commands"' not in html
+    assert '<section id="commands"' not in html
 
 
 def test_audit_navigation_is_revealed_only_for_authorized_users() -> None:
@@ -144,7 +158,7 @@ def test_each_tool_page_has_a_manufacturer_mfd_theme() -> None:
         "items": ("origin", "ORIGIN JUMPWORKS"),
         "inventory": ("crusader", "CRUSADER INDUSTRIES"),
         "timers": ("misc", "MISC INDUSTRIAL"),
-        "commands": ("aegis", "AEGIS DYNAMICS"),
+        "guide": ("aegis", "COMPANION MANUAL"),
         "admin": ("security", "SECURITY AUDIT"),
     }
     for tab_id, (theme, label) in expected.items():

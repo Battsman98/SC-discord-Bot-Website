@@ -14,7 +14,6 @@ const outputs = {
   inventoryImport: document.querySelector("#inventoryImportOutput"),
   exec: document.querySelector("#execOutput"),
   cz: document.querySelector("#czOutput"),
-  commands: document.querySelector("#commandsOutput"),
   audit: document.querySelector("#auditOutput"),
 };
 
@@ -28,7 +27,7 @@ const mfdThemes = {
   items: { theme: "origin", label: "ORIGIN JUMPWORKS" },
   inventory: { theme: "crusader", label: "CRUSADER INDUSTRIES" },
   timers: { theme: "misc", label: "MISC INDUSTRIAL" },
-  commands: { theme: "aegis", label: "AEGIS DYNAMICS" },
+  guide: { theme: "aegis", label: "COMPANION MANUAL" },
   admin: { theme: "security", label: "SECURITY AUDIT" },
 };
 
@@ -2181,15 +2180,6 @@ async function loadTimers() {
   }
 }
 
-async function loadCommands() {
-  try {
-    const data = await api("/api/commands");
-    outputs.commands.innerHTML = markdownLite(data.markdown);
-  } catch (error) {
-    outputs.commands.innerHTML = errorMessage(error.message);
-  }
-}
-
 async function loadAudit() {
   try {
     renderCards(outputs.audit, await api("/api/audit/recent?limit=20"), (event) => card(event.title, [
@@ -2303,7 +2293,6 @@ function cssEscape(value) {
 loadMe();
 loadShipFacets();
 loadTimers();
-loadCommands();
 setInterval(loadTimers, 60_000);
 
 async function loadShipFacets() {

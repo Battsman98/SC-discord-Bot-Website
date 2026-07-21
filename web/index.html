@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260720-inventory-confirm">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260720-guide">
   <link rel="stylesheet" href="/assets/hotfix-overlay.css?v=20260720">
 </head>
 <body data-mfd-theme="overview">
@@ -25,13 +25,14 @@
       <button data-tab="items">Items</button>
       <button data-tab="inventory">Inventory</button>
       <button data-tab="timers">Timers</button>
-      <button data-tab="commands">Commands</button>
+      <button data-tab="guide">Guide</button>
     </nav>
 
     <section id="overview" class="tab-panel active">
       <div class="overview-heading">
-        <h2>Welcome to your home page</h2>
-        <p>Select a destination below to get started.</p>
+        <h2>Your Star Citizen companion</h2>
+        <p>Plan your next session, organize what you own, and find useful game information in one place. Manage your hangar and inventory, research ships and items, compare trade and mining opportunities, track blueprints, and check community timers.</p>
+        <p class="overview-intro-note">Choose a destination below, or open the Guide for a complete walkthrough of every website tool.</p>
       </div>
       <nav class="overview-options" aria-label="Overview destinations">
         <button type="button" data-overview-tab="lookup"><span>Ships</span><small>Search and manage your hangar</small></button>
@@ -41,7 +42,7 @@
         <button type="button" data-overview-tab="items"><span>Items</span><small>Look up equipment and components</small></button>
         <button type="button" data-overview-tab="inventory"><span>Inventory</span><small>Track items across locations</small></button>
         <button type="button" data-overview-tab="timers"><span>Timers</span><small>View event and zone timers</small></button>
-        <button type="button" data-overview-tab="commands"><span>Commands</span><small>Browse the command directory</small></button>
+        <button type="button" data-overview-tab="guide"><span>Website Guide</span><small>Learn how every website tool works</small></button>
       </nav>
       <div class="home-background" aria-hidden="true">
         <div class="home-background-layer active"></div>
@@ -338,10 +339,81 @@
       </div>
     </section>
 
-    <section id="commands" class="tab-panel">
-      <article class="panel">
-        <h2>Command Directory</h2>
-        <div id="commandsOutput" class="markdown"></div>
+    <section id="guide" class="tab-panel">
+      <article class="panel guide-manual">
+        <div class="guide-hero">
+          <p class="guide-kicker">COMPANION MANUAL</p>
+          <h2>Website Guide</h2>
+          <p>Everything you need to use the Star Citizen Companion website. Start with the quick tour, then jump to the tool you need.</p>
+        </div>
+
+        <nav class="guide-toc" aria-label="Guide contents">
+          <a href="#guide-start">Getting started</a><a href="#guide-ships">Ships</a><a href="#guide-trade">Trade</a>
+          <a href="#guide-mining">Mining</a><a href="#guide-blueprints">Blueprints</a><a href="#guide-items">Items</a>
+          <a href="#guide-inventory">Inventory</a><a href="#guide-timers">Timers</a><a href="#guide-permissions">Access &amp; permissions</a>
+        </nav>
+
+        <div class="guide-sections">
+          <section id="guide-start" class="guide-section">
+            <h3>Getting started</h3>
+            <ol>
+              <li>Choose a tool from the Overview page or the navigation bar.</li>
+              <li>Enter the information you know. Optional filters narrow large result lists.</li>
+              <li>Select an available result or action to view details, save an item, or update your records.</li>
+            </ol>
+            <p>Your Discord sign-in connects saved hangar, blueprint, inventory, timer, and permission data to your server identity. Some browsing tools can be used without elevated access; editing and administrative controls depend on your Discord roles.</p>
+          </section>
+
+          <section id="guide-ships" class="guide-section">
+            <h3>Ships &amp; Hangar</h3>
+            <p><strong>Ship Search</strong> finds ships and vehicles by name, role, or keyword. Use manufacturer, vehicle type, size, and status filters to narrow results, then sort by name, manufacturer, size, or cargo capacity.</p>
+            <p><strong>Hangar</strong> stores your fleet. Add ships from search results, refresh the list after a change, and use quantity controls when you own more than one.</p>
+            <p><strong>Import RSI Hangar</strong> imports eligible vehicles from standalone pledges and game packages. With the optional importer extension installed, stay signed in to RSI and select the import button. Otherwise, upload saved RSI pledge-page HTML files when prompted. Paints, upgrades, equipment, flair, and other extras are ignored.</p>
+          </section>
+
+          <section id="guide-trade" class="guide-section">
+            <h3>Trade</h3>
+            <p><strong>Commodity Lookup</strong> shows places to buy and sell a named commodity. Add purchase or sell systems when you want results limited to a region.</p>
+            <p><strong>Trade Routing</strong> builds candidate routes from a starting terminal or location. Enter your ship, investment, and maximum stops. “Stay in system” keeps the route local. Prices and availability can change, so verify them in game before committing credits.</p>
+          </section>
+
+          <section id="guide-mining" class="guide-section">
+            <h3>Mining</h3>
+            <p><strong>Mining Locator</strong> searches for a material and lists matching planets, moons, Lagrange points, or points of interest. Add a system or location filter when you know where you want to operate.</p>
+            <p><strong>Update Material Location</strong> lets authorized community members report a useful location. Choose the correct location type and enter its in-game name carefully. Community additions appear in future mining results.</p>
+          </section>
+
+          <section id="guide-blueprints" class="guide-section">
+            <h3>Blueprints</h3>
+            <p><strong>Blueprint Search</strong> finds crafting blueprints by item name, category, required material, mission type, contractor, or location. Results can include crafting requirements and mission sources.</p>
+            <p><strong>My Blueprints</strong> keeps your saved collection together. Add or remove blueprints from their result controls and refresh the library after updates.</p>
+            <p><strong>Blueprint Import</strong> can capture a shared game window, read uploaded screenshots, or match pasted text. Review matches before saving—image text recognition may need correction when the source is small or blurred.</p>
+          </section>
+
+          <section id="guide-items" class="guide-section">
+            <h3>Items</h3>
+            <p><strong>Item Locator</strong> searches equipment and components. Search by item name or keyword, then narrow by section, category, or size. Open a result for available item details and location information.</p>
+          </section>
+
+          <section id="guide-inventory" class="guide-section">
+            <h3>Inventory</h3>
+            <p><strong>Station Inventory</strong> lists saved items. Search names and notes, filter by location or category, and sort the table. Export Excel downloads a portable copy. “Clear Station” removes the selected location; “Clear All” removes every saved entry. Both ask for confirmation.</p>
+            <p><strong>Add Inventory Item</strong> records an item manually with its category, type, size, location, quantity, quality, SCU volume, and notes. Item name, location, and quantity are required.</p>
+            <p><strong>Inventory Import</strong> reads item names from a shared Star Citizen window. Enter the destination, choose a category, share the game window, start scanning, and hover over each item for a few seconds. Stop when finished and review matches before importing. Advanced settings adjust scan timing, match strictness, guide position, ignored words, and manual OCR troubleshooting.</p>
+          </section>
+
+          <section id="guide-timers" class="guide-section">
+            <h3>Timers</h3>
+            <p><strong>Executive Hangar</strong> displays the current community clock. Authorized members can set the phase and remaining minutes when the state needs correction, or clear a manual override.</p>
+            <p><strong>Contested Zone Timers</strong> displays active zone countdowns and their current state. Changes made through connected Discord tools appear here after refresh.</p>
+          </section>
+
+          <section id="guide-permissions" class="guide-section">
+            <h3>Access, permissions &amp; safety</h3>
+            <p>Sign in with Discord for personal saved data or role-protected actions. Server roles determine whether you can add mining locations, change Executive Hangar timing, or view Audit events. Audit is visible only to authorized administrators.</p>
+            <p>This is an unofficial community tool. Game data, prices, availability, and schedules may change, so confirm important decisions in game. Never share your Discord password, RSI password, session cookie, or account credentials with the website.</p>
+          </section>
+        </div>
       </article>
     </section>
 
@@ -372,6 +444,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260720b" defer></script>
-  <script src="/assets/app.js?v=20260720-ship-quantities" defer></script>
+  <script src="/assets/app.js?v=20260720-guide" defer></script>
 </body>
 </html>
