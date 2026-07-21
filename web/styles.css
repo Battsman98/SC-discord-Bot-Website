@@ -108,8 +108,7 @@ body[data-mfd-theme] {
   padding: 24px clamp(16px, 4vw, 48px) 18px;
   border-bottom: 1px solid var(--line);
   background: rgba(5, 5, 5, 0.88);
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 3;
   backdrop-filter: blur(16px);
   box-shadow: 0 1px 18px var(--glow);
@@ -225,8 +224,8 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
   padding: 22px clamp(16px, 4vw, 48px) 48px;
   width: 100%;
   flex: 1;
@@ -252,15 +251,28 @@ button:hover, .button-link:hover, .tabs button.active {
 
 .tabs {
   position: sticky;
-  top: 96px;
+  top: 0;
   align-self: start;
-  display: grid;
+  z-index: 5;
+  display: flex;
+  grid-column: 1;
+  justify-content: safe center;
   gap: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  scrollbar-width: thin;
 }
 
 .tabs button {
-  width: 100%;
-  text-align: left;
+  width: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  text-align: center;
   background: transparent;
   border-color: transparent;
   color: var(--muted);
@@ -274,7 +286,8 @@ button:hover, .button-link:hover, .tabs button.active {
 }
 
 .app-shell.overview-mode .tabs {
-  position: static;
+  position: sticky;
+  top: 0;
   display: flex;
   grid-column: 1;
   gap: 8px;
@@ -1689,8 +1702,10 @@ body.hangar-modal-open {
   }
 
   .tabs {
-    position: static;
+    position: sticky;
+    top: 0;
     display: flex;
+    justify-content: safe center;
     overflow-x: auto;
     gap: 8px;
   }

@@ -59,6 +59,16 @@ def test_home_page_uses_twenty_curated_images_and_compact_navigation() -> None:
     assert "aspect-ratio: 16 / 7;" in css
 
 
+def test_primary_navigation_stays_at_the_top_on_every_page() -> None:
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    tabs_css = css.split(".tabs {", 1)[1].split("}", 1)[0]
+    assert "position: sticky;" in tabs_css
+    assert "top: 0;" in tabs_css
+    assert "justify-content: safe center;" in tabs_css
+    assert "grid-template-columns: minmax(0, 1fr);" in css
+
+
 def test_fankit_trademark_notice_is_visible_on_the_home_page() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
