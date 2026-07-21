@@ -1124,7 +1124,11 @@ async function clearStationInventory() {
     outputs.inventory.innerHTML = stateMessage("Choose a station/location filter first, then press Clear Station.");
     return;
   }
-  const accepted = window.confirm(`Are you sure you want to clear every inventory item at "${location}"? This cannot be undone.`);
+  const accepted = await confirmInventoryClear({
+    title: "Clear station inventory?",
+    message: `Clear all inventory items stored at "${location}"? This cannot be undone.`,
+    confirmLabel: "Clear Station",
+  });
   if (!accepted) return;
   await clearInventory({ location, label: `"${location}"` });
 }
@@ -1134,9 +1138,44 @@ async function clearAllInventory() {
     outputs.inventory.innerHTML = stateMessage("Log in with Discord before clearing inventory.");
     return;
   }
-  const accepted = window.confirm("Are you sure you want to clear your full inventory? This deletes every station/location and cannot be undone.");
+  const accepted = await confirmInventoryClear({
+    title: "Clear all inventory?",
+    message: "Clear every inventory item across all stations and locations? This cannot be undone.",
+    confirmLabel: "Clear All",
+  });
   if (!accepted) return;
   await clearInventory({ location: null, label: "your full inventory" });
+}
+
+function confirmInventoryClear({ title, message, confirmLabel }) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "inventory-confirm-backdrop";
+    backdrop.innerHTML = `<section class="inventory-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="inventoryConfirmTitle" aria-describedby="inventoryConfirmMessage">
+      <h2 id="inventoryConfirmTitle">${escapeHtml(title)}</h2>
+      <p id="inventoryConfirmMessage">${escapeHtml(message)}</p>
+      <div class="inventory-confirm-actions">
+        <button type="button" data-inventory-confirm-cancel>Cancel</button>
+        <button type="button" class="danger-button" data-inventory-confirm-accept>${escapeHtml(confirmLabel)}</button>
+      </div>
+    </section>`;
+    const finish = (accepted) => {
+      document.removeEventListener("keydown", onKeyDown);
+      backdrop.remove();
+      resolve(accepted);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") finish(false);
+    };
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop) finish(false);
+    });
+    backdrop.querySelector("[data-inventory-confirm-cancel]").addEventListener("click", () => finish(false));
+    backdrop.querySelector("[data-inventory-confirm-accept]").addEventListener("click", () => finish(true));
+    document.addEventListener("keydown", onKeyDown);
+    document.body.append(backdrop);
+    backdrop.querySelector("[data-inventory-confirm-cancel]").focus();
+  });
 }
 
 async function clearInventory({ location, label }) {

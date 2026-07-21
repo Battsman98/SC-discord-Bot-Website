@@ -159,3 +159,15 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
 
     assert 'canvas.toBlob(resolve, "image/webp", 0.82)' in javascript
     assert 'if (options.liveScan) params.set("live_scan", "true")' in javascript
+
+
+def test_inventory_clear_actions_use_centered_confirmation_dialog() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert 'title: "Clear station inventory?"' in javascript
+    assert 'title: "Clear all inventory?"' in javascript
+    assert 'className = "inventory-confirm-backdrop"' in javascript
+    assert "window.confirm" not in javascript
+    assert ".inventory-confirm-backdrop" in css
+    assert "place-items: center" in css
