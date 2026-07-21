@@ -83,6 +83,20 @@ def test_overview_exposes_all_primary_destinations() -> None:
     for tab_id in ("lookup", "trade", "mining", "crafting", "items", "inventory", "timers", "admin"):
         assert f'data-overview-tab="{tab_id}"' in html
 
+
+def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'data-action="industrySplit"' in html
+    assert 'data-action="refineryTimer"' in html
+    assert 'data-action="operationBrief"' in html
+    assert "renderCrewSplit" in javascript
+    assert "renderRefineryCompletion" in javascript
+    assert "renderOperationBrief" in javascript
+    assert "cryon.rocks" not in html
+    assert "regolith.rocks" not in html
+
 def test_guide_is_embedded_on_overview_without_a_separate_tab() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")

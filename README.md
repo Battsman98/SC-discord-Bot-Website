@@ -17,6 +17,7 @@ Python Discord bot for collecting information from approved websites/APIs and se
 - `/lookup` searches Star Citizen game information.
 - `/ship` looks up a Star Citizen ship or vehicle.
 - `/commodity` looks up commodity pricing and locations.
+- `/industry split`, `/industry refinery`, and `/industry brief` plan crew payouts, completion times, and operation posts.
 - `/blueprint` searches crafting blueprints, materials, missions, and rep requirements.
 - `/trade routing` calculates UEX-based circular trade route candidates.
 - `/exec` shows the Executive Hangar clock.

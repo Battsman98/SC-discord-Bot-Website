@@ -13,6 +13,7 @@ from src.bot import (
     _interaction_command_name,
     _message_embed_matches,
     inventory_group,
+    industry_group,
 )
 from src.config import Settings
 
@@ -100,6 +101,12 @@ def test_message_embed_matches_existing_embed_payload() -> None:
 def test_inventory_search_command_is_registered() -> None:
     assert inventory_group.get_command("search") is not None
     assert INVENTORY_CHANNEL_ID == 1528623944947597383
+
+
+def test_industry_planning_commands_are_registered() -> None:
+    assert industry_group.get_command("split") is not None
+    assert industry_group.get_command("refinery") is not None
+    assert industry_group.get_command("brief") is not None
 
 
 def test_inventory_search_embed_shows_station_and_item_metadata() -> None:

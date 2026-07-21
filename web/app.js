@@ -6,6 +6,9 @@ const outputs = {
   savedShips: document.querySelector("#savedShipsOutput"),
   trade: document.querySelector("#tradeOutput"),
   mining: document.querySelector("#miningOutput"),
+  industrySplit: document.querySelector("#industrySplitOutput"),
+  refineryTimer: document.querySelector("#refineryTimerOutput"),
+  operationBrief: document.querySelector("#operationBriefOutput"),
   crafting: document.querySelector("#craftingOutput"),
   blueprintImport: document.querySelector("#blueprintImportOutput"),
   savedBlueprints: document.querySelector("#savedBlueprintsOutput"),
@@ -296,6 +299,15 @@ async function handleForm(action, form) {
     if (action === "miningCommunity") {
       await api("/api/mining/community", { method: "POST", body: data, admin: true });
       outputs.mining.innerHTML = stateMessage("Community location saved.");
+    }
+    if (action === "industrySplit") {
+      renderCrewSplit(data);
+    }
+    if (action === "refineryTimer") {
+      renderRefineryCompletion(data);
+    }
+    if (action === "operationBrief") {
+      renderOperationBrief(data);
     }
     if (action === "blueprints") {
       setLoading(outputs.crafting);
@@ -2208,6 +2220,58 @@ async function loadAudit() {
   }
 }
 
+function renderCrewSplit(data) {
+  const gross = Number(data.gross);
+  const expenses = Number(data.expenses || 0);
+  const crew = String(data.crew || "").split(",").map((name) => name.trim()).filter(Boolean);
+  if (!Number.isFinite(gross) || gross < 0 || !Number.isFinite(expenses) || expenses < 0) {
+    throw new Error("Gross payout and expenses must be positive numbers.");
+  }
+  if (!crew.length) throw new Error("Add at least one crew member.");
+  if (expenses > gross) throw new Error("Expenses cannot exceed the gross payout.");
+  const net = gross - expenses;
+  const baseShare = Math.floor(net / crew.length);
+  let remainder = Math.round(net - (baseShare * crew.length));
+  const lines = crew.map((name) => {
+    const share = baseShare + (remainder > 0 ? 1 : 0);
+    remainder = Math.max(0, remainder - 1);
+    return `${escapeHtml(name)}: <strong>${number(share)} aUEC</strong>`;
+  });
+  outputs.industrySplit.innerHTML = `<div class="metric-grid">${metric("Net payout", money(net))}${metric("Crew", crew.length)}</div><p>${lines.join("<br>")}</p>`;
+}
+
+function renderRefineryCompletion(data) {
+  const hours = Number(data.hours || 0);
+  const minutes = Number(data.minutes || 0);
+  if (!Number.isInteger(hours) || hours < 0 || !Number.isInteger(minutes) || minutes < 0 || minutes > 59) {
+    throw new Error("Enter whole hours and 0–59 minutes.");
+  }
+  if (hours === 0 && minutes === 0) throw new Error("The refinery duration must be longer than zero.");
+  const completionUnix = Math.floor(Date.now() / 1000) + ((hours * 60 + minutes) * 60);
+  const discordTime = `<t:${completionUnix}:F> (<t:${completionUnix}:R>)`;
+  outputs.refineryTimer.innerHTML = `<div class="metric-grid">${metric("Job", data.job)}${metric("Completes", new Date(completionUnix * 1000).toLocaleString())}</div><p><code>${escapeHtml(discordTime)}</code></p><button type="button" data-copy-text="${escapeAttribute(discordTime)}">Copy Discord Time</button>`;
+}
+
+function renderOperationBrief(data) {
+  const brief = [
+    `**${data.operation}**`,
+    `Rally point: ${data.location}`,
+    `Objective: ${data.objective}`,
+    data.crew && `Crew / open roles: ${data.crew}`,
+    data.notes && `Notes: ${data.notes}`,
+  ].filter(Boolean).join("\n");
+  outputs.operationBrief.innerHTML = `<div class="operation-brief">${escapeHtml(brief)}</div><button type="button" data-copy-text="${escapeAttribute(brief)}">Copy for Discord</button>`;
+}
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-copy-text]");
+  if (!button) return;
+  await navigator.clipboard.writeText(button.dataset.copyText);
+  const original = button.textContent;
+  button.textContent = "Copied";
+  window.setTimeout(() => { button.textContent = original; }, 1200);
+});
+
 function auditActionLabel(value) {
   return String(value || "other").replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 }
@@ -2217,6 +2281,9 @@ function outputForAction(action) {
   if (action === "commodity") return outputs.trade;
   if (action === "trade") return outputs.trade;
   if (action.startsWith("mining")) return outputs.mining;
+  if (action === "industrySplit") return outputs.industrySplit;
+  if (action === "refineryTimer") return outputs.refineryTimer;
+  if (action === "operationBrief") return outputs.operationBrief;
   if (action === "blueprints") return outputs.crafting;
   if (action === "items") return outputs.items;
   if (action.startsWith("inventory")) return outputs.inventory;
