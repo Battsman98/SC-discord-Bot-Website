@@ -225,6 +225,7 @@ button:hover, .button-link:hover, .tabs button.active {
 .app-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   gap: 14px;
   padding: 22px clamp(16px, 4vw, 48px) 48px;
   width: 100%;

@@ -67,6 +67,7 @@ def test_primary_navigation_stays_at_the_top_on_every_page() -> None:
     assert "top: 0;" in tabs_css
     assert "justify-content: safe center;" in tabs_css
     assert "grid-template-columns: minmax(0, 1fr);" in css
+    assert "align-content: start;" in css
 
 
 def test_fankit_trademark_notice_is_visible_on_the_home_page() -> None:
