@@ -13,7 +13,7 @@ It only runs on:
 
 It fetches:
 
-- `https://robertsspaceindustries.com/en/account/pledges?page=1&product-type=`
+- `https://robertsspaceindustries.com/account/pledges`
 
 using your existing browser RSI login session. It does not ask for, display, store, or send your RSI password or cookie value to the website.
 

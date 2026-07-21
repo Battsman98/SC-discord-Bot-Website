@@ -16,7 +16,7 @@ function cleanShipName(value) {
   name = name.replace(/^(?:Standalone Ship|Game Package|Package|Ship)\s*[-:]?\s*/i, "");
   name = name.replace(/\b(?:with Lifetime Insurance|Lifetime Insurance|Warbond|Best In Show|BIS|ILW|IAE|LTI)\b.*$/i, "").trim();
   if (name.length < 2 || name.length > 72 || name.split(" ").length > 10) return null;
-  const blocked = /\b(?:upgrade|paint|skin|flair|poster|plushie|figurine|gift card|coupon|currency|insurance|hangar|downloadable|weapon|armor)\b/i;
+  const blocked = /\b(?:upgrade|paint|skin|flair|poster|plushie|figurine|gift card|coupon|currency|insurance|hangar|downloadable|weapon|armor)\b|\bto\b.*\b(?:year|insurance)\b|\b\d+\s*year\b/i;
   return blocked.test(name) ? null : name;
 }
 
@@ -38,7 +38,7 @@ function extractShipCandidates(pageHTML) {
     const cleaned = cleanShipName(match[1]);
     if (cleaned) candidates.add(cleaned);
   }
-  const containedShips = /(?:Contains|Also Contains)\s+([^$<>]{2,120}?)(?=\s+(?:Also Contains|Attributed|Created|Serial|Insurance|Starting Money|Hangar|Downloadable|Contains|$))/gi;
+  const containedShips = /(?:Contains|Also Contains)\s*:?\s+([^$<>]{2,120}?)(?=\s+(?:Also Contains|Attributed|Created|Serial|Insurance|Starting Money|Hangar|Downloadable|Contains|$))/gi;
   for (const match of plainText.matchAll(containedShips)) {
     const cleaned = cleanShipName(match[1]);
     if (cleaned) candidates.add(cleaned);
@@ -107,7 +107,7 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
 async function handleMessage(rawMessage) {
   const message = JSON.parse(rawMessage || "{}");
   if (message.action === "connect") {
-    return { code: 200, version: "0.4.2", scope: "ships-and-vehicles-only" };
+    return { code: 200, version: "0.4.3", scope: "ships-and-vehicles-only" };
   }
   if (message.action === "importHangar") {
     return await importHangar();

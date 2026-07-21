@@ -690,7 +690,7 @@ def _extract_rsi_pledge_ship_names(page_html: str) -> set[str]:
     text = re.sub(r"\s+", " ", text)
     candidates.update(_extract_rsi_pledge_ship_names_from_blocks(text))
     patterns = [
-        r"Contains\s+([^$<>]{2,120}?)(?=\s+(?:Also Contains|Standalone Ship|Package|Serial|Insurance|Starting Money|Hangar|Downloadable|Contains|$))",
+        r"(?:Contains|Also Contains)\s*:?\s+([^$<>]{2,120}?)(?=\s+(?:Also Contains|Standalone Ship|Package|Serial|Insurance|Starting Money|Hangar|Downloadable|Contains|$))",
         r"(?:Standalone Ship|Game Package|Package)\s*[-:]\s*([^$<>]{2,100}?)(?=\s+(?:Attributed|Created|Serial|Insurance|Contains|$))",
         r"Ship\s*[:\-]\s*([^$<>]{2,100}?)(?=\s+(?:Serial|Insurance|Contains|$))",
     ]
@@ -722,7 +722,7 @@ def _extract_rsi_pledge_ship_names_from_blocks(text: str) -> set[str]:
     for block in re.finditer(block_pattern, text, flags=re.IGNORECASE):
         body = block.group("body")
         for pattern in (
-            r"Contains\s+([^$<>]{2,140}?)(?=\s+(?:Also Contains|Attributed|Created|Serial|Insurance|Starting Money|Hangar|Downloadable|Contains|$))",
+            r"(?:Contains|Also Contains)\s*:?\s+([^$<>]{2,140}?)(?=\s+(?:Also Contains|Attributed|Created|Serial|Insurance|Starting Money|Hangar|Downloadable|Contains|$))",
             r"^\s*[-:]?\s*([^$<>]{2,120}?)(?=\s+(?:Attributed|Created|Serial|Insurance|Contains|$))",
         ):
             for match in re.finditer(pattern, body, flags=re.IGNORECASE):
@@ -787,6 +787,8 @@ def _clean_rsi_pledge_ship_name(name: str) -> str | None:
         "united states dollar",
     }
     normalized = _normalize_text(value)
+    if re.search(r"\bto\b.*\b(?:year|insurance)\b|\b\d+\s*year\b", normalized):
+        return None
     if normalized in blocked_words or any(term in normalized for term in blocked_terms):
         return None
     return value

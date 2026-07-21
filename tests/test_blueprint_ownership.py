@@ -130,6 +130,21 @@ def test_rsi_hangar_import_ignores_non_ship_pledge_items() -> None:
     assert _extract_rsi_pledge_ship_names(page) == {"Anvil Arrow"}
 
 
+def test_rsi_hangar_import_reads_colon_separated_contained_ships() -> None:
+    page = r'''
+    <article>Industrial Collection</article>
+    <div>Contains: ARGO MOTH Also Contains: ARGO SRV</div>
+    <div>Contains: Aegis Reclaimer Insurance 10 Year</div>
+    <div>Upgrade - F8C to F8C with 10 Year Insurance</div>
+    '''
+
+    assert _extract_rsi_pledge_ship_names(page) == {
+        "ARGO MOTH",
+        "ARGO SRV",
+        "Aegis Reclaimer",
+    }
+
+
 def test_rsi_import_lookup_candidates_simplify_package_names() -> None:
     assert "Avenger Titan" in _rsi_import_lookup_candidates("Avenger Titan Starter Pack")
 

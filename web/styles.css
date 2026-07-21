@@ -702,7 +702,7 @@ article.tool-panel.active {
 
 .saved-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
   align-items: start;
 }
@@ -724,7 +724,7 @@ article.tool-panel.active {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--control);
-  padding: 9px;
+  padding: 12px;
   min-width: 0;
 }
 
@@ -769,7 +769,7 @@ article.tool-panel.active {
 }
 
 .hangar-name strong {
-  font-size: 1rem;
+  font-size: 1.08rem;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -785,7 +785,7 @@ article.tool-panel.active {
 
 .hangar-card.expanded {
   grid-column: 1 / -1;
-  grid-template-columns: minmax(240px, 38%) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 44%) minmax(0, 1fr);
   gap: 18px;
   padding: 14px;
 }
