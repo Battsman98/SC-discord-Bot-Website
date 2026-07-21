@@ -834,6 +834,19 @@ article.tool-panel.active {
   flex-wrap: wrap;
 }
 
+.audit-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.audit-controls label {
+  display: grid;
+  gap: 5px;
+}
+
 .blueprint-library, .ship-library, .inventory-library {
   margin-bottom: 16px;
 }
@@ -1803,6 +1816,10 @@ body.hangar-modal-open {
 }
 
 @media (max-width: 680px) {
+  .audit-controls {
+    grid-template-columns: 1fr;
+  }
+
   .app-shell.overview-mode {
     min-height: calc(100dvh - 180px);
     padding-bottom: 48px;

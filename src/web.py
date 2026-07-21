@@ -28,7 +28,7 @@ from src.bot import (
     apply_community_mining_locations,
     get_cz_dashboard_timers,
 )
-from src.cache import SQLiteCache
+from src.cache import AUDIT_ACTION_TYPES, SQLiteCache
 from src.config import Settings
 from src.sources.registry import SourceRegistry, build_default_registry
 from src.timers import (
@@ -269,6 +269,95 @@ _RAPID_OCR = None
 
 def state() -> AppState:
     return app.state.game_assist
+
+
+@app.middleware("http")
+async def audit_website_action(request: Request, call_next):
+    metadata = _website_audit_metadata(request.method, request.url.path)
+    response = None
+    error_name = None
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as error:
+        error_name = type(error).__name__
+        raise
+    finally:
+        explicit_success = (
+            _website_has_explicit_audit(request.method, request.url.path)
+            and response is not None
+            and response.status_code < 400
+        )
+        if metadata and not explicit_success and hasattr(app.state, "game_assist"):
+            action_type, title = metadata
+            user = current_user_from_request(request, state().settings)
+            fields = {
+                "Source": "Website",
+                "User": _website_audit_user(user),
+                "Method": request.method,
+                "Path": request.url.path,
+                "Status": response.status_code if response is not None else 500,
+                "Outcome": "Success" if response is not None and response.status_code < 400 else "Failed",
+            }
+            safe_query = _safe_audit_query(request)
+            if safe_query:
+                fields["Query"] = safe_query
+            if error_name:
+                fields["Error"] = error_name
+            try:
+                await state().cache.add_audit_event(title, fields, action_type)
+            except Exception:
+                pass
+
+
+def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:
+    if method in {"HEAD", "OPTIONS"} or path in {"/api/health", "/api/me"} or "/autocomplete/" in path:
+        return None
+    if path.endswith("/facets"):
+        return None
+    mappings = (
+        ("/api/me/inventory", "inventory", "Website Inventory Action"),
+        ("/api/me/blueprints", "blueprints", "Website Blueprint Collection Action"),
+        ("/api/me/ships", "ships", "Website Hangar Action"),
+        ("/api/ships", "ships", "Website Ship Search"),
+        ("/api/mining", "mining", "Website Mining Action"),
+        ("/api/commodities", "trade", "Website Commodity Search"),
+        ("/api/trade", "trade", "Website Trade Route Search"),
+        ("/api/blueprints", "blueprints", "Website Blueprint Search"),
+        ("/api/items", "items", "Website Item Search"),
+        ("/api/exec", "timers", "Website Executive Timer Action"),
+        ("/api/cz", "timers", "Website CZ Timer Action"),
+        ("/api/commands", "commands", "Website Commands Viewed"),
+        ("/api/audit", "audit", "Website Audit Viewed"),
+        ("/api/lookup", "other", "Website General Lookup"),
+        ("/auth/", "authentication", "Website Authentication Action"),
+    )
+    return next(
+        ((action_type, title) for prefix, action_type, title in mappings if path.startswith(prefix)),
+        None,
+    )
+
+
+def _website_has_explicit_audit(method: str, path: str) -> bool:
+    return method != "GET" and (
+        path == "/api/mining/community"
+        or path == "/api/exec/override"
+        or path.startswith("/api/cz/timers")
+    )
+def _website_audit_user(user: Any) -> str:
+    if user is None:
+        return "Anonymous"
+    return f"{user.display_name or user.username} ({user.id})"
+
+
+def _safe_audit_query(request: Request) -> str:
+    secret_names = {"code", "state", "token", "secret", "password"}
+    values = [
+        f"{key}={value}"
+        for key, value in request.query_params.multi_items()
+        if key.lower() not in secret_names
+    ]
+    return "&".join(values)[:500]
 
 
 def require_change_admin(
@@ -990,17 +1079,19 @@ async def multi_mining_signature_payload(query: str, terms: list[str]) -> dict[s
 
 
 @app.post("/api/mining/community", dependencies=[Depends(require_change_admin)])
-async def mining_community(request: MiningCommunityRequest) -> dict[str, str]:
-    await add_community_mining_location(state().cache, request.model_dump())
+async def mining_community(payload: MiningCommunityRequest, request: Request) -> dict[str, str]:
+    await add_community_mining_location(state().cache, payload.model_dump())
     await state().cache.add_audit_event(
         "Website Mining Location Added",
         {
-            "Material": request.material,
-            "System": request.system,
-            "Location Type": request.location_type,
-            "Location": request.location,
-            "Reported By": request.reported_by,
+            "User": _website_audit_user(current_user_from_request(request, state().settings)),
+            "Material": payload.material,
+            "System": payload.system,
+            "Location Type": payload.location_type,
+            "Location": payload.location,
+            "Reported By": payload.reported_by,
         },
+        "mining",
     )
     return {"status": "saved"}
 
@@ -2306,24 +2397,29 @@ async def exec_status() -> dict[str, Any]:
 
 
 @app.post("/api/exec/override", dependencies=[Depends(require_change_admin)])
-async def set_exec_override(request: ExecOverrideRequest) -> dict[str, Any]:
-    cycle_start = calculate_cycle_start_from_phase(request.phase, request.remaining_minutes)
+async def set_exec_override(payload_request: ExecOverrideRequest, request: Request) -> dict[str, Any]:
+    cycle_start = calculate_cycle_start_from_phase(payload_request.phase, payload_request.remaining_minutes)
     payload = {
         "cycle_start_unix": cycle_start,
-        "phase": request.phase,
-        "remaining_minutes": request.remaining_minutes,
-        "corrected_by": request.corrected_by,
+        "phase": payload_request.phase,
+        "remaining_minutes": payload_request.remaining_minutes,
+        "corrected_by": payload_request.corrected_by,
+        "User": _website_audit_user(current_user_from_request(request, state().settings)),
         "created_at": int(time.time()),
     }
     await state().cache.set(EXEC_OVERRIDE_CACHE_KEY, payload, 315360000)
-    await state().cache.add_audit_event("Website Executive Hangar Override Set", payload)
+    await state().cache.add_audit_event("Website Executive Hangar Override Set", payload, "timers")
     return {"status": "saved", "override": payload}
 
 
 @app.delete("/api/exec/override", dependencies=[Depends(require_change_admin)])
-async def clear_exec_override() -> dict[str, str]:
+async def clear_exec_override(request: Request) -> dict[str, str]:
     await state().cache.delete(EXEC_OVERRIDE_CACHE_KEY)
-    await state().cache.add_audit_event("Website Executive Hangar Override Cleared", {"Source": "Website"})
+    await state().cache.add_audit_event(
+        "Website Executive Hangar Override Cleared",
+        {"Source": "Website", "User": _website_audit_user(current_user_from_request(request, state().settings))},
+        "timers",
+    )
     return {"status": "cleared"}
 
 
@@ -2336,41 +2432,53 @@ async def cz_timers() -> dict[str, Any]:
 
 
 @app.post("/api/cz/timers", dependencies=[Depends(require_change_admin)])
-async def start_cz_timer(request: CZTimerRequest) -> dict[str, Any]:
-    if request.timer not in CZ_TIMER_DEFINITIONS:
+async def start_cz_timer(payload: CZTimerRequest, request: Request) -> dict[str, Any]:
+    if payload.timer not in CZ_TIMER_DEFINITIONS:
         raise HTTPException(status_code=422, detail="Unknown timer.")
     timers = await get_cz_dashboard_timers(state().cache)
-    label, duration = CZ_TIMER_DEFINITIONS[request.timer]
-    timers[request.timer] = {
+    label, duration = CZ_TIMER_DEFINITIONS[payload.timer]
+    timers[payload.timer] = {
         "label": label,
-        "ends_at": calculate_countdown_end_unix(duration, request.started_minutes_ago),
+        "ends_at": calculate_countdown_end_unix(duration, payload.started_minutes_ago),
         "duration_seconds": duration,
     }
     await state().cache.set(CZ_TIMERS_CACHE_KEY, timers, 315360000)
-    await state().cache.add_audit_event("Website CZ Timer Started", {"Timer": label})
+    await state().cache.add_audit_event(
+        "Website CZ Timer Started",
+        {"Timer": label, "User": _website_audit_user(current_user_from_request(request, state().settings))},
+        "timers",
+    )
     return {"status": "saved", "timers": timers}
 
 
 @app.delete("/api/cz/timers/{timer}", dependencies=[Depends(require_change_admin)])
-async def reset_cz_timer(timer: str) -> dict[str, Any]:
+async def reset_cz_timer(timer: str, request: Request) -> dict[str, Any]:
     timers = await get_cz_dashboard_timers(state().cache)
     if timer == "all":
         timers = {}
     else:
         timers.pop(timer, None)
     await state().cache.set(CZ_TIMERS_CACHE_KEY, timers, 315360000)
-    await state().cache.add_audit_event("Website CZ Timer Reset", {"Timer": timer})
+    await state().cache.add_audit_event(
+        "Website CZ Timer Reset",
+        {"Timer": timer, "User": _website_audit_user(current_user_from_request(request, state().settings))},
+        "timers",
+    )
     return {"status": "saved", "timers": timers}
 
 
 @app.get("/api/audit/recent")
 async def audit_recent(
     request: Request,
-    limit: int = Query(default=10, ge=1, le=25),
+    limit: int = Query(default=25, ge=1, le=100),
+    action_type: str | None = Query(default=None),
+    sort: str = Query(default="newest", pattern="^(newest|oldest|action)$"),
     _: None = Depends(require_bot_admin),
 ) -> list[dict[str, Any]]:
     del request
-    return await state().cache.recent_audit_events(limit)
+    if action_type and action_type not in AUDIT_ACTION_TYPES:
+        raise HTTPException(status_code=422, detail="Unknown audit action type.")
+    return await state().cache.recent_audit_events(limit, action_type, sort)
 
 
 app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")

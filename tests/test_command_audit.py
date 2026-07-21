@@ -161,3 +161,32 @@ def test_autocomplete_skips_synchronous_command_auditing() -> None:
 
     assert asyncio.run(bot.tree.interaction_check(interaction))
     bot.log_audit_event.assert_not_awaited()
+
+
+def test_discord_audit_is_saved_when_channel_is_not_configured() -> None:
+    settings = Settings(
+        discord_token="token",
+        discord_client_id="",
+        discord_client_secret="",
+        discord_redirect_uri="http://127.0.0.1:8000/auth/discord/callback",
+        discord_guild_id=123,
+        commands_channel_id=None,
+        exec_status_channel_id=None,
+        exec_admin_role_ids=(),
+        bot_admin_role_ids=(),
+        bot_admin_user_ids=(),
+        cz_timers_channel_id=None,
+        audit_log_channel_id=None,
+        command_channel_ids={},
+        command_prefix="!",
+        database_path="data/test.sqlite3",
+        http_timeout_seconds=15,
+        cache_ttl_seconds=300,
+    )
+    cache = SimpleNamespace(add_audit_event=AsyncMock(), close=AsyncMock())
+    sources = SimpleNamespace(close=AsyncMock())
+    bot = GameAssistBot(settings, cache, sources)
+
+    asyncio.run(bot.log_audit_event("Command Used", {"Command": "/mining"}))
+
+    cache.add_audit_event.assert_awaited_once_with("Command Used", {"Command": "/mining"})

@@ -5,6 +5,50 @@ from pathlib import Path
 from typing import Any
 
 
+AUDIT_ACTION_TYPES = {
+    "admin", "audit", "authentication", "blueprints", "commands", "inventory",
+    "items", "mining", "other", "ships", "timers", "trade",
+}
+
+
+def normalize_audit_action_type(value: object) -> str | None:
+    normalized = str(value or "").strip().lower().replace("_", " ").replace("-", " ")
+    aliases = {
+        "blueprint": "blueprints", "command": "commands", "inventory search": "inventory",
+        "item": "items", "item locator": "items", "ship": "ships", "timer": "timers",
+        "cz timer": "timers", "exec": "timers", "commodity": "trade", "trade routing": "trade",
+    }
+    normalized = aliases.get(normalized, normalized)
+    return normalized if normalized in AUDIT_ACTION_TYPES else None
+
+
+def audit_action_type(title: str, fields: dict[str, Any]) -> str:
+    command = str(fields.get("Command") or fields.get("Action") or "").strip().lower().removeprefix("/")
+    first_command = command.split()[0] if command else ""
+    explicit = normalize_audit_action_type(first_command) or normalize_audit_action_type(command)
+    if explicit:
+        return explicit
+
+    text = " ".join([title, command]).lower()
+    keywords = (
+        ("authentication", ("login", "logout", "oauth", "authentication")),
+        ("inventory", ("inventory",)),
+        ("blueprints", ("blueprint", "crafting")),
+        ("mining", ("mining", "material location")),
+        ("ships", ("ship", "hangar", "pledge")),
+        ("trade", ("trade", "commodity")),
+        ("items", ("item locator", "item search")),
+        ("timers", ("timer", "executive", "exec ", "contested zone", "cz ")),
+        ("audit", ("audit",)),
+        ("admin", ("admin", "command blocked")),
+        ("commands", ("command",)),
+    )
+    for action_type, terms in keywords:
+        if any(term in text for term in terms):
+            return action_type
+    return "other"
+
+
 class SQLiteCache:
     def __init__(self, connection: sqlite3.Connection) -> None:
         self._connection = connection
@@ -15,6 +59,8 @@ class SQLiteCache:
         path.parent.mkdir(parents=True, exist_ok=True)
 
         connection = sqlite3.connect(path)
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute("PRAGMA busy_timeout = 5000")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS cache_entries (
@@ -30,6 +76,7 @@ class SQLiteCache:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at INTEGER NOT NULL,
                 title TEXT NOT NULL,
+                action_type TEXT NOT NULL DEFAULT 'other',
                 fields_json TEXT NOT NULL
             )
             """
@@ -92,6 +139,8 @@ class SQLiteCache:
         cls._ensure_column(connection, "user_inventory_items", "item_type", "TEXT")
         cls._ensure_column(connection, "user_inventory_items", "item_size", "TEXT")
         cls._ensure_column(connection, "user_inventory_items", "volume_scu", "REAL")
+        cls._ensure_column(connection, "audit_events", "action_type", "TEXT NOT NULL DEFAULT 'other'")
+        cls._backfill_audit_action_types(connection)
         connection.commit()
         return cls(connection)
 
@@ -100,6 +149,22 @@ class SQLiteCache:
         columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
         if column not in columns:
             connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+
+    @staticmethod
+    def _backfill_audit_action_types(connection: sqlite3.Connection) -> None:
+        rows = connection.execute(
+            "SELECT id, title, fields_json FROM audit_events WHERE action_type IS NULL OR action_type = 'other'"
+        ).fetchall()
+        for event_id, title, fields_json in rows:
+            try:
+                fields = json.loads(fields_json)
+            except (TypeError, json.JSONDecodeError):
+                fields = {}
+            action_type = audit_action_type(str(title), fields if isinstance(fields, dict) else {})
+            connection.execute(
+                "UPDATE audit_events SET action_type = ? WHERE id = ?",
+                (action_type, event_id),
+            )
 
     async def get(self, cache_key: str) -> Any | None:
         row = self._connection.execute(
@@ -136,15 +201,21 @@ class SQLiteCache:
         self._connection.execute("DELETE FROM cache_entries WHERE cache_key = ?", (cache_key,))
         self._connection.commit()
 
-    async def add_audit_event(self, title: str, fields: dict[str, Any]) -> None:
+    async def add_audit_event(
+        self,
+        title: str,
+        fields: dict[str, Any],
+        action_type: str | None = None,
+    ) -> None:
         now = int(time.time())
         clean_fields = {str(key): str(value) for key, value in fields.items()}
+        clean_action_type = normalize_audit_action_type(action_type) or audit_action_type(title, clean_fields)
         self._connection.execute(
             """
-            INSERT INTO audit_events (created_at, title, fields_json)
-            VALUES (?, ?, ?)
+            INSERT INTO audit_events (created_at, title, action_type, fields_json)
+            VALUES (?, ?, ?, ?)
             """,
-            (now, title, json.dumps(clean_fields)),
+            (now, title, clean_action_type, json.dumps(clean_fields)),
         )
         self._connection.execute(
             """
@@ -158,25 +229,42 @@ class SQLiteCache:
         )
         self._connection.commit()
 
-    async def recent_audit_events(self, limit: int = 10) -> list[dict[str, Any]]:
+    async def recent_audit_events(
+        self,
+        limit: int = 10,
+        action_type: str | None = None,
+        sort_order: str = "newest",
+    ) -> list[dict[str, Any]]:
+        clean_action_type = normalize_audit_action_type(action_type)
+        where = "WHERE action_type = ?" if clean_action_type else ""
+        values: list[Any] = [clean_action_type] if clean_action_type else []
+        order_clause = (
+            "action_type ASC, id DESC"
+            if sort_order == "action"
+            else f"id {'ASC' if sort_order == 'oldest' else 'DESC'}"
+        )
+        values.append(max(1, min(limit, 100)))
         rows = self._connection.execute(
-            """
-            SELECT id, created_at, title, fields_json
+            f"""
+            SELECT id, created_at, title, action_type, fields_json
             FROM audit_events
-            ORDER BY id DESC
+            {where}
+            ORDER BY {order_clause}
             LIMIT ?
             """,
-            (max(1, min(limit, 25)),),
+            values,
         ).fetchall()
         return [
             {
                 "id": row[0],
                 "created_at": row[1],
                 "title": row[2],
-                "fields": json.loads(row[3]),
+                "action_type": row[3],
+                "fields": json.loads(row[4]),
             }
             for row in rows
         ]
+
 
     async def user_blueprints(self, user_id: int) -> list[dict[str, Any]]:
         rows = self._connection.execute(

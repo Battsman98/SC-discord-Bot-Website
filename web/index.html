@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260720-sticky-top-nav-gap-fix">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260720-audit-categories">
   <link rel="stylesheet" href="/assets/hotfix-overlay.css?v=20260720">
 </head>
 <body data-mfd-theme="overview">
@@ -423,7 +423,40 @@
     <section id="admin" class="tab-panel">
         <article class="panel">
           <h2>Audit Events</h2>
-          <button data-action-button="refreshAudit">Refresh</button>
+          <div class="audit-controls">
+            <label>Action type
+              <select id="auditActionType">
+                <option value="">All actions</option>
+                <option value="ships">Ships</option>
+                <option value="trade">Trade</option>
+                <option value="mining">Mining</option>
+                <option value="blueprints">Blueprints</option>
+                <option value="items">Items</option>
+                <option value="inventory">Inventory</option>
+                <option value="timers">Timers</option>
+                <option value="commands">Commands</option>
+                <option value="authentication">Authentication</option>
+                <option value="admin">Admin</option>
+                <option value="audit">Audit</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>Sort
+              <select id="auditSort">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="action">Action type A-Z</option>
+              </select>
+            </label>
+            <label>Events
+              <select id="auditLimit">
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <button data-action-button="refreshAudit">Refresh</button>
+          </div>
         <div id="auditOutput" class="results compact"></div>
       </article>
     </section>
@@ -447,6 +480,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260720b" defer></script>
-  <script src="/assets/app.js?v=20260720-extension-045" defer></script>
+  <script src="/assets/app.js?v=20260720-audit-categories" defer></script>
 </body>
 </html>

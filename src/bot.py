@@ -486,6 +486,8 @@ class GameAssistBot(commands.Bot):
         fields: dict[str, object],
         color: discord.Color = discord.Color.blurple(),
     ) -> None:
+        await self.cache.add_audit_event(title, fields)
+
         if not self.settings.audit_log_channel_id:
             return
 
@@ -502,8 +504,6 @@ class GameAssistBot(commands.Bot):
         embed = discord.Embed(title=title, color=color, timestamp=discord.utils.utcnow())
         for name, value in fields.items():
             embed.add_field(name=name, value=_truncate_audit_value(value), inline=False)
-
-        await self.cache.add_audit_event(title, fields)
 
         try:
             await channel.send(embed=embed)

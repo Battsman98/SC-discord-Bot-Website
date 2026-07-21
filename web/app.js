@@ -157,6 +157,9 @@ document.querySelector("[data-action-button='clearExec']").addEventListener("cli
 });
 
 document.querySelector("[data-action-button='refreshAudit']").addEventListener("click", loadAudit);
+document.querySelector("#auditActionType")?.addEventListener("change", loadAudit);
+document.querySelector("#auditSort")?.addEventListener("change", loadAudit);
+document.querySelector("#auditLimit")?.addEventListener("change", loadAudit);
 document.querySelector("[data-action-button='refreshBlueprints']").addEventListener("click", loadSavedBlueprints);
 document.querySelector("[data-action-button='refreshShips']").addEventListener("click", loadSavedShips);
 document.querySelector("[data-action-button='backToOverview']").addEventListener("click", () => activateTab("overview"));
@@ -2189,13 +2192,24 @@ async function loadTimers() {
 
 async function loadAudit() {
   try {
-    renderCards(outputs.audit, await api("/api/audit/recent?limit=20"), (event) => card(event.title, [
+    const params = new URLSearchParams({
+      limit: document.querySelector("#auditLimit")?.value || "25",
+      sort: document.querySelector("#auditSort")?.value || "newest",
+    });
+    const actionType = document.querySelector("#auditActionType")?.value;
+    if (actionType) params.set("action_type", actionType);
+    renderCards(outputs.audit, await api(`/api/audit/recent?${params}`), (event) => card(event.title, [
+      ["Action type", auditActionLabel(event.action_type)],
       ["When", dateTime(event.created_at)],
       ["Fields", Object.entries(event.fields || {}).map(([key, value]) => `${key}: ${value}`).join("<br>")],
     ]));
   } catch (error) {
     outputs.audit.innerHTML = errorMessage(error.message);
   }
+}
+
+function auditActionLabel(value) {
+  return String(value || "other").replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 }
 
 function outputForAction(action) {
