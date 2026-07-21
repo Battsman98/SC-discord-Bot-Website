@@ -178,13 +178,18 @@ def test_lookup_ship_retries_with_canonical_name() -> None:
     async def fake_fetch_pledge_price(data: dict):
         return None
 
+    async def fake_lookup_rsi_ship(query: str):
+        return SimpleNamespace(image_url="https://example.test/raft-high-resolution.jpg")
+
     source._fetch_json = fake_fetch_json
     source._fetch_pledge_price = fake_fetch_pledge_price
+    source._lookup_rsi_ship = fake_lookup_rsi_ship
 
     result = asyncio.run(source.lookup_ship("argo raft"))
 
     assert result is not None
     assert result.name == "Argo RAFT"
+    assert result.image_url == "https://example.test/raft-high-resolution.jpg"
     assert requested_urls[0].endswith("/argo%20raft")
     assert requested_urls[1].endswith("/Argo%20RAFT")
 
