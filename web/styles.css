@@ -77,6 +77,12 @@ body[data-mfd-theme="crusader"] {
   --ambient: rgba(60, 167, 232, 0.13); --glow: rgba(60, 167, 232, 0.27); --panel-tint: rgba(60, 167, 232, 0.04);
 }
 
+body[data-mfd-theme="rsi"] {
+  --bg: #02070b; --surface: #0b151d; --surface-2: #152630; --line: #3d7188;
+  --text: #e9f8ff; --muted: #8facbb; --accent: #32b9e6; --accent-2: #b4efff;
+  --ambient: rgba(50, 185, 230, 0.14); --glow: rgba(50, 185, 230, 0.3); --panel-tint: rgba(180, 239, 255, 0.045);
+}
+
 body[data-mfd-theme="misc"] {
   --bg: #040908; --surface: #0e1916; --surface-2: #182923; --line: #477566;
   --text: #e7fff7; --muted: #9bbdaf; --accent: #35c58b; --accent-2: #9ef0c8;

@@ -36,7 +36,7 @@ const mfdThemes = {
   mining: { theme: "argo", label: "ARGO ASTRONAUTICS" },
   crafting: { theme: "anvil", label: "ANVIL AEROSPACE" },
   items: { theme: "origin", label: "ORIGIN JUMPWORKS" },
-  inventory: { theme: "crusader", label: "CRUSADER INDUSTRIES" },
+  inventory: { theme: "rsi", label: "ROBERTS SPACE INDUSTRIES" },
   timers: { theme: "misc", label: "MISC INDUSTRIAL" },
   admin: { theme: "security", label: "SECURITY AUDIT" },
 };

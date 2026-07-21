@@ -181,7 +181,7 @@ def test_each_tool_page_has_a_manufacturer_mfd_theme() -> None:
         "mining": ("argo", "ARGO ASTRONAUTICS"),
         "crafting": ("anvil", "ANVIL AEROSPACE"),
         "items": ("origin", "ORIGIN JUMPWORKS"),
-        "inventory": ("crusader", "CRUSADER INDUSTRIES"),
+        "inventory": ("rsi", "ROBERTS SPACE INDUSTRIES"),
         "timers": ("misc", "MISC INDUSTRIAL"),
         "admin": ("security", "SECURITY AUDIT"),
     }
