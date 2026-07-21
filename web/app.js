@@ -18,6 +18,14 @@ const outputs = {
 };
 
 const appShell = document.querySelector(".app-shell");
+const overviewPanel = document.querySelector("#overview");
+const standaloneGuide = document.querySelector("#guide");
+if (overviewPanel && standaloneGuide) {
+  while (standaloneGuide.firstElementChild) {
+    overviewPanel.append(standaloneGuide.firstElementChild);
+  }
+  standaloneGuide.remove();
+}
 const mfdThemes = {
   overview: { theme: "overview", label: "RSI HOME SYSTEM" },
   lookup: { theme: "drake", label: "DRAKE INTERPLANETARY" },
@@ -27,7 +35,6 @@ const mfdThemes = {
   items: { theme: "origin", label: "ORIGIN JUMPWORKS" },
   inventory: { theme: "crusader", label: "CRUSADER INDUSTRIES" },
   timers: { theme: "misc", label: "MISC INDUSTRIAL" },
-  guide: { theme: "aegis", label: "COMPANION MANUAL" },
   admin: { theme: "security", label: "SECURITY AUDIT" },
 };
 

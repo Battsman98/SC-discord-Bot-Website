@@ -309,7 +309,8 @@ button:hover, .button-link:hover, .tabs button.active {
 }
 
 .app-shell.overview-mode .overview-heading p {
-  display: none;
+  display: block;
+  max-width: 980px;
 }
 
 .app-shell.overview-mode .overview-options {
@@ -391,6 +392,27 @@ button:hover, .button-link:hover, .tabs button.active {
 .guide-manual {
   max-width: 1120px;
   margin-inline: auto;
+}
+
+.app-shell.overview-mode .guide-manual {
+  margin-top: 28px;
+}
+
+.creator-section {
+  max-width: 1120px;
+  margin: 16px auto 0;
+  border-left: 4px solid var(--accent);
+}
+
+.creator-section h2 {
+  margin-top: 0;
+}
+
+.creator-placeholder {
+  max-width: 760px;
+  color: var(--muted);
+  font-style: italic;
+  line-height: 1.65;
 }
 
 .guide-hero {

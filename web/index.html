@@ -25,14 +25,13 @@
       <button data-tab="items">Items</button>
       <button data-tab="inventory">Inventory</button>
       <button data-tab="timers">Timers</button>
-      <button data-tab="guide">Guide</button>
     </nav>
 
     <section id="overview" class="tab-panel active">
       <div class="overview-heading">
         <h2>Your Star Citizen companion</h2>
         <p>Plan your next session, organize what you own, and find useful game information in one place. Manage your hangar and inventory, research ships and items, compare trade and mining opportunities, track blueprints, and check community timers.</p>
-        <p class="overview-intro-note">Choose a destination below, or open the Guide for a complete walkthrough of every website tool.</p>
+        <p class="overview-intro-note">The guide below provides a complete walkthrough of every website tool.</p>
       </div>
       <nav class="overview-options" aria-label="Overview destinations">
         <button type="button" data-overview-tab="lookup"><span>Ships</span><small>Search and manage your hangar</small></button>
@@ -42,7 +41,6 @@
         <button type="button" data-overview-tab="items"><span>Items</span><small>Look up equipment and components</small></button>
         <button type="button" data-overview-tab="inventory"><span>Inventory</span><small>Track items across locations</small></button>
         <button type="button" data-overview-tab="timers"><span>Timers</span><small>View event and zone timers</small></button>
-        <button type="button" data-overview-tab="guide"><span>Website Guide</span><small>Learn how every website tool works</small></button>
       </nav>
       <div class="home-background" aria-hidden="true">
         <div class="home-background-layer active"></div>
@@ -339,7 +337,7 @@
       </div>
     </section>
 
-    <section id="guide" class="tab-panel">
+    <section id="guide" hidden>
       <article class="panel guide-manual">
         <div class="guide-hero">
           <p class="guide-kicker">COMPANION MANUAL</p>
@@ -415,6 +413,11 @@
           </section>
         </div>
       </article>
+      <article class="panel creator-section">
+        <p class="guide-kicker">ABOUT THE CREATOR</p>
+        <h2>Creator’s Note</h2>
+        <p class="creator-placeholder">Add your name and a short write-up here about why you created the Star Citizen Companion, who it is for, and what you hope it helps the community accomplish.</p>
+      </article>
     </section>
 
     <section id="admin" class="tab-panel">
@@ -444,6 +447,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260720b" defer></script>
-  <script src="/assets/app.js?v=20260720-guide" defer></script>
+  <script src="/assets/app.js?v=20260720-guide-overview" defer></script>
 </body>
 </html>
