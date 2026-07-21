@@ -433,7 +433,7 @@ function shipOwnershipButton(ship, type, currentType, displayName = shipDisplayN
     loaner: "Loaner",
     in_game: "In-game",
   }[type];
-  const prefix = currentType === type ? "Saved: " : "";
+  const prefix = currentType === type ? "Add another: " : "";
   return `<button type="button" data-ship-save="${escapeAttribute(type)}" data-ship='${escapeAttribute(JSON.stringify({
     name: displayName,
     ownership_type: type,
@@ -446,6 +446,7 @@ function shipOwnershipButton(ship, type, currentType, displayName = shipDisplayN
     source_name: ship.source_name,
     source_url: ship.source_url,
     image_url: ship.image_url,
+    increment: true,
   }))}'>${prefix}${label}</button>`;
 }
 
@@ -657,6 +658,7 @@ async function loadSavedShips(options = {}) {
       const displayLoanerFor = item.loaner_for ? shipDisplayName(item.loaner_for) : "";
       const specs = hangarSpecs(item);
       const ownership = `${shipOwnershipLabel(item.ownership_type)}${displayLoanerFor ? ` for ${displayLoanerFor}` : ""}`;
+      const quantity = Math.max(1, Number(item.quantity) || 1);
       return `<article class="hangar-card" data-hangar-card="${escapeAttribute(item.name)}">
       <button type="button" class="hangar-image-button" data-hangar-expand="${escapeAttribute(item.name)}" aria-expanded="false" aria-label="Show details for ${escapeAttribute(displayName)}">
       <div class="ship-image-frame">
@@ -664,12 +666,12 @@ async function loadSavedShips(options = {}) {
       </div>
       </button>
       <div class="hangar-name">
-        <strong>${escapeHtml(displayName)}</strong>
+        <strong>${escapeHtml(displayName)}${quantity > 1 ? ` x${quantity}` : ""}</strong>
         <span>${escapeHtml(ownership)}</span>
       </div>
       <div class="hangar-card-details">
         <div class="hangar-detail-heading">
-          <div><strong>${escapeHtml(displayName)}</strong><span>${escapeHtml(ownership)}</span></div>
+          <div><strong>${escapeHtml(displayName)}${quantity > 1 ? ` x${quantity}` : ""}</strong><span>${escapeHtml(ownership)}</span></div>
           <button type="button" data-hangar-collapse="${escapeAttribute(item.name)}">Back</button>
         </div>
         <div class="hangar-card-body">
@@ -687,6 +689,10 @@ async function loadSavedShips(options = {}) {
             <option value="loaner" ${item.ownership_type === "loaner" ? "selected" : ""}>Loaner</option>
             <option value="in_game" ${item.ownership_type === "in_game" ? "selected" : ""}>In-game</option>
           </select>
+        </label>
+        <label class="manage-quantity">
+          <span>Quantity</span>
+          <input type="number" min="1" max="999" step="1" value="${quantity}" data-ship-quantity="${escapeAttribute(item.name)}">
         </label>
         <label class="manage-notes">
           <span>Info / comments</span>
@@ -2026,6 +2032,7 @@ function bindShipManageButtons(target, ships) {
           source_name: existing.source_name,
           source_url: existing.source_url,
           image_url: existing.image_url,
+          quantity: Math.max(1, Number(target.querySelector(`[data-ship-quantity="${cssEscape(name)}"]`)?.value) || 1),
           notes: target.querySelector(`[data-ship-notes="${cssEscape(name)}"]`)?.value || "",
         },
       });

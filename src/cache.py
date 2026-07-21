@@ -60,6 +60,7 @@ class SQLiteCache:
                 image_url TEXT,
                 notes TEXT,
                 loaner_for TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
                 saved_at INTEGER NOT NULL,
                 PRIMARY KEY (user_id, ship_name)
             )
@@ -86,6 +87,7 @@ class SQLiteCache:
         cls._ensure_column(connection, "user_ships", "image_url", "TEXT")
         cls._ensure_column(connection, "user_ships", "notes", "TEXT")
         cls._ensure_column(connection, "user_ships", "loaner_for", "TEXT")
+        cls._ensure_column(connection, "user_ships", "quantity", "INTEGER NOT NULL DEFAULT 1")
         cls._ensure_column(connection, "user_inventory_items", "quality", "REAL")
         cls._ensure_column(connection, "user_inventory_items", "item_type", "TEXT")
         cls._ensure_column(connection, "user_inventory_items", "item_size", "TEXT")
@@ -230,7 +232,7 @@ class SQLiteCache:
     async def user_ships(self, user_id: int) -> list[dict[str, Any]]:
         rows = self._connection.execute(
             """
-            SELECT ship_name, ownership_type, manufacturer, role, source_name, source_url, image_url, notes, loaner_for, saved_at
+            SELECT ship_name, ownership_type, manufacturer, role, source_name, source_url, image_url, notes, loaner_for, quantity, saved_at
             FROM user_ships
             WHERE user_id = ?
             ORDER BY loaner_for IS NOT NULL, ship_name COLLATE NOCASE
@@ -248,7 +250,8 @@ class SQLiteCache:
                 "image_url": row[6],
                 "notes": row[7],
                 "loaner_for": row[8],
-                "saved_at": row[9],
+                "quantity": max(1, int(row[9] or 1)),
+                "saved_at": row[10],
             }
             for row in rows
         ]
@@ -265,15 +268,16 @@ class SQLiteCache:
         image_url: str | None = None,
         notes: str | None = None,
         loaner_for: str | None = None,
+        quantity: int | None = None,
     ) -> None:
         now = int(time.time())
         self._connection.execute(
             """
             INSERT INTO user_ships (
                 user_id, ship_name, ownership_type, manufacturer, role, source_name, source_url,
-                image_url, notes, loaner_for, saved_at
+                image_url, notes, loaner_for, quantity, saved_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, 1), ?)
             ON CONFLICT(user_id, ship_name) DO UPDATE SET
                 ownership_type = excluded.ownership_type,
                 manufacturer = excluded.manufacturer,
@@ -283,9 +287,10 @@ class SQLiteCache:
                 image_url = excluded.image_url,
                 notes = excluded.notes,
                 loaner_for = excluded.loaner_for,
+                quantity = CASE WHEN ? IS NULL THEN user_ships.quantity ELSE excluded.quantity END,
                 saved_at = excluded.saved_at
             """,
-            (user_id, ship_name, ownership_type, manufacturer, role, source_name, source_url, image_url, notes, loaner_for, now),
+            (user_id, ship_name, ownership_type, manufacturer, role, source_name, source_url, image_url, notes, loaner_for, quantity, now, quantity),
         )
         self._connection.commit()
 

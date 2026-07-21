@@ -264,6 +264,7 @@ def test_user_ship_ownership_round_trip(tmp_path) -> None:
                 "image_url": None,
                 "notes": None,
                 "loaner_for": None,
+                "quantity": 1,
                 "saved_at": ships[0]["saved_at"],
             }
         ]
@@ -279,6 +280,19 @@ def test_user_ship_ownership_round_trip(tmp_path) -> None:
         )
 
         assert (await cache.user_ships(42))[0]["ownership_type"] == "loaner"
+
+        await cache.save_user_ship(
+            user_id=42,
+            ship_name="Drake Corsair",
+            ownership_type="loaner",
+            manufacturer="Drake Interplanetary",
+            role="Exploration",
+            source_name="Star Citizen Wiki",
+            source_url="https://example.test/corsair",
+            quantity=2,
+        )
+
+        assert (await cache.user_ships(42))[0]["quantity"] == 2
 
         await cache.delete_user_ship(42, "Drake Corsair")
 

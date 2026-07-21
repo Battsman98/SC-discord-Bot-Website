@@ -204,6 +204,8 @@ class ShipOwnershipRequest(BaseModel):
     source_url: str | None = None
     image_url: str | None = None
     notes: str | None = None
+    quantity: int | None = Field(default=None, ge=1, le=999)
+    increment: bool = False
 
 
 class RsiPledgeImportRequest(BaseModel):
@@ -555,6 +557,13 @@ async def save_my_ship(request: ShipOwnershipRequest, user=Depends(require_user)
         raise HTTPException(status_code=422, detail="Ship ownership type must be pledged, loaner, or in_game.")
     ship_name = request.name.strip()
     display_name = _ship_display_name(ship_name)
+    quantity = request.quantity
+    if request.increment:
+        existing = next(
+            (ship for ship in await state().cache.user_ships(user.id) if _normalize_text(ship.get("name")) == _normalize_text(display_name)),
+            None,
+        )
+        quantity = int(existing.get("quantity") or 1) + 1 if existing else 1
     await state().cache.save_user_ship(
         user.id,
         display_name,
@@ -572,6 +581,7 @@ async def save_my_ship(request: ShipOwnershipRequest, user=Depends(require_user)
         str(request.image_url).strip() if request.image_url else None,
         request.notes.strip() if request.notes else None,
         None,
+        quantity,
     )
     await _sync_auto_loaners(user.id, display_name, ownership_type, request.status)
     return {"status": "saved"}
