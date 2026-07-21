@@ -110,7 +110,10 @@ def test_ship_search_results_are_contained_inside_ship_search_panel() -> None:
 def test_hangar_modal_keeps_other_ships_visible() -> None:
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
 
-    assert "background: rgb(0 0 0 / 0.42) !important;" in css
+    for state in (".hangar-modal-backdrop:hover", ".hangar-modal-backdrop:focus-visible", ".hangar-modal-backdrop:active"):
+        assert state in css
+    assert "background: transparent !important;" in css
+    assert "backdrop-filter: none;" in css
 
 
 def test_home_page_starts_on_a_random_background() -> None:

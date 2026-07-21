@@ -802,14 +802,21 @@ article.tool-panel.active {
   box-shadow: 0 24px 80px rgb(0 0 0 / 0.72);
 }
 
-.hangar-modal-backdrop {
+.hangar-modal-backdrop,
+.hangar-modal-backdrop:hover,
+.hangar-modal-backdrop:focus,
+.hangar-modal-backdrop:focus-visible,
+.hangar-modal-backdrop:active {
   position: fixed;
   z-index: 1000;
   inset: 0;
   border: 0;
   border-radius: 0;
-  background: rgb(0 0 0 / 0.42) !important;
-  backdrop-filter: blur(1px);
+  outline: 0;
+  box-shadow: none;
+  background: transparent !important;
+  color: transparent;
+  backdrop-filter: none;
   cursor: default;
 }
 
