@@ -2523,7 +2523,9 @@ def build_inventory_search_embed(
         if row.get("item_size"):
             details.append(f"Size {row['item_size']}")
         detail_text = " / ".join(discord.utils.escape_markdown(str(value)) for value in details if value)
-        line = f"**{name}** × {_format_number(row.get('quantity'))} — {location}"
+        line = f"**{name}** × {_format_number(row.get('quantity'))}"
+        if not station:
+            line = f"{line} — {location}"
         if detail_text:
             line = f"{line}\n{detail_text}"
         candidate = "\n".join([*lines, line])
