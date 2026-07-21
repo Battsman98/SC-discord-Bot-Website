@@ -120,8 +120,17 @@ def test_inventory_search_embed_shows_station_and_item_metadata() -> None:
 
     assert "Station: Everus Harbor" in embed.description
     assert "250-E Laser Pointer" in embed.description
+    assert "250-E Laser Pointer** × 3 — Everus Harbor" not in embed.description
     assert "Personal Weapons / Attachments / Size 1" in embed.description
     assert "Showing 1 of 1 matching item" in embed.footer.text
+
+
+def test_inventory_search_embed_keeps_locations_without_station_filter() -> None:
+    embed = build_inventory_search_embed(
+        [{"name": "FS-9 LMG", "location": "Port Tressler", "quantity": 1}]
+    )
+
+    assert "FS-9 LMG** × 1 — Port Tressler" in embed.description
 
 
 def test_autocomplete_skips_synchronous_command_auditing() -> None:
