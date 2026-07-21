@@ -54,6 +54,9 @@ class GameAssistCommandTree(app_commands.CommandTree):
         if not isinstance(bot, GameAssistBot):
             return True
 
+        if interaction.type == discord.InteractionType.autocomplete:
+            return True
+
         command_name = _interaction_command_name(interaction)
         allowed_channel_id = bot.settings.command_channel_ids.get(command_name)
         if allowed_channel_id is None and command_name == "item search":
@@ -61,33 +64,57 @@ class GameAssistCommandTree(app_commands.CommandTree):
         if command_name == "inventory search" and bot.inventory_channel_id:
             allowed_channel_id = bot.inventory_channel_id
         if allowed_channel_id and interaction.channel_id != allowed_channel_id:
-            await bot.log_audit_event(
-                "Command Blocked",
-                {
-                    "Command": f"/{command_name}",
-                    "User": _audit_user(interaction.user),
-                    "Used In": _audit_channel(interaction.channel_id),
-                    "Allowed Channel": f"<#{allowed_channel_id}>",
-                    "Options": _format_interaction_options(interaction) or "None",
-                },
-                color=discord.Color.red(),
-            )
             await interaction.response.send_message(
                 f"`/{command_name}` can only be used in <#{allowed_channel_id}>.",
                 ephemeral=True,
             )
+            asyncio.create_task(
+                bot.log_audit_event(
+                    "Command Blocked",
+                    {
+                        "Command": f"/{command_name}",
+                        "User": _audit_user(interaction.user),
+                        "Used In": _audit_channel(interaction.channel_id),
+                        "Allowed Channel": f"<#{allowed_channel_id}>",
+                        "Options": _format_interaction_options(interaction) or "None",
+                    },
+                    color=discord.Color.red(),
+                )
+            )
             return False
 
-        await bot.log_audit_event(
-            "Command Used",
-            {
-                "Command": f"/{command_name}",
-                "User": _audit_user(interaction.user),
-                "Channel": _audit_channel(interaction.channel_id),
-                "Options": _format_interaction_options(interaction) or "None",
-            },
+        asyncio.create_task(
+            bot.log_audit_event(
+                "Command Used",
+                {
+                    "Command": f"/{command_name}",
+                    "User": _audit_user(interaction.user),
+                    "Channel": _audit_channel(interaction.channel_id),
+                    "Options": _format_interaction_options(interaction) or "None",
+                },
+            )
         )
         return True
+
+    async def on_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+        original = getattr(error, "original", error)
+        logging.error(
+            "Application command failed: %s",
+            _interaction_command_name(interaction),
+            exc_info=(type(original), original, original.__traceback__),
+        )
+        try:
+            if interaction.type == discord.InteractionType.autocomplete:
+                if not interaction.response.is_done():
+                    await interaction.response.autocomplete([])
+                return
+            message = "That command encountered an error. Please try again in a moment."
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+        except discord.HTTPException:
+            logging.warning("Could not send application-command error response")
 
 
 class GameAssistBot(commands.Bot):
