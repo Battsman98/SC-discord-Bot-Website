@@ -503,7 +503,7 @@ async def my_ships(user=Depends(require_user)) -> list[dict[str, Any]]:
             ship["name"] = display_name
             ship["loaner_for"] = display_loaner_for
             repaired = True
-        if ship.get("image_url") and ship.get("manufacturer") and _has_ship_basic_info(ship.get("role")):
+        if not _ship_image_needs_refresh(ship.get("image_url")) and ship.get("manufacturer") and _has_ship_basic_info(ship.get("role")):
             if ship.get("ownership_type") == "pledged":
                 repaired = await _sync_auto_loaners(user.id, str(ship.get("name") or ""), "pledged") or repaired
             continue
@@ -531,6 +531,11 @@ async def my_ships(user=Depends(require_user)) -> list[dict[str, Any]]:
         )
         repaired = True
     return await state().cache.user_ships(user.id) if repaired else ships
+
+
+def _ship_image_needs_refresh(image_url: object) -> bool:
+    value = str(image_url or "").strip().lower()
+    return not value or "/thumb/" in value or "store_small" in value
 
 
 @app.put("/api/me/ships")

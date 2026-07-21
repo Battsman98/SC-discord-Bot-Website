@@ -441,6 +441,16 @@ def test_rsi_ship_search_candidates_strip_manufacturer_prefixes() -> None:
     assert source._rsi_ship_search_candidates("Anvil Arrow") == ["Anvil Arrow", "Arrow"]
 
 
+def test_ship_image_prefers_high_resolution_original() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    assert source._ship_image_url({
+        "images": [{
+            "thumbnail_url": "https://example.test/thumb/600px-ship.webp",
+            "original_url": "https://example.test/ship-4k.png",
+        }]
+    }) == "https://example.test/ship-4k.png"
+
+
 def test_search_ships_falls_back_to_rsi_store() -> None:
     source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
     source._ship_summaries = []

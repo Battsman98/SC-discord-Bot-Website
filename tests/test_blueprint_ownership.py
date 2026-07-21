@@ -19,6 +19,7 @@ from src.web import (
     _inventory_scanner_text_candidates,
     _rsi_import_lookup_candidates,
     _ship_display_name,
+    _ship_image_needs_refresh,
     _ship_is_in_concept,
 )
 
@@ -28,6 +29,13 @@ def test_ship_display_name_removes_manufacturer_prefix() -> None:
     assert _ship_display_name("RSI Galaxy") == "Galaxy"
     assert _ship_display_name("Aopoa Nox") == "Nox"
     assert _ship_display_name("Galaxy") == "Galaxy"
+
+
+def test_ship_image_refresh_detects_missing_and_low_resolution_urls() -> None:
+    assert _ship_image_needs_refresh(None)
+    assert _ship_image_needs_refresh("https://media.starcitizen.tools/thumb/x/600px-ship.webp")
+    assert _ship_image_needs_refresh("https://media.robertsspaceindustries.com/x/store_small.jpg")
+    assert not _ship_image_needs_refresh("https://media.starcitizen.tools/x/ship-4k.png")
 
 
 def test_arrastra_loaners_are_mapped() -> None:

@@ -729,7 +729,13 @@ article.tool-panel.active {
 }
 
 #savedShipsOutput {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+@media (min-width: 1280px) {
+  #savedShipsOutput {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .hangar-image-button {
@@ -759,6 +765,7 @@ article.tool-panel.active {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  image-rendering: auto;
 }
 
 .hangar-card-body {

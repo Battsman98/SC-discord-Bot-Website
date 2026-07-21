@@ -70,7 +70,7 @@ class StarCitizenWikiSource:
         if not normalized_query:
             return None
 
-        cache_key = f"star-citizen-wiki:ship:v5:{normalized_query.lower()}"
+        cache_key = f"star-citizen-wiki:ship:v6:{normalized_query.lower()}"
         cached = await self._cache.get(cache_key)
         if cached:
             return self._ship_from_cache(cached)
@@ -94,6 +94,10 @@ class StarCitizenWikiSource:
         if rsi_pledge_status is not None:
             pledge_data = {**(pledge_data or {}), **rsi_pledge_status}
         result = self._parse_ship_result(data, pledge_data)
+        if not result.image_url:
+            rsi_result = await self._lookup_rsi_ship(normalized_query)
+            if rsi_result and rsi_result.image_url:
+                result.image_url = rsi_result.image_url
         await self._cache.set(cache_key, self._ship_to_cache(result), self._settings.cache_ttl_seconds)
         return result
 
@@ -399,7 +403,7 @@ class StarCitizenWikiSource:
             image_url=next(
                 (
                     thumbnail.get(key)
-                    for key in ("storeSmall", "wallpaperMedium", "slideshow")
+                    for key in ("wallpaperMedium", "slideshow", "storeSmall")
                     if isinstance(thumbnail.get(key), str) and thumbnail.get(key)
                 ),
                 None,
@@ -944,12 +948,12 @@ class StarCitizenWikiSource:
         for image in images:
             if not isinstance(image, dict):
                 continue
-            thumbnail = image.get("thumbnail_url")
             original = image.get("original_url")
-            if isinstance(thumbnail, str) and thumbnail:
-                return thumbnail
             if isinstance(original, str) and original:
                 return original
+            thumbnail = image.get("thumbnail_url")
+            if isinstance(thumbnail, str) and thumbnail:
+                return thumbnail
         return None
 
     def _normalize_name(self, value: object) -> str:
