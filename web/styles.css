@@ -278,12 +278,13 @@ button:hover, .button-link:hover, .tabs button.active {
   display: flex;
   grid-column: 1;
   gap: 8px;
+  justify-content: safe center;
   overflow-x: auto;
   scrollbar-width: thin;
 }
 
 .app-shell.overview-mode .tabs.without-audit {
-  justify-content: space-between;
+  justify-content: safe center;
 }
 
 .app-shell.overview-mode .tabs button {
