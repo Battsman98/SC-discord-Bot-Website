@@ -26,7 +26,11 @@ def maintenance_restart_seconds() -> int:
         return DEFAULT_MAINTENANCE_RESTART_SECONDS
 
 
-def clean_expired_cache(database_path: str, now: int | None = None) -> int:
+def clean_expired_cache(
+    database_path: str,
+    now: int | None = None,
+    compact: bool = True,
+) -> int:
     """Remove disposable expired cache rows without touching application data."""
     path = Path(database_path)
     if not path.exists():
@@ -45,30 +49,43 @@ def clean_expired_cache(database_path: str, now: int | None = None) -> int:
         )
         removed = max(0, cursor.rowcount)
         connection.commit()
-        connection.execute("VACUUM")
+        if compact:
+            connection.execute("VACUUM")
         return removed
     finally:
         connection.close()
 
 
-def start_processes(port: str) -> list[subprocess.Popen]:
-    return [
-        subprocess.Popen([sys.executable, "-m", "src.bot"]),
-        subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "uvicorn",
-                "src.web:app",
-                "--host",
-                "0.0.0.0",
-                "--port",
-                port,
-                "--proxy-headers",
-                "--forwarded-allow-ips=*",
-            ]
-        ),
-    ]
+def start_bot_process() -> subprocess.Popen:
+    return subprocess.Popen([sys.executable, "-m", "src.bot"])
+
+
+def start_web_process(port: str) -> subprocess.Popen:
+    return subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "src.web:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            port,
+            "--workers",
+            "2",
+            "--proxy-headers",
+            "--forwarded-allow-ips=*",
+        ]
+    )
+
+
+def rolling_restart_web(process: subprocess.Popen) -> bool:
+    """Ask Uvicorn to replace its workers one at a time without dropping the port."""
+    sighup = getattr(signal, "SIGHUP", None)
+    if sighup is None or process.poll() is not None:
+        return False
+    process.send_signal(sighup)
+    return True
 
 
 def stop_processes(processes: list[subprocess.Popen], timeout_seconds: float = 10) -> None:
@@ -99,35 +116,47 @@ def main() -> int:
     signal.signal(signal.SIGTERM, request_stop)
     signal.signal(signal.SIGINT, request_stop)
 
-    while not stopping:
-        removed = clean_expired_cache(database_path)
-        print(
-            f"Maintenance startup: removed {removed} expired cache entr{'y' if removed == 1 else 'ies'}; "
-            f"next restart in {restart_seconds} seconds.",
-            flush=True,
-        )
-        processes = start_processes(port)
-        restart_at = time.monotonic() + restart_seconds
-        unexpected_return_code: int | None = None
+    removed = clean_expired_cache(database_path)
+    print(
+        f"Maintenance startup: removed {removed} expired cache entr{'y' if removed == 1 else 'ies'}; "
+        f"next restart in {restart_seconds} seconds.",
+        flush=True,
+    )
+    bot_process = start_bot_process()
+    web_process = start_web_process(port)
+    restart_at = time.monotonic() + restart_seconds
+    return_code = 0
 
-        while not stopping and time.monotonic() < restart_at:
-            for process in processes:
-                return_code = process.poll()
-                if return_code is not None:
-                    unexpected_return_code = return_code
+    try:
+        while not stopping:
+            for process in (bot_process, web_process):
+                child_return_code = process.poll()
+                if child_return_code is not None:
+                    return_code = child_return_code
+                    stopping = True
                     break
-            if unexpected_return_code is not None:
+            if stopping:
                 break
+
+            if time.monotonic() >= restart_at:
+                print("Daily maintenance: rolling website workers and restarting bot.", flush=True)
+                stop_processes([bot_process])
+                removed = clean_expired_cache(database_path, compact=False)
+                bot_process = start_bot_process()
+                if not rolling_restart_web(web_process):
+                    print("Website rolling restart is unavailable; leaving the healthy web process running.", flush=True)
+                print(
+                    f"Daily maintenance complete: removed {removed} expired cache "
+                    f"entr{'y' if removed == 1 else 'ies'}.",
+                    flush=True,
+                )
+                restart_at = time.monotonic() + restart_seconds
+
             time.sleep(1)
+    finally:
+        stop_processes([bot_process, web_process])
 
-        if not stopping and unexpected_return_code is None:
-            print("Daily maintenance restart: stopping bot and website.", flush=True)
-        stop_processes(processes)
-
-        if unexpected_return_code is not None:
-            return unexpected_return_code
-
-    return 0
+    return return_code
 
 
 if __name__ == "__main__":
