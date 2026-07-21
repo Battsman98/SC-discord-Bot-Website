@@ -1,0 +1,8 @@
+:root { color-scheme: dark; font: 14px/1.45 system-ui, sans-serif; }
+body { margin: 0; width: 320px; background: #07131d; color: #e9f7ff; }
+main { padding: 18px; }
+h1 { margin: 0 0 10px; color: #64d9ff; font-size: 19px; }
+p { margin: 9px 0; }
+.privacy { color: #b8d3df; }
+a { display: block; margin: 16px 0; padding: 10px 12px; border-radius: 6px; background: #0b789e; color: white; text-align: center; text-decoration: none; font-weight: 700; }
+small { display: block; color: #8fa8b3; font-size: 11px; }

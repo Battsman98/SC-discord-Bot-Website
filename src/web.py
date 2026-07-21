@@ -2382,3 +2382,11 @@ async def index() -> FileResponse:
         WEB_DIR / "index.html",
         headers={"Cache-Control": "no-store, max-age=0"},
     )
+
+
+@app.get("/rsi-hangar-importer/privacy")
+async def rsi_hangar_importer_privacy() -> FileResponse:
+    return FileResponse(
+        WEB_DIR / "rsi-hangar-importer-privacy.html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )

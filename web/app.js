@@ -769,7 +769,7 @@ function connectorInstallPrompt(message) {
       <p>${escapeHtml(message)} Install the local importer once, then click Import RSI Hangar again.</p>
     </div>
     <div class="connector-actions">
-      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.4.zip">Download connector v0.4.4</a>
+      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.5.zip">Download connector v0.4.5</a>
       <button type="button" data-open-extension-help>Install steps</button>
       <button type="button" data-import-rsi-files>Use saved HTML</button>
     </div>

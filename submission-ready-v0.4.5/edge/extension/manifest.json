@@ -19,10 +19,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://sccompanion.org/*",
-        "https://star-citizen-game-assist.onrender.com/*",
-        "http://127.0.0.1:8000/*",
-        "http://localhost:8000/*"
+        "https://sccompanion.org/*"
       ],
       "js": [
         "content.js"

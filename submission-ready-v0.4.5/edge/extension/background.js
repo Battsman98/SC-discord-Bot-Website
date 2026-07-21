@@ -104,10 +104,7 @@ async function importHangar() {
 }
 
 const ALLOWED_WEBSITE_ORIGINS = new Set([
-  "https://sccompanion.org",
-  "https://star-citizen-game-assist.onrender.com",
-  "http://127.0.0.1:8000",
-  "http://localhost:8000"
+  "https://sccompanion.org"
 ]);
 
 chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
