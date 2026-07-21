@@ -145,6 +145,24 @@ def test_rsi_hangar_import_reads_colon_separated_contained_ships() -> None:
     }
 
 
+def test_rsi_hangar_import_reads_typed_ship_items_from_upgraded_pledges() -> None:
+    page = r'''
+    <li class="pledge">
+      <input class="js-pledge-name" value="Upgrade - F8C to F8C with 10 Year Insurance">
+      <div class="item"><span class="kind">Ship</span><strong class="title">Aegis Reclaimer</strong></div>
+      <div class="item"><span class="kind">Vehicle</span><strong class="title">ARGO SRV</strong></div>
+      <div class="item"><strong class="title">ARGO MOTH</strong><span class="kind">Ship</span></div>
+      <div class="item"><span class="kind">Paint</span><strong class="title">MOTH Yellow Paint</strong></div>
+    </li>
+    '''
+
+    assert _extract_rsi_pledge_ship_names(page) == {
+        "Aegis Reclaimer",
+        "ARGO SRV",
+        "ARGO MOTH",
+    }
+
+
 def test_rsi_import_lookup_candidates_simplify_package_names() -> None:
     assert "Avenger Titan" in _rsi_import_lookup_candidates("Avenger Titan Starter Pack")
 

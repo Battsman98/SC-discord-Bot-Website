@@ -20,8 +20,34 @@ function cleanShipName(value) {
   return blocked.test(name) ? null : name;
 }
 
+function htmlText(value) {
+  return String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#(?:39|x27);/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractTypedItemShips(pageHTML) {
+  const candidates = new Set();
+  const itemStart = /<[^>]+class=["'][^"']*\bitem\b[^"']*["'][^>]*>/gi;
+  const starts = [...pageHTML.matchAll(itemStart)].map((match) => match.index);
+  for (let index = 0; index < starts.length; index += 1) {
+    const block = pageHTML.slice(starts[index], Math.min(starts[index + 1] || pageHTML.length, starts[index] + 2400));
+    const kind = block.match(/class=["'][^"']*\bkind\b[^"']*["'][^>]*>([\s\S]{0,240}?)<\/[^>]+>/i);
+    const title = block.match(/class=["'][^"']*\btitle\b[^"']*["'][^>]*>([\s\S]{0,240}?)<\/[^>]+>/i);
+    if (!kind || !title || !/\b(?:ship|vehicle)\b/i.test(htmlText(kind[1]))) continue;
+    const cleaned = cleanShipName(htmlText(title[1]));
+    if (cleaned) candidates.add(cleaned);
+  }
+  return candidates;
+}
+
 function extractShipCandidates(pageHTML) {
   const candidates = new Set();
+  for (const name of extractTypedItemShips(pageHTML)) candidates.add(name);
   const titled = /["'](?:name|title|label)["']\s*:\s*["']((?:Standalone Ship|Game Package|Package)\s*(?:[-:]|\s)[^"']{2,120})["']/gi;
   for (const match of pageHTML.matchAll(titled)) {
     const cleaned = cleanShipName(match[1]);
@@ -107,7 +133,7 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
 async function handleMessage(rawMessage) {
   const message = JSON.parse(rawMessage || "{}");
   if (message.action === "connect") {
-    return { code: 200, version: "0.4.3", scope: "ships-and-vehicles-only" };
+    return { code: 200, version: "0.4.4", scope: "ships-and-vehicles-only" };
   }
   if (message.action === "importHangar") {
     return await importHangar();

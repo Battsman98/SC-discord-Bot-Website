@@ -684,6 +684,7 @@ def _normalize_text(value: object) -> str:
 
 def _extract_rsi_pledge_ship_names(page_html: str) -> set[str]:
     candidates: set[str] = set()
+    candidates.update(_extract_rsi_typed_item_ship_names(page_html))
     candidates.update(_extract_rsi_pledge_ship_names_from_links(page_html))
     candidates.update(_extract_rsi_pledge_ship_names_from_json(page_html))
     text = html.unescape(re.sub(r"<[^>]+>", "\n", page_html))
@@ -700,6 +701,29 @@ def _extract_rsi_pledge_ship_names(page_html: str) -> set[str]:
                 cleaned = _clean_rsi_pledge_ship_name(name)
                 if cleaned:
                     candidates.add(cleaned)
+    return candidates
+
+
+def _extract_rsi_typed_item_ship_names(page_html: str) -> set[str]:
+    candidates: set[str] = set()
+    item_starts = [
+        match.start()
+        for match in re.finditer(r'''<[^>]+class=["'][^"']*\bitem\b[^"']*["'][^>]*>''', page_html, flags=re.IGNORECASE)
+    ]
+    for index, start in enumerate(item_starts):
+        end = min(item_starts[index + 1] if index + 1 < len(item_starts) else len(page_html), start + 2400)
+        block = page_html[start:end]
+        kind_match = re.search(r'''class=["'][^"']*\bkind\b[^"']*["'][^>]*>([\s\S]{0,240}?)</[^>]+>''', block, flags=re.IGNORECASE)
+        title_match = re.search(r'''class=["'][^"']*\btitle\b[^"']*["'][^>]*>([\s\S]{0,240}?)</[^>]+>''', block, flags=re.IGNORECASE)
+        if not kind_match or not title_match:
+            continue
+        kind_text = html.unescape(re.sub(r"<[^>]+>", " ", kind_match.group(1)))
+        if not re.search(r"\b(?:ship|vehicle)\b", kind_text, flags=re.IGNORECASE):
+            continue
+        title_text = html.unescape(re.sub(r"<[^>]+>", " ", title_match.group(1)))
+        cleaned = _clean_rsi_pledge_ship_name(title_text)
+        if cleaned:
+            candidates.add(cleaned)
     return candidates
 
 
