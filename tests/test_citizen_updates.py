@@ -38,13 +38,18 @@ def test_direct_source_parsers_keep_official_and_unverified_items_separate() -> 
 def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
     javascript = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+    styles = (ROOT / "web" / "styles.css").read_text(encoding="utf-8")
 
     assert 'data-tab="intel">Intel</button>' in html
     assert 'data-overview-tab="intel"' in html
     assert 'id="intelOutput"' in html
     assert "Leak and datamine posts are unverified" in html
     assert 'api("/api/updates")' in javascript
-    assert 'intel: { theme: "aegis", label: "AEGIS DYNAMICS INTELLIGENCE" }' in javascript
+    assert html.index('data-tab="overview"') < html.index('data-tab="intel"') < html.index('data-tab="lookup"')
+    assert html.index('data-overview-tab="intel"') < html.index('data-overview-tab="lookup"')
+    assert 'intel: { theme: "aegis-intel", label: "AEGIS DYNAMICS INTELLIGENCE" }' in javascript
+    assert 'body[data-mfd-theme="aegis-intel"]' in styles
+    assert "--accent: #9fca62" in styles
     assert 'target="_blank" rel="noreferrer">Open source</a>' in javascript
 
 

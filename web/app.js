@@ -40,7 +40,7 @@ const mfdThemes = {
   items: { theme: "origin", label: "ORIGIN JUMPWORKS" },
   inventory: { theme: "rsi", label: "ROBERTS SPACE INDUSTRIES" },
   timers: { theme: "misc", label: "MISC INDUSTRIAL" },
-  intel: { theme: "aegis", label: "AEGIS DYNAMICS INTELLIGENCE" },
+  intel: { theme: "aegis-intel", label: "AEGIS DYNAMICS INTELLIGENCE" },
   admin: { theme: "security", label: "SECURITY AUDIT" },
 };
 

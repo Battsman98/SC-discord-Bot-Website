@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260722-warbond-tracker">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260722-intel-mfd-order">
   <link rel="stylesheet" href="/assets/hotfix-overlay.css?v=20260720">
 </head>
 <body data-mfd-theme="overview">
@@ -18,6 +18,7 @@
   <main class="app-shell overview-mode">
     <nav class="tabs" aria-label="Website sections">
       <button class="active" data-tab="overview">Overview</button>
+      <button data-tab="intel">Intel</button>
       <button data-tab="lookup">Ships</button>
       <button data-tab="trade">Trade</button>
       <button data-tab="mining">Mining</button>
@@ -25,7 +26,6 @@
       <button data-tab="items">Items</button>
       <button data-tab="inventory">Inventory</button>
       <button data-tab="timers">Timers</button>
-      <button data-tab="intel">Intel</button>
     </nav>
 
     <section id="overview" class="tab-panel active">
@@ -35,6 +35,7 @@
         <p class="overview-intro-note">The guide below provides a complete walkthrough of every website tool.</p>
       </div>
       <nav class="overview-options" aria-label="Overview destinations">
+        <button type="button" data-overview-tab="intel"><span>Intel</span><small>Patch notes, PU status, previews, and leaks</small></button>
         <button type="button" data-overview-tab="lookup"><span>Ships</span><small>Search and manage your hangar</small></button>
         <button type="button" data-overview-tab="trade"><span>Trade</span><small>Find commodities and build routes</small></button>
         <button type="button" data-overview-tab="mining"><span>Mining</span><small>Locate materials and mining sites</small></button>
@@ -42,7 +43,6 @@
         <button type="button" data-overview-tab="items"><span>Items</span><small>Look up equipment and components</small></button>
         <button type="button" data-overview-tab="inventory"><span>Inventory</span><small>Track items across locations</small></button>
         <button type="button" data-overview-tab="timers"><span>Timers</span><small>View event and zone timers</small></button>
-        <button type="button" data-overview-tab="intel"><span>Intel</span><small>Patch notes, PU status, previews, and leaks</small></button>
       </nav>
       <div class="home-background" aria-hidden="true">
         <div class="home-background-layer active"></div>
@@ -551,6 +551,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260720b" defer></script>
-  <script src="/assets/app.js?v=20260722-warbond-tracker" defer></script>
+  <script src="/assets/app.js?v=20260722-intel-mfd-order" defer></script>
 </body>
 </html>

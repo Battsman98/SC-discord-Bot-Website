@@ -756,6 +756,12 @@ article.tool-panel.active {
   margin-top: 16px;
 }
 
+body[data-mfd-theme="aegis-intel"] {
+  --bg: #050806; --surface: #101811; --surface-2: #1c281e; --line: #536b4f;
+  --text: #eef7e9; --muted: #a5b8a0; --accent: #9fca62; --accent-2: #ff795f;
+  --ambient: rgba(159, 202, 98, 0.12); --glow: rgba(159, 202, 98, 0.26); --panel-tint: rgba(255, 121, 95, 0.035);
+}
+
 .intel-heading,
 .intel-group-heading,
 .intel-card-meta,
