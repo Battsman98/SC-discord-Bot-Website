@@ -18,6 +18,7 @@ const outputs = {
   exec: document.querySelector("#execOutput"),
   cz: document.querySelector("#czOutput"),
   audit: document.querySelector("#auditOutput"),
+  intel: document.querySelector("#intelOutput"),
 };
 
 const appShell = document.querySelector(".app-shell");
@@ -38,6 +39,7 @@ const mfdThemes = {
   items: { theme: "origin", label: "ORIGIN JUMPWORKS" },
   inventory: { theme: "rsi", label: "ROBERTS SPACE INDUSTRIES" },
   timers: { theme: "misc", label: "MISC INDUSTRIAL" },
+  intel: { theme: "aegis", label: "AEGIS DYNAMICS INTELLIGENCE" },
   admin: { theme: "security", label: "SECURITY AUDIT" },
 };
 
@@ -57,6 +59,7 @@ function activateTab(tabId) {
     showToolPanel(panel, "lookup-tool-0");
     void loadSavedShips({ quiet: true });
   }
+  if (tabId === "intel") void loadIntel();
 }
 
 document.querySelectorAll(".tabs button").forEach((button) => {
@@ -164,6 +167,7 @@ document.querySelector("[data-action-button='clearExec']").addEventListener("cli
 });
 
 document.querySelector("[data-action-button='refreshAudit']").addEventListener("click", loadAudit);
+document.querySelector("[data-action-button='refreshIntel']")?.addEventListener("click", () => loadIntel(true));
 document.querySelector("#auditActionType")?.addEventListener("change", loadAudit);
 document.querySelector("#auditSort")?.addEventListener("change", loadAudit);
 document.querySelector("#auditLimit")?.addEventListener("change", loadAudit);
@@ -2173,6 +2177,46 @@ function pledgeAvailability(pledge) {
 async function removeBlueprint(name) {
   await api(`/api/me/blueprints/${encodeURIComponent(name)}`, { method: "DELETE" });
   await loadSavedBlueprints();
+}
+
+let intelLoaded = false;
+
+async function loadIntel(force = false) {
+  if (!outputs.intel || (intelLoaded && !force)) return;
+  outputs.intel.innerHTML = stateMessage("Contacting direct Star Citizen sources...");
+  try {
+    const payload = await api("/api/updates");
+    const groups = [
+      ["Patch Notes", "Official LIVE release notes", payload.patch_notes || [], "patch"],
+      ["PU Server Updates", "Maintenance, deployments, and service incidents", payload.pu_updates || [], "status"],
+      ["Sneak Peeks", "Official previews, roadmap updates, and development reports", payload.sneak_peeks || [], "preview"],
+      ["Leaks & Datamines", "Unverified community reports—treat as rumor until confirmed", payload.leaks || [], "unverified"],
+    ];
+    outputs.intel.innerHTML = groups.map(([title, description, items, kind]) => intelGroup(title, description, items, kind)).join("");
+    intelLoaded = true;
+  } catch (error) {
+    outputs.intel.innerHTML = errorMessage(`Could not load direct-source updates: ${error.message}`);
+  }
+}
+
+function intelGroup(title, description, items, kind) {
+  const cards = items.length
+    ? items.map((item) => intelCard(item, kind)).join("")
+    : stateMessage("No current items were returned by this source.");
+  return `<section class="intel-group intel-${escapeAttribute(kind)}">
+    <div class="intel-group-heading"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><span>${items.length}</span></div>
+    <div class="intel-grid">${cards}</div>
+  </section>`;
+}
+
+function intelCard(item, kind) {
+  const confidence = item.confirmed ? "Confirmed" : "Unverified";
+  return `<article class="intel-card ${item.confirmed ? "confirmed" : "unverified"}">
+    <div class="intel-card-meta"><span>${escapeHtml(item.status || confidence)}</span><time>${escapeHtml(item.published || "Latest")}</time></div>
+    <h3>${escapeHtml(item.title || "Star Citizen update")}</h3>
+    ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ""}
+    <div class="intel-card-source"><small>${escapeHtml(item.source || "Direct source")}</small>${item.url ? `<a href="${escapeAttribute(item.url)}" target="_blank" rel="noreferrer">Open source</a>` : ""}</div>
+  </article>`;
 }
 
 async function loadTimers() {

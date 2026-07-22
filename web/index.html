@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260721-rsi-inventory">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260722-direct-intel">
   <link rel="stylesheet" href="/assets/hotfix-overlay.css?v=20260720">
 </head>
 <body data-mfd-theme="overview">
@@ -25,6 +25,7 @@
       <button data-tab="items">Items</button>
       <button data-tab="inventory">Inventory</button>
       <button data-tab="timers">Timers</button>
+      <button data-tab="intel">Intel</button>
     </nav>
 
     <section id="overview" class="tab-panel active">
@@ -41,6 +42,7 @@
         <button type="button" data-overview-tab="items"><span>Items</span><small>Look up equipment and components</small></button>
         <button type="button" data-overview-tab="inventory"><span>Inventory</span><small>Track items across locations</small></button>
         <button type="button" data-overview-tab="timers"><span>Timers</span><small>View event and zone timers</small></button>
+        <button type="button" data-overview-tab="intel"><span>Intel</span><small>Patch notes, PU status, previews, and leaks</small></button>
       </nav>
       <div class="home-background" aria-hidden="true">
         <div class="home-background-layer active"></div>
@@ -374,6 +376,21 @@
       </div>
     </section>
 
+    <section id="intel" class="tab-panel">
+      <div class="intel-heading">
+        <div>
+          <p class="eyebrow">DIRECT SOURCE NETWORK</p>
+          <h2>Patch &amp; Intel Feed</h2>
+          <p>Official updates and clearly marked community reports, linked directly to where each item was published.</p>
+        </div>
+        <button type="button" data-action-button="refreshIntel">Refresh</button>
+      </div>
+      <div class="intel-notice">
+        <strong>Source confidence matters.</strong> Official RSI information is marked Confirmed. Leak and datamine posts are unverified community reports and may be incomplete, outdated, or wrong.
+      </div>
+      <div id="intelOutput" class="intel-feed" aria-live="polite"></div>
+    </section>
+
     <section id="guide" hidden>
       <article class="panel guide-manual">
         <div class="guide-hero">
@@ -475,6 +492,7 @@
                 <option value="inventory">Inventory</option>
                 <option value="timers">Timers</option>
                 <option value="commands">Commands</option>
+                <option value="updates">Updates</option>
                 <option value="authentication">Authentication</option>
                 <option value="admin">Admin</option>
                 <option value="audit">Audit</option>
@@ -520,6 +538,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260720b" defer></script>
-  <script src="/assets/app.js?v=20260722-rsi-hangar-sync" defer></script>
+  <script src="/assets/app.js?v=20260722-direct-intel" defer></script>
 </body>
 </html>

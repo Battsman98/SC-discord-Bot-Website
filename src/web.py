@@ -31,6 +31,7 @@ from src.bot import (
 from src.cache import AUDIT_ACTION_TYPES, SQLiteCache
 from src.config import Settings
 from src.sources.registry import SourceRegistry, build_default_registry
+from src.sources.citizen_updates import CitizenUpdatesSource
 from src.timers import (
     calculate_countdown_end_unix,
     calculate_cycle_start_from_phase,
@@ -159,6 +160,7 @@ class AppState:
     settings: Settings
     cache: SQLiteCache
     sources: SourceRegistry
+    updates: CitizenUpdatesSource
 
 
 class MiningCommunityRequest(BaseModel):
@@ -247,13 +249,16 @@ async def lifespan(app: FastAPI):
     settings = Settings.from_env(require_discord_token=False)
     cache = await SQLiteCache.create(settings.database_path)
     sources = await build_default_registry(settings, cache)
+    updates = CitizenUpdatesSource(settings, cache)
     app.state.game_assist = AppState()
     app.state.game_assist.settings = settings
     app.state.game_assist.cache = cache
     app.state.game_assist.sources = sources
+    app.state.game_assist.updates = updates
     try:
         yield
     finally:
+        await updates.close()
         await sources.close()
         await cache.close()
 
@@ -328,6 +333,7 @@ def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:
         ("/api/exec", "timers", "Website Executive Timer Action"),
         ("/api/cz", "timers", "Website CZ Timer Action"),
         ("/api/commands", "commands", "Website Commands Viewed"),
+        ("/api/updates", "updates", "Website Updates Viewed"),
         ("/api/audit", "audit", "Website Audit Viewed"),
         ("/api/lookup", "other", "Website General Lookup"),
         ("/auth/", "authentication", "Website Authentication Action"),
@@ -502,6 +508,11 @@ async def logout() -> RedirectResponse:
 @app.get("/api/commands")
 async def commands() -> dict[str, str]:
     return {"markdown": COMMANDS_PATH.read_text(encoding="utf-8")}
+
+
+@app.get("/api/updates")
+async def citizen_updates() -> dict[str, Any]:
+    return await state().updates.get_updates()
 
 
 @app.get("/api/lookup")

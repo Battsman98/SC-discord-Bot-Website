@@ -59,5 +59,6 @@ def test_audit_ui_has_category_filter_and_sort_controls() -> None:
     assert 'id="auditActionType"' in html
     assert '<option value="mining">Mining</option>' in html
     assert '<option value="inventory">Inventory</option>' in html
+    assert '<option value="updates">Updates</option>' in html
     assert '<option value="action">Action type A-Z</option>' in html
     assert 'params.set("action_type", actionType)' in javascript
