@@ -59,7 +59,6 @@ function activateTab(tabId) {
   if (tabId === "lookup") {
     showToolPanel(panel, "lookup-tool-0");
     void loadSavedShips({ quiet: true });
-    void loadWarbonds();
   }
   if (tabId === "intel") void loadIntel();
 }
@@ -257,7 +256,10 @@ function initToolMenus() {
       button.type = "button";
       button.dataset.toolTarget = id;
       button.textContent = title;
-      button.addEventListener("click", () => toggleToolPanel(tab, id));
+      button.addEventListener("click", () => {
+        toggleToolPanel(tab, id);
+        if (tool.classList.contains("warbond-tracker")) void loadWarbonds();
+      });
       menu.append(button);
     });
     tab.prepend(menu);

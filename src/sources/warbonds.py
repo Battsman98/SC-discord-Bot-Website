@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -12,7 +13,14 @@ class WarbondTrackerSource:
     PRICES_URL = "https://api.uexcorp.uk/2.0/vehicles_prices"
     VEHICLES_URL = "https://api.uexcorp.uk/2.0/vehicles"
     STORE_URL = "https://robertsspaceindustries.com/en/pledge/ship-upgrades"
-    CACHE_KEY = "warbonds:active:v1"
+    CACHE_KEY = "warbonds:active:v2"
+    ACTIVE_OFFERS = {
+        "railen": {"name": "Railen", "standard_price": 400, "warbond_price": 360},
+        "tyilui": {"name": "Tyilui", "standard_price": 425, "warbond_price": 385},
+        "basher": {"name": "Basher", "standard_price": 110, "warbond_price": 100},
+        "hermes": {"name": "Hermes", "standard_price": 220, "warbond_price": 200},
+        "mole": {"name": "MOLE", "standard_price": 315, "warbond_price": 295},
+    }
 
     def __init__(self, cache: SQLiteCache, timeout_seconds: int = 15) -> None:
         self._cache = cache
@@ -31,12 +39,13 @@ class WarbondTrackerSource:
             return {"offers": [], "updated_at": None, "source": "UEX / RSI pledge store"}
 
         usd_prices = self._latest_usd_prices(rows)
-        active_rows = [
-            row for row in usd_prices.values()
-            if self._number(row.get("on_sale_warbond")) == 1
-            and self._number(row.get("on_sale")) == 1
-            and 0 < self._number(row.get("price_warbond")) < self._number(row.get("price"))
-        ]
+        rsi_results = await asyncio.gather(*(self._verify_rsi_ship(offer["name"]) for offer in self.ACTIVE_OFFERS.values()))
+        rsi_by_name = {
+            self._normalize(result.get("title")): result
+            for result in rsi_results
+            if isinstance(result, dict) and result.get("title")
+        }
+        active_rows = self._active_rows(usd_prices, rsi_by_name)
         vehicle_by_name = {
             self._normalize(vehicle.get("name")): vehicle
             for vehicle in vehicles
@@ -59,10 +68,12 @@ class WarbondTrackerSource:
             name = str(row.get("vehicle_name") or "").strip()
             standard = self._number(row.get("price"))
             warbond = self._number(row.get("price_warbond"))
-            vehicle = vehicle_by_name.get(self._normalize(name), {})
+            key = self._normalize(name)
+            vehicle = vehicle_by_name.get(key, {})
+            rsi_ship = rsi_by_name.get(key, {})
             offers.append({
                 "name": name,
-                "title": f"{name} (CCU) - Warbond Edition",
+                "title": f"{name} - Warbond Edition",
                 "warbond_price": warbond,
                 "standard_price": standard,
                 "saving": standard - warbond,
@@ -70,11 +81,10 @@ class WarbondTrackerSource:
                 "flight_ready_source": self._best_source(price_catalog, warbond, flight_ready=True),
                 "unlimited_source": self._best_source(price_catalog, warbond, on_sale=True),
                 "image_url": vehicle.get("url_photo"),
-                "store_url": vehicle.get("url_store") or self.STORE_URL,
+                "store_url": vehicle.get("url_store") or rsi_ship.get("url") or self.STORE_URL,
                 "updated_at": self._iso_date(row.get("date_modified")),
             })
 
-        offers.sort(key=lambda offer: (-offer["saving"], offer["name"].lower()))
         result = {
             "offers": offers,
             "updated_at": max((offer["updated_at"] for offer in offers if offer["updated_at"]), default=None),
@@ -83,11 +93,51 @@ class WarbondTrackerSource:
         await self._cache.set(self.CACHE_KEY, result, 1800)
         return result
 
+    def _active_rows(self, prices: dict[str, dict], rsi_ships: dict[str, dict]) -> list[dict]:
+        rows = []
+        for key, configured in self.ACTIVE_OFFERS.items():
+            if key not in rsi_ships:
+                continue
+            rows.append({
+                **prices.get(key, {}),
+                "vehicle_name": configured["name"],
+                "price": configured["standard_price"],
+                "price_warbond": configured["warbond_price"],
+            })
+        return rows
+
     async def _fetch(self, url: str) -> dict | None:
         async with self._session.get(url, headers={"Accept": "application/json"}) as response:
             response.raise_for_status()
             payload = await response.json()
         return payload if isinstance(payload, dict) else None
+
+    async def _verify_rsi_ship(self, name: str) -> dict | None:
+        query = """
+        query ActiveWarbondShip($query: SearchQuery) {
+          store(name: "pledge", browse: true) {
+            search(query: $query) {
+              resources { ... on RSIShip { title url msrp productionStatus } }
+            }
+          }
+        }
+        """
+        async with self._session.post(
+            "https://robertsspaceindustries.com/graphql",
+            json={"query": query, "variables": {"query": {"ships": {"name": name}}}},
+            headers={"Accept": "application/json", "Content-Type": "application/json", "Referer": self.STORE_URL},
+        ) as response:
+            response.raise_for_status()
+            payload = await response.json()
+        resources = payload.get("data", {}).get("store", {}).get("search", {}).get("resources", [])
+        expected = self._normalize(name)
+        for resource in resources if isinstance(resources, list) else []:
+            if isinstance(resource, dict) and self._normalize(resource.get("title")) == expected:
+                url = resource.get("url")
+                if isinstance(url, str) and url.startswith("/"):
+                    resource["url"] = f"https://robertsspaceindustries.com{url}"
+                return resource
+        return None
 
     @classmethod
     def _latest_usd_prices(cls, rows: list[Any]) -> dict[str, dict]:

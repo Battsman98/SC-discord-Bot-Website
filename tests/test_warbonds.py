@@ -30,3 +30,15 @@ def test_best_warbond_source_uses_closest_eligible_ship() -> None:
         "name": "Constellation Taurus",
         "price": 95,
     }
+
+
+def test_active_warbonds_are_limited_to_the_curated_rsi_verified_set() -> None:
+    source = WarbondTrackerSource.__new__(WarbondTrackerSource)
+    verified = {name: {"title": offer["name"]} for name, offer in source.ACTIVE_OFFERS.items()}
+
+    rows = source._active_rows({}, verified)
+
+    assert [row["vehicle_name"] for row in rows] == ["Railen", "Tyilui", "Basher", "Hermes", "MOLE"]
+    assert [(row["price_warbond"], row["price"]) for row in rows] == [
+        (360, 400), (385, 425), (100, 110), (200, 220), (295, 315)
+    ]
