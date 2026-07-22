@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260722-direct-intel">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260722-warbond-tracker">
   <link rel="stylesheet" href="/assets/hotfix-overlay.css?v=20260720">
 </head>
 <body data-mfd-theme="overview">
@@ -90,6 +90,7 @@
         </div>
         <div id="savedShipsOutput" class="saved-list"></div>
       </article>
+      <div class="ship-search-layout">
       <form class="panel form wide" data-action="ship">
         <h2>Ship Search</h2>
         <div class="field-row">
@@ -118,6 +119,18 @@
         <button type="submit">Search Ships</button>
         <div id="lookupOutput" class="results"></div>
       </form>
+      <article class="panel warbond-tracker">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">RSI STORE WATCH</p>
+            <h2>Active Warbonds</h2>
+          </div>
+          <button type="button" data-action-button="refreshWarbonds">Refresh</button>
+        </div>
+        <p class="warbond-intro">Current USD warbond CCUs with savings and suggested source ships. New-money purchase required.</p>
+        <div id="warbondOutput" class="warbond-list" aria-live="polite"><div class="state">Loading active offers...</div></div>
+      </article>
+      </div>
     </section>
 
     <section id="trade" class="tab-panel">
@@ -538,6 +551,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260720b" defer></script>
-  <script src="/assets/app.js?v=20260722-direct-intel" defer></script>
+  <script src="/assets/app.js?v=20260722-warbond-tracker" defer></script>
 </body>
 </html>

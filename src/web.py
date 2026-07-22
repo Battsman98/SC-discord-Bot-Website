@@ -32,6 +32,7 @@ from src.cache import AUDIT_ACTION_TYPES, SQLiteCache
 from src.config import Settings
 from src.sources.registry import SourceRegistry, build_default_registry
 from src.sources.citizen_updates import CitizenUpdatesSource
+from src.sources.warbonds import WarbondTrackerSource
 from src.timers import (
     calculate_countdown_end_unix,
     calculate_cycle_start_from_phase,
@@ -161,6 +162,7 @@ class AppState:
     cache: SQLiteCache
     sources: SourceRegistry
     updates: CitizenUpdatesSource
+    warbonds: WarbondTrackerSource
 
 
 class MiningCommunityRequest(BaseModel):
@@ -250,14 +252,17 @@ async def lifespan(app: FastAPI):
     cache = await SQLiteCache.create(settings.database_path)
     sources = await build_default_registry(settings, cache)
     updates = CitizenUpdatesSource(settings, cache)
+    warbonds = WarbondTrackerSource(cache, settings.http_timeout_seconds)
     app.state.game_assist = AppState()
     app.state.game_assist.settings = settings
     app.state.game_assist.cache = cache
     app.state.game_assist.sources = sources
     app.state.game_assist.updates = updates
+    app.state.game_assist.warbonds = warbonds
     try:
         yield
     finally:
+        await warbonds.close()
         await updates.close()
         await sources.close()
         await cache.close()
@@ -531,6 +536,11 @@ async def autocomplete_ships(query: str = "") -> list[str]:
 @app.get("/api/ships/facets")
 async def ship_facets() -> dict[str, list[str]]:
     return await state().sources.ship_facets()
+
+
+@app.get("/api/ships/warbonds")
+async def active_warbonds() -> dict[str, Any]:
+    return await state().warbonds.active()
 
 
 @app.get("/api/ships")

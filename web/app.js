@@ -19,6 +19,7 @@ const outputs = {
   cz: document.querySelector("#czOutput"),
   audit: document.querySelector("#auditOutput"),
   intel: document.querySelector("#intelOutput"),
+  warbonds: document.querySelector("#warbondOutput"),
 };
 
 const appShell = document.querySelector(".app-shell");
@@ -58,6 +59,7 @@ function activateTab(tabId) {
   if (tabId === "lookup") {
     showToolPanel(panel, "lookup-tool-0");
     void loadSavedShips({ quiet: true });
+    void loadWarbonds();
   }
   if (tabId === "intel") void loadIntel();
 }
@@ -168,6 +170,7 @@ document.querySelector("[data-action-button='clearExec']").addEventListener("cli
 
 document.querySelector("[data-action-button='refreshAudit']").addEventListener("click", loadAudit);
 document.querySelector("[data-action-button='refreshIntel']")?.addEventListener("click", () => loadIntel(true));
+document.querySelector("[data-action-button='refreshWarbonds']")?.addEventListener("click", () => loadWarbonds(true));
 document.querySelector("#auditActionType")?.addEventListener("change", loadAudit);
 document.querySelector("#auditSort")?.addEventListener("change", loadAudit);
 document.querySelector("#auditLimit")?.addEventListener("change", loadAudit);
@@ -2197,6 +2200,44 @@ async function loadIntel(force = false) {
   } catch (error) {
     outputs.intel.innerHTML = errorMessage(`Could not load direct-source updates: ${error.message}`);
   }
+}
+
+let warbondsLoaded = false;
+
+async function loadWarbonds(force = false) {
+  if (!outputs.warbonds || (warbondsLoaded && !force)) return;
+  outputs.warbonds.innerHTML = stateMessage("Checking active warbond offers...");
+  try {
+    const payload = await api("/api/ships/warbonds");
+    const offers = payload.offers || [];
+    outputs.warbonds.innerHTML = offers.length
+      ? offers.map(renderWarbond).join("")
+      : stateMessage("No active USD warbond CCUs were reported.");
+    warbondsLoaded = true;
+  } catch (error) {
+    outputs.warbonds.innerHTML = errorMessage(`Could not load active warbonds: ${error.message}`);
+  }
+}
+
+function renderWarbond(offer) {
+  const source = (label, item) => `<div><dt>${label}</dt><dd>${item ? `${escapeHtml(item.name)} <strong>${money(item.price)}</strong>` : "None found"}</dd></div>`;
+  return `<article class="warbond-card">
+    ${offer.image_url ? `<img src="${escapeAttribute(offer.image_url)}" alt="${escapeAttribute(offer.name)}">` : ""}
+    <div class="warbond-card-body">
+      <h3>${escapeHtml(offer.title)}</h3>
+      <a href="${escapeAttribute(offer.store_url)}" target="_blank" rel="noreferrer">View in RSI Ship Upgrades</a>
+      <dl class="warbond-prices">
+        <div><dt>WB Price</dt><dd>${money(offer.warbond_price)}</dd></div>
+        <div><dt>Standard Price</dt><dd>${money(offer.standard_price)}</dd></div>
+        <div><dt>Saving</dt><dd>${money(offer.saving)}</dd></div>
+      </dl>
+      <dl class="warbond-sources">
+        ${source("Cheapest Src", offer.cheapest_source)}
+        ${source("FlightReady Src", offer.flight_ready_source)}
+        ${source("Unlimited Src", offer.unlimited_source)}
+      </dl>
+    </div>
+  </article>`;
 }
 
 function intelGroup(title, description, items, kind) {
