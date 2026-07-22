@@ -1,4 +1,9 @@
+from pathlib import Path
+
 from src.sources.warbonds import WarbondTrackerSource
+
+
+WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 
 def test_latest_usd_prices_deduplicates_and_ignores_other_currencies() -> None:
@@ -42,3 +47,13 @@ def test_active_warbonds_are_limited_to_the_curated_rsi_verified_set() -> None:
     assert [(row["price_warbond"], row["price"]) for row in rows] == [
         (360, 400), (385, 425), (100, 110), (200, 220), (295, 315)
     ]
+
+
+def test_warbond_prices_use_localized_pledge_currency_not_auec() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    renderer = javascript.split("function renderWarbond", 1)[1].split("function intelGroup", 1)[0]
+
+    assert "pledgeMoney(offer.warbond_price, offer.currency)" in renderer
+    assert "pledgeMoney(offer.standard_price, offer.currency)" in renderer
+    assert "money(offer.warbond_price)" not in renderer
+    assert 'style: "currency"' in javascript

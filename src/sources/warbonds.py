@@ -13,7 +13,7 @@ class WarbondTrackerSource:
     PRICES_URL = "https://api.uexcorp.uk/2.0/vehicles_prices"
     VEHICLES_URL = "https://api.uexcorp.uk/2.0/vehicles"
     STORE_URL = "https://robertsspaceindustries.com/en/pledge/ship-upgrades"
-    CACHE_KEY = "warbonds:active:v2"
+    CACHE_KEY = "warbonds:active:v3"
     ACTIVE_OFFERS = {
         "railen": {"name": "Railen", "standard_price": 400, "warbond_price": 360},
         "tyilui": {"name": "Tyilui", "standard_price": 425, "warbond_price": 385},
@@ -77,6 +77,7 @@ class WarbondTrackerSource:
                 "warbond_price": warbond,
                 "standard_price": standard,
                 "saving": standard - warbond,
+                "currency": "USD",
                 "cheapest_source": self._best_source(price_catalog, warbond),
                 "flight_ready_source": self._best_source(price_catalog, warbond, flight_ready=True),
                 "unlimited_source": self._best_source(price_catalog, warbond, on_sale=True),

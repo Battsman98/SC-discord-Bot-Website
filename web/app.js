@@ -2222,16 +2222,16 @@ async function loadWarbonds(force = false) {
 }
 
 function renderWarbond(offer) {
-  const source = (label, item) => `<div><dt>${label}</dt><dd>${item ? `${escapeHtml(item.name)} <strong>${money(item.price)}</strong>` : "None found"}</dd></div>`;
+  const source = (label, item) => `<div><dt>${label}</dt><dd>${item ? `${escapeHtml(item.name)} <strong>${pledgeMoney(item.price, offer.currency)}</strong>` : "None found"}</dd></div>`;
   return `<article class="warbond-card">
     ${offer.image_url ? `<img src="${escapeAttribute(offer.image_url)}" alt="${escapeAttribute(offer.name)}">` : ""}
     <div class="warbond-card-body">
       <h3>${escapeHtml(offer.title)}</h3>
       <a href="${escapeAttribute(offer.store_url)}" target="_blank" rel="noreferrer">View in RSI Ship Upgrades</a>
       <dl class="warbond-prices">
-        <div><dt>WB Price</dt><dd>${money(offer.warbond_price)}</dd></div>
-        <div><dt>Standard Price</dt><dd>${money(offer.standard_price)}</dd></div>
-        <div><dt>Saving</dt><dd>${money(offer.saving)}</dd></div>
+        <div><dt>WB Price</dt><dd>${pledgeMoney(offer.warbond_price, offer.currency)}</dd></div>
+        <div><dt>Standard Price</dt><dd>${pledgeMoney(offer.standard_price, offer.currency)}</dd></div>
+        <div><dt>Saving</dt><dd>${pledgeMoney(offer.saving, offer.currency)}</dd></div>
       </dl>
       <dl class="warbond-sources">
         ${source("Cheapest Src", offer.cheapest_source)}
@@ -2415,6 +2415,16 @@ function metric(label, value) {
 
 function money(value) {
   return value === null || value === undefined ? "" : `${number(value)} aUEC`;
+}
+
+function pledgeMoney(value, currency = "USD") {
+  if (value === null || value === undefined) return "";
+  return new Intl.NumberFormat(navigator.language || undefined, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value));
 }
 
 function number(value) {
