@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from src.sources.citizen_updates import COMM_LINK_ARCHIVE_URLS, UPDATE_LOOKBACK_DAYS, CitizenUpdatesSource
+from datetime import datetime, timezone
+
+from src.sources.citizen_updates import COMM_LINK_ARCHIVE_URLS, UPDATE_LOOKBACK_DAYS, CitizenUpdatesSource, _within_lookback
 from src.web import _website_audit_metadata
 
 
@@ -76,6 +78,21 @@ def test_direct_source_defaults_retain_a_three_month_sized_history() -> None:
 
     assert len(CitizenUpdatesSource.parse_patch_notes(development)) == 20
     assert len(CitizenUpdatesSource.parse_status_updates(status)) == 20
+
+
+def test_update_history_excludes_entries_older_than_three_months() -> None:
+    now = datetime(2026, 7, 22, tzinfo=timezone.utc)
+    items = [
+        {"title": "Current patch", "published": "1 week ago"},
+        {"title": "Boundary patch", "published": "3 months ago"},
+        {"title": "Old patch", "published": "4 months ago"},
+        {"title": "Current incident", "published": "2026-07-01T12:00:00Z"},
+        {"title": "Old incident", "published": "2026-03-01T12:00:00Z"},
+    ]
+
+    assert [item["title"] for item in _within_lookback(items, now)] == [
+        "Current patch", "Boundary patch", "Current incident"
+    ]
 
 
 def test_updates_view_is_audited_as_updates() -> None:

@@ -1,6 +1,7 @@
 import asyncio
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -38,7 +39,7 @@ class CitizenUpdatesSource:
         await self._session.close()
 
     async def get_updates(self) -> dict:
-        cache_key = "citizen-updates:direct-sources:v4:dated-auto-refresh"
+        cache_key = "citizen-updates:direct-sources:v5:dated-90-day-refresh"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, dict):
             return cached
@@ -56,10 +57,10 @@ class CitizenUpdatesSource:
         ]
         comm_link_history = "\n".join((comm_link, *comm_link_archives))
         payload = {
-            "patch_notes": self.parse_patch_notes(development),
-            "pu_updates": self.parse_status_updates(status),
-            "sneak_peeks": self.parse_comm_link_updates(comm_link_history),
-            "leaks": self.parse_community_intel(community),
+            "patch_notes": _within_lookback(self.parse_patch_notes(development)),
+            "pu_updates": _within_lookback(self.parse_status_updates(status)),
+            "sneak_peeks": _within_lookback(self.parse_comm_link_updates(comm_link_history)),
+            "leaks": _within_lookback(self.parse_community_intel(community)),
             "lookback_days": UPDATE_LOOKBACK_DAYS,
             "sources": {
                 "patch_notes": DEVELOPMENT_URL,
@@ -207,3 +208,28 @@ def _item(title: str, url: str, source: str, published: str, status: str, confir
         "confirmed": confirmed,
         "summary": _clean(summary),
     }
+
+
+def _within_lookback(items: list[dict], now: datetime | None = None) -> list[dict]:
+    cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=UPDATE_LOOKBACK_DAYS)
+    kept = []
+    for item in items:
+        published = str(item.get("published") or "").strip()
+        relative = re.fullmatch(r"(\d+|an?|one)\s+(minute|hour|day|week|month|year)s?\s+ago", published, re.IGNORECASE)
+        if relative:
+            amount_text, unit = relative.groups()
+            amount = 1 if amount_text.lower() in {"a", "an", "one"} else int(amount_text)
+            days = amount * {"minute": 0, "hour": 0, "day": 1, "week": 7, "month": 30, "year": 365}[unit.lower()]
+            if days > UPDATE_LOOKBACK_DAYS:
+                continue
+        elif published:
+            try:
+                parsed = datetime.fromisoformat(published.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                if parsed < cutoff:
+                    continue
+            except ValueError:
+                pass
+        kept.append(item)
+    return kept
