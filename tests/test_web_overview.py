@@ -192,6 +192,15 @@ def test_each_tool_page_has_a_manufacturer_mfd_theme() -> None:
     assert "panel.dataset.mfdLabel = mfdTheme.label" in javascript
 
 
+def test_selecting_ships_opens_and_refreshes_the_hangar() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'if (tabId === "lookup")' in javascript
+    assert 'showToolPanel(panel, "lookup-tool-0")' in javascript
+    assert 'void loadSavedShips({ quiet: true })' in javascript
+    assert "function showToolPanel(tab, id)" in javascript
+
+
 def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 

@@ -53,6 +53,10 @@ function activateTab(tabId) {
   const mfdTheme = mfdThemes[tabId] || mfdThemes.overview;
   document.body.dataset.mfdTheme = mfdTheme.theme;
   panel.dataset.mfdLabel = mfdTheme.label;
+  if (tabId === "lookup") {
+    showToolPanel(panel, "lookup-tool-0");
+    void loadSavedShips({ quiet: true });
+  }
 }
 
 document.querySelectorAll(".tabs button").forEach((button) => {
@@ -263,6 +267,16 @@ function toggleToolPanel(tab, id) {
     target.classList.add("active");
     tab.querySelector(`[data-tool-target="${cssEscape(id)}"]`)?.classList.add("active");
   }
+  updateToolContainers(tab);
+}
+
+function showToolPanel(tab, id) {
+  const target = tab.querySelector(`[data-tool-id="${cssEscape(id)}"]`);
+  if (!target) return;
+  tab.querySelectorAll(".tool-panel").forEach((panel) => panel.classList.remove("active"));
+  tab.querySelectorAll("[data-tool-target]").forEach((button) => button.classList.remove("active"));
+  target.classList.add("active");
+  tab.querySelector(`[data-tool-target="${cssEscape(id)}"]`)?.classList.add("active");
   updateToolContainers(tab);
 }
 
