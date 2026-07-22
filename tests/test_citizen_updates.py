@@ -47,7 +47,7 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert 'data-overview-tab="intel"' in html
     assert 'id="intelOutput"' in html
     assert "Leak and datamine posts are unverified" in html
-    assert "Three months of official updates" in html
+    assert "Three months of official updates" not in html
     assert 'id="intelUpdatedAt"' in html
     assert 'api("/api/updates")' in javascript
     assert html.index('data-tab="overview"') < html.index('data-tab="intel"') < html.index('data-tab="lookup"')
