@@ -2246,7 +2246,7 @@ function intelGroup(title, description, items, kind) {
     : stateMessage("No current items were returned by this source.");
   return `<section class="intel-group intel-${escapeAttribute(kind)}">
     <div class="intel-group-heading"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><span>${items.length}</span></div>
-    <div class="intel-grid">${cards}</div>
+    <div class="intel-grid" role="region" aria-label="${escapeAttribute(title)} — scroll through the past three months" tabindex="0">${cards}</div>
   </section>`;
 }
 

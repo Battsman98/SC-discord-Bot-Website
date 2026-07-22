@@ -15,6 +15,7 @@ DEVELOPMENT_URL = f"{RSI_BASE}/en/development"
 COMM_LINK_URL = f"{RSI_BASE}/en/comm-link"
 STATUS_URL = "https://status.robertsspaceindustries.com/"
 COMMUNITY_INTEL_URL = "https://www.reddit.com/r/starcitizen/search.rss?q=leak%20OR%20datamine%20OR%20spoiler&restrict_sr=on&sort=new"
+UPDATE_LOOKBACK_DAYS = 90
 
 
 class CitizenUpdatesSource:
@@ -31,7 +32,7 @@ class CitizenUpdatesSource:
         await self._session.close()
 
     async def get_updates(self) -> dict:
-        cache_key = "citizen-updates:direct-sources:v1"
+        cache_key = "citizen-updates:direct-sources:v2:90-days"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, dict):
             return cached
@@ -49,6 +50,7 @@ class CitizenUpdatesSource:
             "pu_updates": self.parse_status_updates(status),
             "sneak_peeks": self.parse_comm_link_updates(comm_link),
             "leaks": self.parse_community_intel(community),
+            "lookback_days": UPDATE_LOOKBACK_DAYS,
             "sources": {
                 "patch_notes": DEVELOPMENT_URL,
                 "pu_updates": STATUS_URL,
@@ -70,7 +72,7 @@ class CitizenUpdatesSource:
             return ""
 
     @staticmethod
-    def parse_patch_notes(html: str, limit: int = 8) -> list[dict]:
+    def parse_patch_notes(html: str, limit: int = 24) -> list[dict]:
         soup = BeautifulSoup(html or "", "html.parser")
         rows = []
         seen = set()
@@ -88,7 +90,7 @@ class CitizenUpdatesSource:
         return rows
 
     @staticmethod
-    def parse_status_updates(html: str, limit: int = 8) -> list[dict]:
+    def parse_status_updates(html: str, limit: int = 32) -> list[dict]:
         soup = BeautifulSoup(html or "", "html.parser")
         rows = []
         for issue in soup.select(".issue"):
@@ -110,7 +112,7 @@ class CitizenUpdatesSource:
         return rows
 
     @staticmethod
-    def parse_comm_link_updates(html: str, limit: int = 10) -> list[dict]:
+    def parse_comm_link_updates(html: str, limit: int = 40) -> list[dict]:
         soup = BeautifulSoup(html or "", "html.parser")
         keywords = (
             "inside star citizen", "roadmap roundup", "this week in star citizen", "monthly report",
@@ -135,7 +137,7 @@ class CitizenUpdatesSource:
         return rows
 
     @staticmethod
-    def parse_community_intel(xml: str, limit: int = 8) -> list[dict]:
+    def parse_community_intel(xml: str, limit: int = 25) -> list[dict]:
         try:
             root = ET.fromstring(xml or "<feed />")
         except ET.ParseError:

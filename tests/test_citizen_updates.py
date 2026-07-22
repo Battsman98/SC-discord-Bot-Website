@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.sources.citizen_updates import CitizenUpdatesSource
+from src.sources.citizen_updates import UPDATE_LOOKBACK_DAYS, CitizenUpdatesSource
 from src.web import _website_audit_metadata
 
 
@@ -44,6 +44,7 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert 'data-overview-tab="intel"' in html
     assert 'id="intelOutput"' in html
     assert "Leak and datamine posts are unverified" in html
+    assert "Three months of official updates" in html
     assert 'api("/api/updates")' in javascript
     assert html.index('data-tab="overview"') < html.index('data-tab="intel"') < html.index('data-tab="lookup"')
     assert html.index('data-overview-tab="intel"') < html.index('data-overview-tab="lookup"')
@@ -51,6 +52,24 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert 'body[data-mfd-theme="aegis-intel"]' in styles
     assert "--accent: #9fca62" in styles
     assert 'target="_blank" rel="noreferrer">Open source</a>' in javascript
+    assert 'scroll through the past three months' in javascript
+    assert "grid-auto-flow: column" in styles
+    assert "overflow-x: auto" in styles
+    assert UPDATE_LOOKBACK_DAYS == 90
+
+
+def test_direct_source_defaults_retain_a_three_month_sized_history() -> None:
+    development = "".join(
+        f'<a href="/en/comm-link/Patch-Notes/{number}-Patch-{number}">Patch {number} Posted 1 month ago</a>'
+        for number in range(20)
+    )
+    status = "".join(
+        f'<div class="issue"><div class="issue__header"><h3>Incident {number}</h3></div></div>'
+        for number in range(20)
+    )
+
+    assert len(CitizenUpdatesSource.parse_patch_notes(development)) == 20
+    assert len(CitizenUpdatesSource.parse_status_updates(status)) == 20
 
 
 def test_updates_view_is_audited_as_updates() -> None:
