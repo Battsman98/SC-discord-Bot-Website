@@ -13,6 +13,12 @@ from src.config import Settings
 RSI_BASE = "https://robertsspaceindustries.com"
 DEVELOPMENT_URL = f"{RSI_BASE}/en/development"
 COMM_LINK_URL = f"{RSI_BASE}/en/comm-link"
+COMM_LINK_ARCHIVE_URLS = (
+    f"{COMM_LINK_URL}?series=this-week-in-sc&sort=publish_new",
+    f"{COMM_LINK_URL}?series=monthly-report&sort=publish_new",
+    f"{COMM_LINK_URL}?series=roadmap-roundup&sort=publish_new",
+    f"{COMM_LINK_URL}?series=inside-star-citizen&sort=publish_new",
+)
 STATUS_URL = "https://status.robertsspaceindustries.com/"
 COMMUNITY_INTEL_URL = "https://www.reddit.com/r/starcitizen/search.rss?q=leak%20OR%20datamine%20OR%20spoiler&restrict_sr=on&sort=new"
 UPDATE_LOOKBACK_DAYS = 90
@@ -32,7 +38,7 @@ class CitizenUpdatesSource:
         await self._session.close()
 
     async def get_updates(self) -> dict:
-        cache_key = "citizen-updates:direct-sources:v2:90-days"
+        cache_key = "citizen-updates:direct-sources:v3:90-day-archives"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, dict):
             return cached
@@ -42,13 +48,17 @@ class CitizenUpdatesSource:
             self._fetch_text(STATUS_URL),
             self._fetch_text(COMM_LINK_URL),
             self._fetch_text(COMMUNITY_INTEL_URL),
+            *(self._fetch_text(url) for url in COMM_LINK_ARCHIVE_URLS),
             return_exceptions=True,
         )
-        development, status, comm_link, community = [page if isinstance(page, str) else "" for page in pages]
+        development, status, comm_link, community, *comm_link_archives = [
+            page if isinstance(page, str) else "" for page in pages
+        ]
+        comm_link_history = "\n".join((comm_link, *comm_link_archives))
         payload = {
             "patch_notes": self.parse_patch_notes(development),
             "pu_updates": self.parse_status_updates(status),
-            "sneak_peeks": self.parse_comm_link_updates(comm_link),
+            "sneak_peeks": self.parse_comm_link_updates(comm_link_history),
             "leaks": self.parse_community_intel(community),
             "lookback_days": UPDATE_LOOKBACK_DAYS,
             "sources": {

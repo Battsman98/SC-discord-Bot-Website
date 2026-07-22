@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.sources.citizen_updates import UPDATE_LOOKBACK_DAYS, CitizenUpdatesSource
+from src.sources.citizen_updates import COMM_LINK_ARCHIVE_URLS, UPDATE_LOOKBACK_DAYS, CitizenUpdatesSource
 from src.web import _website_audit_metadata
 
 
@@ -56,6 +56,8 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert "grid-auto-flow: column" in styles
     assert "overflow-x: auto" in styles
     assert UPDATE_LOOKBACK_DAYS == 90
+    assert len(COMM_LINK_ARCHIVE_URLS) == 4
+    assert all("robertsspaceindustries.com/en/comm-link" in url for url in COMM_LINK_ARCHIVE_URLS)
 
 
 def test_direct_source_defaults_retain_a_three_month_sized_history() -> None:
