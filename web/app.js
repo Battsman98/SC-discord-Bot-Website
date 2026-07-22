@@ -817,11 +817,13 @@ function showRsiImportResult(result) {
     `${result.imported.length} pledged ship${result.imported.length === 1 ? "" : "s"} updated`,
     result.candidates?.length ? `${result.candidates.length} candidate${result.candidates.length === 1 ? "" : "s"} found` : "No ship candidates found",
     result.skipped.length ? `${result.skipped.length} item${result.skipped.length === 1 ? "" : "s"} skipped` : "",
+    result.removed?.length ? `${result.removed.length} stale pledged ship${result.removed.length === 1 ? "" : "s"} removed` : "",
   ].filter(Boolean).join(". ");
   outputs.lookup.innerHTML = `<div class="state">
     <strong>${escapeHtml(details || "Pledged ship update complete.")}</strong>
     ${result.imported.length ? `<p>Updated: ${escapeHtml(result.imported.join(", "))}</p>` : ""}
     ${result.skipped.length ? `<p>Skipped: ${escapeHtml(result.skipped.slice(0, 20).join(", "))}</p>` : ""}
+    ${result.removed?.length ? `<p>Removed because no longer present in RSI: ${escapeHtml(result.removed.join(", "))}</p>` : ""}
   </div>`;
 }
 

@@ -680,6 +680,7 @@ async def save_my_ship(request: ShipOwnershipRequest, user=Depends(require_user)
 async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(require_user)) -> dict[str, Any]:
     imported: list[str] = []
     skipped: list[str] = []
+    removed: list[str] = []
     candidates: set[str] = {
         cleaned
         for value in request.candidates[:500]
@@ -709,12 +710,34 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
         )
         await _sync_auto_loaners(user.id, display_name, "pledged", detail.status)
         imported.append(display_name)
+    # Candidate-based imports come from the extension's complete paginated scan.
+    # Saved HTML uploads remain additive because users may upload only some pages.
+    if request.candidates:
+        protected_names = _rsi_import_protected_names(candidates, imported)
+        existing_ships = await state().cache.user_ships(user.id)
+        for ship in existing_ships:
+            if ship.get("ownership_type") != "pledged":
+                continue
+            ship_name = str(ship.get("name") or "").strip()
+            if not ship_name or _normalize_text(ship_name) in protected_names:
+                continue
+            await state().cache.delete_user_ship(user.id, ship_name)
+            await state().cache.delete_user_loaners_for_ship(user.id, ship_name)
+            removed.append(ship_name)
     return {
         "status": "imported",
         "candidates": sorted(candidates, key=str.lower),
         "imported": sorted(set(imported), key=str.lower),
         "skipped": sorted(set(skipped), key=str.lower),
+        "removed": sorted(set(removed), key=str.lower),
     }
+
+
+def _rsi_import_protected_names(candidates: set[str], imported: list[str]) -> set[str]:
+    protected = {_normalize_text(name) for name in [*candidates, *imported]}
+    for candidate in candidates:
+        protected.update(_normalize_text(name) for name in _rsi_import_lookup_candidates(candidate))
+    return protected
 
 
 async def _resolve_imported_ship(candidate: str) -> Any:

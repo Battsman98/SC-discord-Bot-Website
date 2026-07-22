@@ -19,6 +19,7 @@ from src.web import (
     _normalize_inventory_tooltip_name,
     _inventory_scanner_text_candidates,
     _rsi_import_lookup_candidates,
+    _rsi_import_protected_names,
     _ship_display_name,
     _ship_image_needs_refresh,
     _ship_is_in_concept,
@@ -194,6 +195,16 @@ def test_rsi_hangar_import_reads_typed_ship_items_from_upgraded_pledges() -> Non
 
 def test_rsi_import_lookup_candidates_simplify_package_names() -> None:
     assert "Avenger Titan" in _rsi_import_lookup_candidates("Avenger Titan Starter Pack")
+
+
+def test_rsi_sync_protects_canonical_and_display_ship_names() -> None:
+    protected = _rsi_import_protected_names({"ARGO SRV", "Aegis Reclaimer"}, ["SRV", "Reclaimer"])
+
+    assert "argo srv" in protected
+    assert "srv" in protected
+    assert "aegis reclaimer" in protected
+    assert "reclaimer" in protected
+    assert "moth" not in protected
 
 
 def test_blueprint_text_candidates_clean_ocr_lines() -> None:
