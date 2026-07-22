@@ -787,6 +787,12 @@ body[data-mfd-theme="aegis-intel"] {
   margin: 0;
 }
 
+.intel-updated-at {
+  margin-top: 6px !important;
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+
 .intel-notice {
   margin-bottom: 18px;
   padding: 12px 14px;

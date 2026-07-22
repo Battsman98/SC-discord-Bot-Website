@@ -38,7 +38,7 @@ class CitizenUpdatesSource:
         await self._session.close()
 
     async def get_updates(self) -> dict:
-        cache_key = "citizen-updates:direct-sources:v3:90-day-archives"
+        cache_key = "citizen-updates:direct-sources:v4:dated-auto-refresh"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, dict):
             return cached
@@ -69,7 +69,7 @@ class CitizenUpdatesSource:
             },
         }
         if any(payload[key] for key in ("patch_notes", "pu_updates", "sneak_peeks", "leaks")):
-            await self._cache.set(cache_key, payload, 10 * 60)
+            await self._cache.set(cache_key, payload, 5 * 60)
         return payload
 
     async def _fetch_text(self, url: str) -> str:
@@ -92,7 +92,7 @@ class CitizenUpdatesSource:
                 continue
             seen.add(url)
             text = _clean(anchor.get_text(" ", strip=True))
-            title = re.sub(r"\s+Posted\s+.*$", "", text, flags=re.IGNORECASE).strip()
+            title = _clean(anchor.get("title", "")) or re.sub(r"\s+Posted:?\s+.*$", "", text, flags=re.IGNORECASE).strip()
             posted = _posted_text(text)
             rows.append(_item(title, url, "RSI Patch Notes", posted, "Official", True))
             if len(rows) >= limit:
@@ -184,7 +184,14 @@ def _clean(value: str) -> str:
 
 
 def _posted_text(value: str) -> str:
-    match = re.search(r"Posted:\s*(.+?)(?:\s+[A-Z][a-z]+\s|$)", value)
+    relative = re.search(
+        r"\bPosted:?\s+((?:\d+|an?|one)\s+(?:minute|hour|day|week|month|year)s?\s+ago|today|yesterday)",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if relative:
+        return _clean(relative.group(1))
+    match = re.search(r"\bPosted:?\s+(.+?)(?:\s+[A-Z][a-z]+\s|$)", value)
     return _clean(match.group(1)) if match else ""
 
 

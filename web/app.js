@@ -2186,9 +2186,9 @@ async function removeBlueprint(name) {
 
 let intelLoaded = false;
 
-async function loadIntel(force = false) {
+async function loadIntel(force = false, quiet = false) {
   if (!outputs.intel || (intelLoaded && !force)) return;
-  outputs.intel.innerHTML = stateMessage("Contacting direct Star Citizen sources...");
+  if (!quiet) outputs.intel.innerHTML = stateMessage("Contacting direct Star Citizen sources...");
   try {
     const payload = await api("/api/updates");
     const groups = [
@@ -2199,8 +2199,10 @@ async function loadIntel(force = false) {
     ];
     outputs.intel.innerHTML = groups.map(([title, description, items, kind]) => intelGroup(title, description, items, kind)).join("");
     intelLoaded = true;
+    const updatedAt = document.querySelector("#intelUpdatedAt");
+    if (updatedAt) updatedAt.textContent = `Updated automatically at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`;
   } catch (error) {
-    outputs.intel.innerHTML = errorMessage(`Could not load direct-source updates: ${error.message}`);
+    if (!quiet) outputs.intel.innerHTML = errorMessage(`Could not load direct-source updates: ${error.message}`);
   }
 }
 
@@ -2495,6 +2497,9 @@ loadMe();
 loadShipFacets();
 loadTimers();
 setInterval(loadTimers, 60_000);
+setInterval(() => {
+  if (document.querySelector("#intel.tab-panel.active")) void loadIntel(true, true);
+}, 5 * 60_000);
 
 async function loadShipFacets() {
   try {

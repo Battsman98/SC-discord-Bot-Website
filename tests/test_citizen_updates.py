@@ -27,6 +27,7 @@ def test_direct_source_parsers_keep_official_and_unverified_items_separate() -> 
     leaks = CitizenUpdatesSource.parse_community_intel(community)
 
     assert patches[0]["title"] == "Star Citizen Alpha 4.9"
+    assert patches[0]["published"] == "6 days ago"
     assert patches[0]["confirmed"] is True
     assert incidents[0]["title"] == "Live Deployment"
     assert incidents[0]["url"].startswith("https://status.robertsspaceindustries.com/")
@@ -45,6 +46,7 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert 'id="intelOutput"' in html
     assert "Leak and datamine posts are unverified" in html
     assert "Three months of official updates" in html
+    assert 'id="intelUpdatedAt"' in html
     assert 'api("/api/updates")' in javascript
     assert html.index('data-tab="overview"') < html.index('data-tab="intel"') < html.index('data-tab="lookup"')
     assert html.index('data-overview-tab="intel"') < html.index('data-overview-tab="lookup"')
@@ -53,6 +55,8 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert "--accent: #9fca62" in styles
     assert 'target="_blank" rel="noreferrer">Open source</a>' in javascript
     assert 'scroll through the past three months' in javascript
+    assert "5 * 60_000" in javascript
+    assert "void loadIntel(true, true)" in javascript
     assert "grid-auto-flow: column" in styles
     assert "overflow-x: auto" in styles
     assert UPDATE_LOOKBACK_DAYS == 90
