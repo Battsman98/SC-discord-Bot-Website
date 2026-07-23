@@ -5,6 +5,7 @@ from scripts.run_render import (
     clean_expired_cache,
     maintenance_restart_seconds,
     rolling_restart_web,
+    start_web_process,
 )
 
 
@@ -76,3 +77,22 @@ def test_maintenance_restart_defaults_and_validates(monkeypatch) -> None:
 
     monkeypatch.setenv("MAINTENANCE_RESTART_SECONDS", "1")
     assert maintenance_restart_seconds() == 60
+
+
+def test_render_starts_one_web_worker_to_limit_memory(monkeypatch) -> None:
+    captured = {}
+
+    class FakeProcess:
+        pass
+
+    def fake_popen(command):
+        captured["command"] = command
+        return FakeProcess()
+
+    monkeypatch.setattr("scripts.run_render.subprocess.Popen", fake_popen)
+
+    process = start_web_process("10000")
+
+    assert isinstance(process, FakeProcess)
+    workers_index = captured["command"].index("--workers")
+    assert captured["command"][workers_index + 1] == "1"

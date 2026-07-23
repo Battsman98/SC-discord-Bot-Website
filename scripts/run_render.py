@@ -72,7 +72,7 @@ def start_web_process(port: str) -> subprocess.Popen:
             "--port",
             port,
             "--workers",
-            "2",
+            "1",
             "--proxy-headers",
             "--forwarded-allow-ips=*",
         ]
