@@ -146,14 +146,12 @@
           <h2>Trade Routing</h2>
           <label class="form-field">
             <span>Starting location</span>
-            <input name="starting_point" list="tradeLocationSuggestions" placeholder="Start typing a station or terminal" autocomplete="off" data-autocomplete-endpoint="/api/autocomplete/trade-locations" data-autocomplete-list="tradeLocationSuggestions" required>
+            <input name="starting_point" placeholder="Start typing a station or terminal" autocomplete="off" data-autocomplete-endpoint="/api/autocomplete/trade-locations" required>
           </label>
-          <datalist id="tradeLocationSuggestions"></datalist>
           <label class="form-field">
             <span>Ship</span>
-            <input name="ship" list="tradeShipSuggestions" value="Ironclad Assault" autocomplete="off" data-autocomplete-endpoint="/api/autocomplete/ships" data-autocomplete-list="tradeShipSuggestions" required>
+            <input name="ship" value="Ironclad Assault" autocomplete="off" data-autocomplete-endpoint="/api/autocomplete/ships" required>
           </label>
-          <datalist id="tradeShipSuggestions"></datalist>
           <div class="trade-route-options">
             <label class="form-field">
               <span>Initial profit</span>

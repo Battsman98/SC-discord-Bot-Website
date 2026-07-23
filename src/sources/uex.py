@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -30,11 +31,13 @@ class UEXSource:
         self._session = session
         self._commodities: list[dict] | None = None
         self._all_prices: list[dict] | None = None
+        self._all_prices_loaded_at = 0.0
         self._item_categories: list[dict] | None = None
         self._items_by_category: dict[int, list[dict]] = {}
         self._all_item_prices: list[dict] | None = None
         self._buyable_items: list[dict] | None = None
         self._terminals_by_id: dict[str, dict] | None = None
+        self._terminals_loaded_at = 0.0
         self._location_filter_names: list[str] | None = None
         self._mining_associations: dict[str, list[str]] | None = None
         self._mining_signatures: dict[str, list[int]] | None = None
@@ -486,17 +489,21 @@ class UEXSource:
         return [row for row in rows if isinstance(row, dict)]
 
     async def _fetch_all_prices(self) -> list[dict]:
-        if self._all_prices is not None:
+        now = time.monotonic()
+        if self._all_prices is not None and now - getattr(self, "_all_prices_loaded_at", now) < self._settings.cache_ttl_seconds:
             return self._all_prices
+        self._all_prices = None
 
         cached = await self._cache.get("uex:commodities-prices-all:v1")
         if isinstance(cached, list):
             self._all_prices = [row for row in cached if isinstance(row, dict)]
+            self._all_prices_loaded_at = now
             return self._all_prices
 
         payload = await self._fetch_json(f"{self.base_url}/commodities_prices_all")
         rows = payload.get("data") if isinstance(payload, dict) else []
         self._all_prices = [row for row in rows if isinstance(row, dict)]
+        self._all_prices_loaded_at = now
         await self._cache.set(
             "uex:commodities-prices-all:v1",
             self._all_prices,
@@ -599,8 +606,10 @@ class UEXSource:
         return self._buyable_items
 
     async def _fetch_terminals_by_id(self) -> dict[str, dict]:
-        if self._terminals_by_id is not None:
+        now = time.monotonic()
+        if self._terminals_by_id is not None and now - getattr(self, "_terminals_loaded_at", now) < 86400:
             return self._terminals_by_id
+        self._terminals_by_id = None
 
         cached = await self._cache.get("uex:commodity-terminals:v1")
         if isinstance(cached, dict):
@@ -609,6 +618,7 @@ class UEXSource:
                 for terminal_id, terminal in cached.items()
                 if isinstance(terminal, dict)
             }
+            self._terminals_loaded_at = now
             return self._terminals_by_id
 
         payload = await self._fetch_json(f"{self.base_url}/terminals?type=commodity")
@@ -618,7 +628,8 @@ class UEXSource:
             for row in rows
             if isinstance(row, dict) and row.get("id") is not None
         }
-        await self._cache.set("uex:commodity-terminals:v1", self._terminals_by_id, 12 * 60 * 60)
+        self._terminals_loaded_at = now
+        await self._cache.set("uex:commodity-terminals:v1", self._terminals_by_id, 86400)
         return self._terminals_by_id
 
     async def _fetch_json(self, url: str) -> dict | None:

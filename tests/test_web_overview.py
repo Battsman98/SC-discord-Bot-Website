@@ -160,6 +160,9 @@ def test_trade_route_form_has_labels_dropdown_and_autocomplete_assistance() -> N
     assert 'data-autocomplete-endpoint="/api/autocomplete/trade-locations"' in html
     assert 'data-autocomplete-endpoint="/api/autocomplete/ships"' in html
     assert "initAutocompleteInputs();" in javascript
+    assert 'menu.setAttribute("role", "listbox")' in javascript
+    assert 'option.setAttribute("role", "option")' in javascript
+    assert 'event.key === "ArrowDown"' in javascript
 
 
 def test_hangar_modal_keeps_other_ships_visible() -> None:

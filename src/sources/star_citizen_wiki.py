@@ -1,4 +1,5 @@
 from dataclasses import replace
+import time
 from urllib.parse import quote
 
 import aiohttp
@@ -18,6 +19,7 @@ class StarCitizenWikiSource:
         self._cache = cache
         self._session = session
         self._ship_names: list[str] | None = None
+        self._ship_names_loaded_at = 0.0
         self._ship_summaries: list[ShipResult] | None = None
 
     async def lookup_inventory_items(self, query: str, limit: int = 10) -> list[ItemLocatorResult]:
@@ -412,16 +414,20 @@ class StarCitizenWikiSource:
         )
 
     async def _get_ship_names(self) -> list[str]:
-        if self._ship_names is not None:
+        now = time.monotonic()
+        if self._ship_names is not None and now - getattr(self, "_ship_names_loaded_at", now) < 86400:
             return self._ship_names
+        self._ship_names = None
 
         cached = await self._cache.get("star-citizen-wiki:ship-names:v1")
         if isinstance(cached, list) and all(isinstance(name, str) for name in cached):
             self._ship_names = cached
+            self._ship_names_loaded_at = now
             return self._ship_names
 
         names = await self._fetch_ship_names()
         self._ship_names = names
+        self._ship_names_loaded_at = now
         await self._cache.set("star-citizen-wiki:ship-names:v1", names, 86400)
         return names
 

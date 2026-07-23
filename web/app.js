@@ -166,26 +166,90 @@ document.querySelectorAll("form[data-action]").forEach((form) => {
 
 function initAutocompleteInputs() {
   document.querySelectorAll("[data-autocomplete-endpoint]").forEach((input) => {
+    const field = input.closest(".form-field");
+    if (!field) return;
+    field.classList.add("autocomplete-field");
+    const menu = document.createElement("div");
+    menu.className = "autocomplete-menu";
+    menu.setAttribute("role", "listbox");
+    menu.hidden = true;
+    field.append(menu);
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-expanded", "false");
+
     let timer = null;
+    let activeIndex = -1;
+    let requestNumber = 0;
+
+    const closeMenu = () => {
+      menu.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+      activeIndex = -1;
+    };
+
+    const selectSuggestion = (value) => {
+      input.value = value;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      closeMenu();
+      input.focus();
+    };
+
+    const setActiveSuggestion = (index) => {
+      const options = Array.from(menu.querySelectorAll("[role='option']"));
+      if (!options.length) return;
+      activeIndex = (index + options.length) % options.length;
+      options.forEach((option, optionIndex) => option.classList.toggle("active", optionIndex === activeIndex));
+      const active = options[activeIndex];
+      input.setAttribute("aria-activedescendant", active.id);
+      active.scrollIntoView({ block: "nearest" });
+    };
+
     const loadSuggestions = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(async () => {
-        const list = document.querySelector(`#${cssEscape(input.dataset.autocompleteList)}`);
-        if (!list) return;
+        const currentRequest = ++requestNumber;
         try {
           const values = await api(`${input.dataset.autocompleteEndpoint}?query=${encodeURIComponent(input.value.trim())}`);
-          list.replaceChildren(...values.map((value) => {
-            const option = document.createElement("option");
-            option.value = value;
+          if (currentRequest !== requestNumber || document.activeElement !== input) return;
+          menu.replaceChildren(...values.map((value, index) => {
+            const option = document.createElement("button");
+            option.type = "button";
+            option.id = `autocomplete-${input.name}-${index}`;
+            option.setAttribute("role", "option");
+            option.textContent = value;
+            option.addEventListener("pointerdown", (event) => event.preventDefault());
+            option.addEventListener("click", () => selectSuggestion(value));
             return option;
           }));
+          activeIndex = -1;
+          menu.hidden = values.length === 0;
+          input.setAttribute("aria-expanded", String(values.length > 0));
         } catch {
-          list.replaceChildren();
+          menu.replaceChildren();
+          closeMenu();
         }
       }, 180);
     };
+
     input.addEventListener("input", loadSuggestions);
     input.addEventListener("focus", loadSuggestions);
+    input.addEventListener("blur", () => window.setTimeout(closeMenu, 100));
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (menu.hidden) loadSuggestions();
+        else setActiveSuggestion(activeIndex + 1);
+      } else if (event.key === "ArrowUp" && !menu.hidden) {
+        event.preventDefault();
+        setActiveSuggestion(activeIndex - 1);
+      } else if (event.key === "Enter" && activeIndex >= 0 && !menu.hidden) {
+        event.preventDefault();
+        selectSuggestion(menu.querySelectorAll("[role='option']")[activeIndex].textContent);
+      } else if (event.key === "Escape") {
+        closeMenu();
+      }
+    });
   });
 }
 
