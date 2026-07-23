@@ -2195,6 +2195,7 @@ async function loadIntel(force = false, quiet = false) {
       ["Patch Notes", "Official LIVE release notes", payload.patch_notes || [], "patch"],
       ["PU Server Updates", "Maintenance, deployments, and service incidents", payload.pu_updates || [], "status"],
       ["Sneak Peeks", "Official previews, roadmap updates, and development reports", payload.sneak_peeks || [], "preview"],
+      ["CIG Developer Updates", "Official Spectrum announcements and developer tracker posts", payload.cig_updates || [], "developer"],
       ["Leaks & Datamines", "Unverified community reports—treat as rumor until confirmed", payload.leaks || [], "unverified"],
     ];
     outputs.intel.innerHTML = groups.map(([title, description, items, kind]) => intelGroup(title, description, items, kind)).join("");

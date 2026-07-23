@@ -22,11 +22,16 @@ def test_direct_source_parsers_keep_official_and_unverified_items_separate() -> 
       <title>New vehicle datamine leak</title><link href="https://www.reddit.com/r/starcitizen/comments/example"/>
       <updated>2026-07-21T01:02:03Z</updated><content type="html">Original public report</content>
       </entry></feed>'''
+    dev_tracker = '''<a class="devpost" href="/spectrum/community/SC/forum/1/thread/ship-matrix-specs-now-straight-from-the-game/9043731">
+      <div class="handle">Freyja-CIG</div><span class="time">3 hours ago</span>
+      <span class="category">Announcements</span><span class="thread">Ship Matrix Specs, Now Straight from the Game</span>
+      <p class="details">The RSI Ship Matrix now pulls specifications directly from the game.</p></a>'''
 
     patches = CitizenUpdatesSource.parse_patch_notes(development)
     incidents = CitizenUpdatesSource.parse_status_updates(status)
     previews = CitizenUpdatesSource.parse_comm_link_updates(comm_link)
     leaks = CitizenUpdatesSource.parse_community_intel(community)
+    developer_updates = CitizenUpdatesSource.parse_dev_tracker_updates(dev_tracker)
 
     assert patches[0]["title"] == "Star Citizen Alpha 4.9"
     assert patches[0]["published"] == "6 days ago"
@@ -36,6 +41,9 @@ def test_direct_source_parsers_keep_official_and_unverified_items_separate() -> 
     assert previews[0]["title"] == "Roadmap Roundup - July 15, 2026"
     assert leaks[0]["confirmed"] is False
     assert leaks[0]["status"] == "Unverified"
+    assert developer_updates[0]["title"] == "Ship Matrix Specs, Now Straight from the Game"
+    assert developer_updates[0]["url"].endswith("/ship-matrix-specs-now-straight-from-the-game")
+    assert developer_updates[0]["source"] == "RSI Developer Tracker · Freyja-CIG"
 
 
 def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
@@ -50,6 +58,8 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert "Three months of official updates" not in html
     assert 'id="intelUpdatedAt"' in html
     assert 'api("/api/updates")' in javascript
+    assert 'payload.cig_updates || []' in javascript
+    assert "CIG Developer Updates" in javascript
     assert html.index('data-tab="overview"') < html.index('data-tab="intel"') < html.index('data-tab="lookup"')
     assert html.index('data-overview-tab="intel"') < html.index('data-overview-tab="lookup"')
     assert 'intel: { theme: "aegis-intel", label: "AEGIS DYNAMICS INTELLIGENCE" }' in javascript

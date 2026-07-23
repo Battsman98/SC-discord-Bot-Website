@@ -21,6 +21,7 @@ COMM_LINK_ARCHIVE_URLS = (
     f"{COMM_LINK_URL}?series=inside-star-citizen&sort=publish_new",
 )
 STATUS_URL = "https://status.robertsspaceindustries.com/"
+DEV_TRACKER_URL = f"{RSI_BASE}/community/devtracker"
 COMMUNITY_INTEL_URL = "https://www.reddit.com/r/starcitizen/search.rss?q=leak%20OR%20datamine%20OR%20spoiler&restrict_sr=on&sort=new"
 UPDATE_LOOKBACK_DAYS = 90
 
@@ -39,7 +40,7 @@ class CitizenUpdatesSource:
         await self._session.close()
 
     async def get_updates(self) -> dict:
-        cache_key = "citizen-updates:direct-sources:v5:dated-90-day-refresh"
+        cache_key = "citizen-updates:direct-sources:v6:official-devtracker"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, dict):
             return cached
@@ -49,10 +50,11 @@ class CitizenUpdatesSource:
             self._fetch_text(STATUS_URL),
             self._fetch_text(COMM_LINK_URL),
             self._fetch_text(COMMUNITY_INTEL_URL),
+            self._fetch_text(DEV_TRACKER_URL),
             *(self._fetch_text(url) for url in COMM_LINK_ARCHIVE_URLS),
             return_exceptions=True,
         )
-        development, status, comm_link, community, *comm_link_archives = [
+        development, status, comm_link, community, dev_tracker, *comm_link_archives = [
             page if isinstance(page, str) else "" for page in pages
         ]
         comm_link_history = "\n".join((comm_link, *comm_link_archives))
@@ -60,16 +62,18 @@ class CitizenUpdatesSource:
             "patch_notes": _within_lookback(self.parse_patch_notes(development)),
             "pu_updates": _within_lookback(self.parse_status_updates(status)),
             "sneak_peeks": _within_lookback(self.parse_comm_link_updates(comm_link_history)),
+            "cig_updates": _within_lookback(self.parse_dev_tracker_updates(dev_tracker)),
             "leaks": _within_lookback(self.parse_community_intel(community)),
             "lookback_days": UPDATE_LOOKBACK_DAYS,
             "sources": {
                 "patch_notes": DEVELOPMENT_URL,
                 "pu_updates": STATUS_URL,
                 "sneak_peeks": COMM_LINK_URL,
+                "cig_updates": DEV_TRACKER_URL,
                 "leaks": COMMUNITY_INTEL_URL,
             },
         }
-        if any(payload[key] for key in ("patch_notes", "pu_updates", "sneak_peeks", "leaks")):
+        if any(payload[key] for key in ("patch_notes", "pu_updates", "sneak_peeks", "cig_updates", "leaks")):
             await self._cache.set(cache_key, payload, 5 * 60)
         return payload
 
@@ -128,6 +132,7 @@ class CitizenUpdatesSource:
         keywords = (
             "inside star citizen", "roadmap roundup", "this week in star citizen", "monthly report",
             "sneak", "teaser", "behind the ships", "squadron 42", "citizencon", "letter from",
+            "twitch drops", "foundation festival", "ship matrix",
         )
         rows = []
         seen = set()
@@ -143,6 +148,41 @@ class CitizenUpdatesSource:
             title = re.sub(r"^(post|video|slideshow|poll)\s+", "", text, flags=re.IGNORECASE)
             title = re.sub(r"\s+\d+\s+Posted:.*$", "", title, flags=re.IGNORECASE).strip()
             rows.append(_item(title, url, "RSI Comm-Link", _posted_text(text), "Official preview", True))
+            if len(rows) >= limit:
+                break
+        return rows
+
+    @staticmethod
+    def parse_dev_tracker_updates(html: str, limit: int = 30) -> list[dict]:
+        soup = BeautifulSoup(html or "", "html.parser")
+        keywords = (
+            "announcement", "hotfix", "patch", "live", "ptu", "evocati", "server", "deployment",
+            "ship matrix", "foundation festival", "twitch drop", "testing", "release",
+        )
+        rows = []
+        seen = set()
+        for post in soup.select("a.devpost[href]"):
+            title_node = post.select_one(".thread")
+            if not title_node:
+                continue
+            title = _clean(title_node.get_text(" ", strip=True))
+            category_node = post.select_one(".category")
+            category = _clean(category_node.get_text(" ", strip=True)) if category_node else "Developer update"
+            summary_node = post.select_one(".details")
+            summary = _clean(summary_node.get_text(" ", strip=True)) if summary_node else ""
+            searchable = f"{category} {title} {summary}".lower()
+            if not any(keyword in searchable for keyword in keywords):
+                continue
+            url = urljoin(RSI_BASE, post.get("href", ""))
+            canonical_url = re.sub(r"/\d+/?$", "", url)
+            if canonical_url in seen:
+                continue
+            seen.add(canonical_url)
+            date_node = post.select_one(".time")
+            published = _clean(date_node.get_text(" ", strip=True)) if date_node else ""
+            handle_node = post.select_one(".handle")
+            handle = _clean(handle_node.get_text(" ", strip=True)) if handle_node else "CIG Developer"
+            rows.append(_item(title, canonical_url, f"RSI Developer Tracker · {handle}", published, category, True, summary))
             if len(rows) >= limit:
                 break
         return rows
