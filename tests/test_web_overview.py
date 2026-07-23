@@ -246,12 +246,24 @@ def test_live_inventory_scanner_retries_missed_reads_and_only_skips_exact_frames
     assert 'inventoryScannerSpacingInput.value = "350"' in javascript
 
 
+def test_window_share_auto_starts_scanning_and_stop_ignores_late_results() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "Start Scan" not in html
+    assert "beginInventoryAutoScan();" in javascript
+    assert "inventoryScannerGeneration += 1" in javascript
+    assert "options.scannerGeneration !== inventoryScannerGeneration" in javascript
+    assert "Scanner stopped. Review questionable reads below" in javascript
+
+
 def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> None:
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
 
     assert "await asyncio.to_thread(_initialize_rapid_ocr_pool)" in python
     assert "await asyncio.to_thread(_read_image_text, data)" in python
     assert "candidate_limit=1 if live_scan else None" in python
+    assert "effective_min_score = max(min_score, 0.92) if live_scan else min_score" in python
 
 
 def test_live_scanner_avoids_cpu_contention_and_reports_stage_timings() -> None:

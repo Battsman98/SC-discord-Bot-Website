@@ -183,7 +183,6 @@ document.querySelector("[data-action-button='clearStationInventory']").addEventL
 document.querySelector("[data-action-button='clearAllInventory']").addEventListener("click", clearAllInventory);
 document.querySelector("[data-action-button='matchInventoryText']").addEventListener("click", importInventoryText);
 document.querySelector("[data-action-button='startInventoryScanner']").addEventListener("click", startInventoryScanner);
-document.querySelector("[data-action-button='startInventoryAutoScan']").addEventListener("click", startInventoryAutoScan);
 document.querySelector("[data-action-button='stopInventoryScanner']").addEventListener("click", stopInventoryScanner);
 document.querySelector("[data-action-button='importRsiPledges']").addEventListener("click", importRsiPledgesFromBrowser);
 document.querySelector("#rsiPledgeImport").addEventListener("change", importRsiPledgeFiles);
@@ -209,6 +208,7 @@ let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
 const inventoryScannerQueueLimit = 8;
+let inventoryScannerGeneration = 0;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
 const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
@@ -1310,9 +1310,11 @@ function renderInventoryImportItems(payload, options = {}) {
     return;
   }
   if (!items.length) {
-    const emptyMessage = options.scannerMode && inventoryScannerHistory.length
-      ? stateMessage("Still scanning. Hover the next item and wait a few seconds.")
-      : stateMessage("No inventory items found. Try a clearer screenshot or paste copied rows.");
+    const emptyMessage = options.reviewMode || inventoryScannerStatus === "Scanner stopped."
+      ? stateMessage("Scanner stopped. Review questionable reads below or share the window to scan again.")
+      : options.scannerMode && inventoryScannerHistory.length
+        ? stateMessage("Still scanning. Hover the next item and wait a few seconds.")
+        : stateMessage("No inventory items found. Try a clearer screenshot or paste copied rows.");
     outputs.inventoryImport.innerHTML = `${ocrWarning}${emptyMessage}${scanProgress}${diagnostics}${textPreview}`;
     return;
   }
@@ -1325,10 +1327,10 @@ function renderInventoryImportItems(payload, options = {}) {
       <label class="import-name-field"><span>Name</span><input data-import-name value="${escapeAttribute(item.name)}"></label>
       <label class="import-category-field"><span>Category</span>${inventoryCategorySelect("data-import-category", item.category || "")}</label>
       <label class="import-type-field"><span>Type</span>${inventoryTypeSelect("data-import-type", item.category || "", item.item_type || "")}</label>
-      <label class="import-size-field"><span>Size</span><input data-import-size value="${escapeAttribute(item.item_size || "")}" placeholder="—"></label>
+      <label class="import-size-field"><span>Size</span><input data-import-size value="${escapeAttribute(item.item_size || "")}" placeholder="-"></label>
       <label class="import-quantity-field"><span>Quantity</span><input data-import-quantity type="number" min="0" step="0.01" value="${escapeAttribute(item.quantity || 1)}"></label>
-      <label class="import-quality-field"><span>Quality</span><input data-import-quality type="number" min="0" step="0.01" value="${escapeAttribute(item.quality ?? "")}" placeholder="—"></label>
-      <label class="import-scu-field"><span>SCU</span><input data-import-volume type="number" min="0" step="0.000001" value="${escapeAttribute(item.volume_scu ?? "")}" placeholder="—"></label>
+      <label class="import-quality-field"><span>Quality</span><input data-import-quality type="number" min="0" step="0.01" value="${escapeAttribute(item.quality ?? "")}" placeholder="-"></label>
+      <label class="import-scu-field"><span>SCU</span><input data-import-volume type="number" min="0" step="0.000001" value="${escapeAttribute(item.volume_scu ?? "")}" placeholder="-"></label>
       <label class="import-location-field"><span>Station / location</span><input data-import-location value="${escapeAttribute(item.location)}"></label>
       <label class="import-notes-field"><span>Scanner notes</span><textarea data-import-notes>${escapeHtml(scannerCandidateNotes(item))}</textarea></label>
       <div class="import-row-actions">
@@ -1577,11 +1579,12 @@ async function startInventoryScanner() {
   sizeInventoryScannerOverlay();
   drawInventoryScannerOverlay();
   const empty = document.querySelector(".scanner-empty");
-  if (empty) empty.textContent = "Scanner ready. Click Start Scan, then hover each item for a few seconds.";
-  outputs.inventoryImport.innerHTML = stateMessage("Scanner ready. Click Start Scan, then hover each item for a few seconds.");
+  if (empty) empty.textContent = "Scanning. Hover one item at a time.";
+  beginInventoryAutoScan();
 }
 
 function stopInventoryScanner(clearOutput = true) {
+  inventoryScannerGeneration += 1;
   if (inventoryScannerTimer) {
     clearInterval(inventoryScannerTimer);
     inventoryScannerTimer = null;
@@ -1599,7 +1602,7 @@ function stopInventoryScanner(clearOutput = true) {
   }
   document.querySelector(".scanner-preview")?.classList.remove("active");
   const empty = document.querySelector(".scanner-empty");
-  if (empty) empty.textContent = "Low-impact scanner mode. Share Star Citizen, start scan, then hover each item for a few seconds.";
+  if (empty) empty.textContent = "Scanner stopped. Share the Star Citizen window to scan again.";
   if (clearOutput) {
     inventoryScannerStatus = "Scanner stopped.";
     renderInventoryImportItems(
@@ -1629,7 +1632,7 @@ async function scanInventoryHover() {
       || inventoryScannerQueue.some((queued) => imageHashDistance(queued.hash, capture.hash) <= 2)) {
       return;
     }
-    inventoryScannerQueue.push({ ...capture, captureMs });
+    inventoryScannerQueue.push({ ...capture, captureMs, generation: inventoryScannerGeneration });
     if (inventoryScannerQueue.length > inventoryScannerQueueLimit) inventoryScannerQueue.shift();
     drainInventoryScannerQueue();
   } finally {
@@ -1644,7 +1647,9 @@ function drainInventoryScannerQueue() {
     inventoryScannerPendingHashes.add(capture.hash);
     processInventoryScannerCapture(capture)
       .catch((error) => {
-        outputs.inventoryImport.innerHTML = errorMessage(error.message);
+        if (capture.generation === inventoryScannerGeneration) {
+          outputs.inventoryImport.innerHTML = errorMessage(error.message);
+        }
       })
       .finally(() => {
         inventoryScannerPendingHashes.delete(capture.hash);
@@ -1660,7 +1665,9 @@ async function processInventoryScannerCapture(capture) {
     append: true,
     liveScan: true,
     captureMs: capture.captureMs,
+    scannerGeneration: capture.generation,
   });
+  if (capture.generation !== inventoryScannerGeneration) return;
   if (payload?.items?.length) {
     inventoryScannerLastHash = capture.hash;
   } else {
@@ -1668,10 +1675,8 @@ async function processInventoryScannerCapture(capture) {
   }
 }
 
-async function startInventoryAutoScan() {
-  if (!inventoryScannerStream) {
-    await startInventoryScanner();
-  }
+function beginInventoryAutoScan() {
+  if (!inventoryScannerStream) return;
   if (!inventoryScannerCrop) {
     inventoryScannerCrop = defaultInventoryTooltipCrop();
     drawInventoryScannerOverlay();
@@ -1680,7 +1685,9 @@ async function startInventoryAutoScan() {
   const empty = document.querySelector(".scanner-empty");
   if (empty) empty.textContent = inventoryScannerStatus;
   outputs.inventoryImport.innerHTML = `${stateMessage(inventoryScannerStatus)}${renderInventoryScanProgress()}`;
-  await scanInventoryHover();
+  scanInventoryHover().catch((error) => {
+    outputs.inventoryImport.innerHTML = errorMessage(error.message);
+  });
   const spacing = Math.max(250, Number(document.querySelector("#inventoryScannerSpacing")?.value || 350));
   if (inventoryScannerTimer) clearInterval(inventoryScannerTimer);
   inventoryScannerTimer = setInterval(() => {
@@ -1898,6 +1905,8 @@ async function submitInventoryImages(files, options = {}) {
     const response = await fetch(`/api/me/inventory/import/images?${params}`, { method: "POST", body: formData });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || `Request failed with ${response.status}`);
+    if (options.scannerGeneration !== undefined
+      && options.scannerGeneration !== inventoryScannerGeneration) return null;
     if (options.scannerMode) {
       inventoryScannerLastTiming = {
         capture_ms: Number(options.captureMs || 0),
@@ -1915,6 +1924,8 @@ async function submitInventoryImages(files, options = {}) {
     });
     return payload;
   } catch (error) {
+    if (options.scannerGeneration !== undefined
+      && options.scannerGeneration !== inventoryScannerGeneration) return null;
     outputs.inventoryImport.innerHTML = errorMessage(error.message);
     return null;
   }

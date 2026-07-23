@@ -1341,6 +1341,7 @@ async def import_inventory_from_images(
     ocr_text, ocr_error = await _ocr_blueprint_images(files)
     ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
     if scanner_mode:
+        effective_min_score = max(min_score, 0.92) if live_scan else min_score
         match_started_at = time.perf_counter()
         scanner_lookups = await _inventory_scanner_lookups(
             ocr_text,
@@ -1351,7 +1352,7 @@ async def import_inventory_from_images(
             ocr_text,
             default_location,
             default_category,
-            min_score,
+            effective_min_score,
             exclude_words,
             scanner_lookups,
         ) if ocr_text.strip() else []
@@ -1363,7 +1364,7 @@ async def import_inventory_from_images(
             "items": items,
             "diagnostics": await _inventory_scanner_diagnostics(
                 ocr_text,
-                min_score,
+                effective_min_score,
                 exclude_words,
                 scanner_lookups,
             ) if ocr_text.strip() else {"candidates": [], "rejected_lines": []},
