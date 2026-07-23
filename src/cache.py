@@ -146,6 +146,36 @@ class SQLiteCache:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS item_catalog (
+                item_uuid TEXT PRIMARY KEY,
+                stable_id INTEGER NOT NULL,
+                item_name TEXT NOT NULL,
+                normalized_name TEXT NOT NULL,
+                category TEXT,
+                item_type TEXT,
+                company_name TEXT,
+                item_size TEXT,
+                source_url TEXT NOT NULL,
+                source_name TEXT NOT NULL,
+                game_version TEXT,
+                source_updated_at TEXT,
+                verified_at INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS item_catalog_metadata (
+                metadata_key TEXT PRIMARY KEY,
+                metadata_value TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_item_catalog_normalized_name ON item_catalog(normalized_name)"
+        )
         cls._ensure_column(connection, "user_ships", "image_url", "TEXT")
         cls._ensure_column(connection, "user_ships", "notes", "TEXT")
         cls._ensure_column(connection, "user_ships", "loaner_for", "TEXT")
@@ -717,6 +747,85 @@ class SQLiteCache:
             "item_types": values_for("item_type"),
             "item_sizes": values_for("item_size"),
         }
+
+    async def item_catalog_rows(self) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            """
+            SELECT item_uuid, stable_id, item_name, normalized_name, category, item_type,
+                   company_name, item_size, source_url, source_name, game_version,
+                   source_updated_at, verified_at
+            FROM item_catalog
+            ORDER BY item_name COLLATE NOCASE
+            """
+        ).fetchall()
+        columns = (
+            "item_uuid", "stable_id", "item_name", "normalized_name", "category", "item_type",
+            "company_name", "item_size", "source_url", "source_name", "game_version",
+            "source_updated_at", "verified_at",
+        )
+        return [dict(zip(columns, row)) for row in rows]
+
+    async def item_catalog_metadata(self) -> dict[str, Any]:
+        rows = self._connection.execute(
+            "SELECT metadata_key, metadata_value FROM item_catalog_metadata"
+        ).fetchall()
+        metadata: dict[str, Any] = {}
+        for key, value in rows:
+            try:
+                metadata[key] = json.loads(value)
+            except (TypeError, json.JSONDecodeError):
+                metadata[key] = value
+        return metadata
+
+    async def set_item_catalog_metadata(self, values: dict[str, Any]) -> None:
+        self._connection.executemany(
+            """
+            INSERT INTO item_catalog_metadata (metadata_key, metadata_value)
+            VALUES (?, ?)
+            ON CONFLICT(metadata_key) DO UPDATE SET metadata_value = excluded.metadata_value
+            """,
+            [(str(key), json.dumps(value)) for key, value in values.items()],
+        )
+        self._connection.commit()
+
+    async def replace_item_catalog(
+        self,
+        rows: list[dict[str, Any]],
+        metadata: dict[str, Any],
+    ) -> None:
+        required = {"item_uuid", "stable_id", "item_name", "normalized_name", "source_url"}
+        if not rows or any(not required.issubset(row) for row in rows):
+            raise ValueError("Item catalog replacement is empty or missing required fields.")
+        now = int(time.time())
+        values = [
+            (
+                row["item_uuid"], row["stable_id"], row["item_name"], row["normalized_name"],
+                row.get("category"), row.get("item_type"), row.get("company_name"),
+                row.get("item_size"), row["source_url"], row.get("source_name") or "Star Citizen Wiki",
+                row.get("game_version"), row.get("source_updated_at"), now,
+            )
+            for row in rows
+        ]
+        with self._connection:
+            self._connection.execute("DELETE FROM item_catalog")
+            self._connection.executemany(
+                """
+                INSERT INTO item_catalog (
+                    item_uuid, stable_id, item_name, normalized_name, category, item_type,
+                    company_name, item_size, source_url, source_name, game_version,
+                    source_updated_at, verified_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                values,
+            )
+            self._connection.executemany(
+                """
+                INSERT INTO item_catalog_metadata (metadata_key, metadata_value)
+                VALUES (?, ?)
+                ON CONFLICT(metadata_key) DO UPDATE SET metadata_value = excluded.metadata_value
+                """,
+                [(str(key), json.dumps(value)) for key, value in metadata.items()],
+            )
 
     async def close(self) -> None:
         self._connection.close()

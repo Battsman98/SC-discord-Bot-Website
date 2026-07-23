@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import replace
 import time
 from urllib.parse import quote
@@ -21,11 +22,18 @@ class StarCitizenWikiSource:
         self._ship_names: list[str] | None = None
         self._ship_names_loaded_at = 0.0
         self._ship_summaries: list[ShipResult] | None = None
+        self._local_items: list[ItemLocatorResult] | None = None
+        self._local_item_exact: dict[str, list[int]] = {}
+        self._local_item_trigrams: dict[str, set[int]] = {}
+        self._catalog_sync_lock = asyncio.Lock()
 
     async def lookup_inventory_items(self, query: str, limit: int = 10) -> list[ItemLocatorResult]:
         normalized_query = " ".join(str(query or "").strip().split())
         if not normalized_query:
             return []
+        await self._load_local_item_catalog()
+        if self._local_items:
+            return self._search_local_item_catalog(normalized_query, limit)
 
         cache_key = f"star-citizen-wiki:inventory-items:v1:{normalized_query.lower()}"
         cached = await self._cache.get(cache_key)
@@ -47,6 +55,190 @@ class StarCitizenWikiSource:
         results = results[:limit]
         await self._cache.set(cache_key, [self._item_to_cache(item) for item in results], 86400)
         return results
+
+    async def item_catalog_status(self) -> dict:
+        metadata = await self._cache.item_catalog_metadata()
+        metadata.setdefault("item_count", len(self._local_items or []))
+        metadata.setdefault("status", "empty" if not metadata["item_count"] else "ready")
+        return metadata
+
+    async def item_catalog_ready(self) -> bool:
+        await self._load_local_item_catalog()
+        return bool(self._local_items)
+
+    async def validate_item_catalog(self, force_deep: bool = False) -> dict:
+        async with self._catalog_sync_lock:
+            now = int(time.time())
+            metadata = await self._cache.item_catalog_metadata()
+            existing_count = int(metadata.get("item_count") or 0)
+            last_deep = int(metadata.get("last_deep_validation_at") or 0)
+            try:
+                summary = await self._fetch_item_catalog_summary()
+                deep_due = force_deep or existing_count == 0 or last_deep <= now - (7 * 86400)
+                changed = (
+                    int(summary["item_count"]) != existing_count
+                    or str(summary.get("game_version") or "") != str(metadata.get("game_version") or "")
+                )
+                if deep_due or changed:
+                    return await self._replace_with_downloaded_item_catalog(summary, now)
+                await self._cache.set_item_catalog_metadata(
+                    {
+                        "status": "ready",
+                        "last_daily_validation_at": now,
+                        "last_validation_error": None,
+                        "source_item_count": summary["item_count"],
+                    }
+                )
+            except Exception as exc:
+                await self._cache.set_item_catalog_metadata(
+                    {
+                        "status": "stale" if existing_count else "unavailable",
+                        "last_validation_attempt_at": now,
+                        "last_validation_error": str(exc)[:500],
+                    }
+                )
+            return await self.item_catalog_status()
+
+    async def _fetch_item_catalog_summary(self) -> dict:
+        payload = await self._fetch_json(f"{self.base_url}/api/items?page[size]=1&page[number]=1")
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        meta = payload.get("meta") if isinstance(payload, dict) else None
+        if not isinstance(rows, list) or not rows or not isinstance(meta, dict):
+            raise RuntimeError("Item catalog source did not return a valid summary.")
+        return {
+            "item_count": int(meta.get("total") or 0),
+            "last_page": int(meta.get("last_page") or 0),
+            "game_version": self._string_or_none(rows[0].get("version")),
+        }
+
+    async def _replace_with_downloaded_item_catalog(self, summary: dict, now: int) -> dict:
+        page_size = 200
+        total = int(summary["item_count"])
+        last_page = max(1, (total + page_size - 1) // page_size)
+        rows_by_uuid: dict[str, dict] = {}
+        versions: set[str] = set()
+        for page in range(1, last_page + 1):
+            payload = await self._fetch_json(
+                f"{self.base_url}/api/items?page[size]={page_size}&page[number]={page}"
+            )
+            source_rows = payload.get("data") if isinstance(payload, dict) else None
+            if not isinstance(source_rows, list):
+                raise RuntimeError(f"Item catalog page {page} was unavailable.")
+            for source_row in source_rows:
+                if not isinstance(source_row, dict):
+                    continue
+                item_uuid = self._string_or_none(source_row.get("uuid"))
+                parsed = self._parse_item_result(source_row)
+                if not item_uuid or parsed is None:
+                    continue
+                version = self._string_or_none(source_row.get("version"))
+                if version:
+                    versions.add(version)
+                rows_by_uuid[item_uuid] = {
+                    "item_uuid": item_uuid,
+                    "stable_id": parsed.id,
+                    "item_name": parsed.name,
+                    "normalized_name": self._normalize_name(parsed.name),
+                    "category": parsed.category,
+                    "item_type": parsed.section,
+                    "company_name": parsed.company_name,
+                    "item_size": parsed.size,
+                    "source_url": parsed.source_url,
+                    "source_name": parsed.source_name,
+                    "game_version": version,
+                    "source_updated_at": self._string_or_none(source_row.get("updated_at")),
+                }
+        rows = list(rows_by_uuid.values())
+        existing = await self._cache.item_catalog_metadata()
+        existing_count = int(existing.get("item_count") or 0)
+        minimum_count = max(1000, int(total * 0.98), int(existing_count * 0.9))
+        if len(rows) < minimum_count:
+            raise RuntimeError(
+                f"Item catalog validation rejected {len(rows)} rows; expected at least {minimum_count}."
+            )
+        game_version = str(summary.get("game_version") or (sorted(versions)[-1] if versions else ""))
+        metadata = {
+            "status": "ready",
+            "item_count": len(rows),
+            "source_item_count": total,
+            "game_version": game_version,
+            "last_daily_validation_at": now,
+            "last_deep_validation_at": now,
+            "last_successful_sync_at": now,
+            "last_validation_error": None,
+            "source_name": self.name,
+            "source_url": f"{self.base_url}/api/items",
+        }
+        await self._cache.replace_item_catalog(rows, metadata)
+        self._local_items = None
+        await self._load_local_item_catalog()
+        return metadata
+
+    async def _load_local_item_catalog(self) -> None:
+        if self._local_items is not None:
+            return
+        rows = await self._cache.item_catalog_rows()
+        items: list[ItemLocatorResult] = []
+        exact: dict[str, list[int]] = {}
+        trigrams: dict[str, set[int]] = {}
+        for row in rows:
+            item = ItemLocatorResult(
+                id=int(row["stable_id"]),
+                name=str(row["item_name"]),
+                section=row.get("item_type"),
+                category=row.get("category"),
+                company_name=row.get("company_name"),
+                size=row.get("item_size"),
+                wiki_url=str(row["source_url"]),
+                source_url=str(row["source_url"]),
+                source_name=str(row.get("source_name") or self.name),
+                purchases=[],
+            )
+            index = len(items)
+            items.append(item)
+            normalized = str(row["normalized_name"])
+            exact.setdefault(normalized, []).append(index)
+            for trigram in self._item_name_trigrams(normalized):
+                trigrams.setdefault(trigram, set()).add(index)
+        self._local_items = items
+        self._local_item_exact = exact
+        self._local_item_trigrams = trigrams
+
+    def _search_local_item_catalog(self, query: str, limit: int) -> list[ItemLocatorResult]:
+        normalized = self._normalize_name(query)
+        if not normalized or not self._local_items:
+            return []
+        exact_indices = self._local_item_exact.get(normalized, [])
+        if exact_indices:
+            return [self._local_items[index] for index in exact_indices[:limit]]
+        query_trigrams = self._item_name_trigrams(normalized)
+        candidate_indices: set[int] = set()
+        for trigram in query_trigrams:
+            candidate_indices.update(self._local_item_trigrams.get(trigram, set()))
+        ranked = sorted(
+            candidate_indices,
+            key=lambda index: self._local_item_rank(normalized, query_trigrams, self._local_items[index].name),
+        )
+        return [self._local_items[index] for index in ranked[:limit]]
+
+    def _local_item_rank(self, query: str, query_trigrams: set[str], name: str) -> tuple:
+        normalized_name = self._normalize_name(name)
+        name_trigrams = self._item_name_trigrams(normalized_name)
+        overlap = len(query_trigrams & name_trigrams)
+        union = max(1, len(query_trigrams | name_trigrams))
+        similarity = overlap / union
+        return (
+            0 if normalized_name.startswith(query) else 1,
+            0 if query in normalized_name else 1,
+            -similarity,
+            abs(len(normalized_name) - len(query)),
+            normalized_name,
+        )
+
+    @staticmethod
+    def _item_name_trigrams(value: str) -> set[str]:
+        compact = f"  {value}  "
+        return {compact[index:index + 3] for index in range(max(1, len(compact) - 2))}
 
     async def lookup(self, query: str) -> LookupResult | None:
         normalized_query = " ".join(query.strip().split())

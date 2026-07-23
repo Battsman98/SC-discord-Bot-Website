@@ -272,9 +272,26 @@ class SourceRegistry:
                 matches.append(result)
                 if len(matches) >= limit:
                     return matches
+            catalog_ready = getattr(source, "item_catalog_ready", None)
+            if catalog_ready is not None and await catalog_ready():
+                return matches
         if matches:
             return matches
         return await self.lookup_items(query=query, limit=limit)
+
+    async def validate_item_catalog(self, force_deep: bool = False) -> dict:
+        for source in self._sources:
+            validate = getattr(source, "validate_item_catalog", None)
+            if validate is not None:
+                return await validate(force_deep)
+        return {"status": "unavailable", "item_count": 0}
+
+    async def item_catalog_status(self) -> dict:
+        for source in self._sources:
+            status = getattr(source, "item_catalog_status", None)
+            if status is not None:
+                return await status()
+        return {"status": "unavailable", "item_count": 0}
 
     async def autocomplete_items(self, query: str, limit: int = 25) -> list[str]:
         seen: set[str] = set()

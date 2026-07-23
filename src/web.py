@@ -8,7 +8,7 @@ import secrets
 import threading
 from io import BytesIO
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
@@ -167,6 +167,7 @@ class AppState:
     sources: SourceRegistry
     updates: CitizenUpdatesSource
     warbonds: WarbondTrackerSource
+    item_catalog_task: asyncio.Task | None
 
 
 class MiningCommunityRequest(BaseModel):
@@ -263,6 +264,10 @@ async def lifespan(app: FastAPI):
     app.state.game_assist.sources = sources
     app.state.game_assist.updates = updates
     app.state.game_assist.warbonds = warbonds
+    app.state.game_assist.item_catalog_task = asyncio.create_task(
+        _item_catalog_maintenance_loop(sources),
+        name="item-catalog-maintenance",
+    )
     try:
         await asyncio.to_thread(_initialize_rapid_ocr_pool)
     except Exception:
@@ -270,6 +275,9 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        app.state.game_assist.item_catalog_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await app.state.game_assist.item_catalog_task
         await warbonds.close()
         await updates.close()
         await sources.close()
@@ -292,6 +300,15 @@ VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
 def state() -> AppState:
     return app.state.game_assist
+
+
+async def _item_catalog_maintenance_loop(sources: SourceRegistry) -> None:
+    while True:
+        try:
+            await sources.validate_item_catalog()
+        except Exception:
+            pass
+        await asyncio.sleep(6 * 60 * 60)
 
 
 @app.middleware("http")
@@ -467,11 +484,13 @@ def not_found(message: str) -> None:
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
     settings = state().settings
+    catalog = await state().sources.item_catalog_status()
     return {
         "status": "online",
         "database_path": settings.database_path,
         "discord_auth_enabled": discord_auth_configured(settings),
         "legacy_admin_token_enabled": bool(settings.web_admin_token),
+        "item_catalog": catalog,
         "configured_channels": {
             "commands": settings.commands_channel_id,
             "exec_status": settings.exec_status_channel_id,
