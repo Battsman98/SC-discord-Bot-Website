@@ -1887,13 +1887,29 @@ function bindInventoryImportButtons(target) {
     });
   });
   target.querySelector("[data-inventory-save-all]")?.addEventListener("click", async () => {
+    const saveAllButton = target.querySelector("[data-inventory-save-all]");
     const buttons = Array.from(target.querySelectorAll("[data-inventory-import-save]"));
+    if (saveAllButton) {
+      saveAllButton.disabled = true;
+      saveAllButton.textContent = "Saving...";
+    }
     for (const button of buttons) {
       if (button.disabled) continue;
-      await saveImportedInventoryRow(button.closest(".inventory-import-row"));
+      await saveImportedInventoryRow(button.closest(".inventory-import-row"), { refresh: false });
       button.textContent = "Saved";
       button.disabled = true;
     }
+    stopInventoryScanner(false);
+    inventoryImportItems = [];
+    inventoryScannerHistory = [];
+    outputs.inventoryImport.replaceChildren();
+    await loadInventory();
+    const inventoryTab = document.querySelector("#inventory");
+    showToolPanel(inventoryTab, "inventory-tool-0");
+    inventoryTab.querySelector('[data-tool-id="inventory-tool-0"]')?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   });
 }
 
@@ -1920,7 +1936,7 @@ async function annotateImportedInventoryRows(target) {
   }
 }
 
-async function saveImportedInventoryRow(row) {
+async function saveImportedInventoryRow(row, options = {}) {
   if (!row) return;
   const item = inventoryItemFromImportRow(row);
   const existing = await findExistingInventoryItem(item);
@@ -1943,7 +1959,7 @@ async function saveImportedInventoryRow(row) {
   } else {
     await api("/api/me/inventory", { method: "POST", body: item });
   }
-  await loadInventory();
+  if (options.refresh !== false) await loadInventory();
 }
 
 function inventoryItemFromImportRow(row) {

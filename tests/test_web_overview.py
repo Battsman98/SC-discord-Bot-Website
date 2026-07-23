@@ -287,6 +287,15 @@ def test_scanner_review_rows_use_compact_inventory_density() -> None:
     assert ".import-notes-field { grid-column: span 6; }" in css
 
 
+def test_save_all_returns_to_station_inventory_after_one_refresh() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'saveImportedInventoryRow(button.closest(".inventory-import-row"), { refresh: false })' in javascript
+    assert 'showToolPanel(inventoryTab, "inventory-tool-0")' in javascript
+    assert "outputs.inventoryImport.replaceChildren()" in javascript
+    assert 'inventoryTab.querySelector(\'[data-tool-id="inventory-tool-0"]\')?.scrollIntoView' in javascript
+
+
 def test_inventory_clear_actions_use_centered_confirmation_dialog() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
