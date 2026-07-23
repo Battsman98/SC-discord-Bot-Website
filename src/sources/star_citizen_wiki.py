@@ -14,6 +14,7 @@ from src.sources.base import ItemLocatorResult, LookupResult, ShipPledge, ShipPu
 class StarCitizenWikiSource:
     name = "Star Citizen Wiki"
     base_url = "https://api.star-citizen.wiki"
+    item_catalog_page_delay_seconds = 3.1
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -146,6 +147,8 @@ class StarCitizenWikiSource:
                     "game_version": version,
                     "source_updated_at": self._string_or_none(source_row.get("updated_at")),
                 }
+            if page < last_page:
+                await asyncio.sleep(self.item_catalog_page_delay_seconds)
         rows = list(rows_by_uuid.values())
         existing = await self._cache.item_catalog_metadata()
         existing_count = int(existing.get("item_count") or 0)

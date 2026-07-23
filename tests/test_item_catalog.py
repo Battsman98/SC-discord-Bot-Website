@@ -155,3 +155,7 @@ def test_catalog_page_retries_transient_source_failures() -> None:
         assert responses == []
 
     asyncio.run(run())
+
+
+def test_bulk_catalog_download_is_paced_below_source_rate_limit() -> None:
+    assert StarCitizenWikiSource.item_catalog_page_delay_seconds >= 3
