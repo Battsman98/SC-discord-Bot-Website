@@ -211,6 +211,9 @@ const inventoryScannerQueueLimit = 8;
 let inventoryScannerGeneration = 0;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
+let inventoryScannerLastCountedKey = "";
+let inventoryScannerEmptyReadStreak = 0;
+let inventoryScannerReadyToCount = true;
 const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
 if (inventoryScannerSpacingInput?.value === "3500") inventoryScannerSpacingInput.value = "350";
 if (inventoryScannerSpacingInput) inventoryScannerSpacingInput.min = "250";
@@ -1279,13 +1282,25 @@ async function clearInventory({ location, label }) {
 
 function renderInventoryImportItems(payload, options = {}) {
   const incomingItems = payload.items || [];
+  const countedScannerItems = [];
   if (options.append) {
-    const seen = new Set(inventoryImportItems.map(inventoryImportKey));
     incomingItems.forEach((item) => {
       const key = inventoryImportKey(item);
-      if (!seen.has(key)) {
+      const existing = inventoryImportItems.find((candidate) => inventoryImportKey(candidate) === key);
+      const shouldCount = !options.scannerMode
+        || inventoryScannerReadyToCount
+        || inventoryScannerLastCountedKey !== key;
+      if (!existing) {
         inventoryImportItems.push(item);
-        seen.add(key);
+        countedScannerItems.push(item);
+      } else if (shouldCount) {
+        existing.quantity = Number(existing.quantity || 1) + Number(item.quantity || 1);
+        countedScannerItems.push(existing);
+      }
+      if (options.scannerMode && shouldCount) {
+        inventoryScannerLastCountedKey = key;
+        inventoryScannerReadyToCount = false;
+        inventoryScannerEmptyReadStreak = 0;
       }
     });
   } else {
@@ -1294,7 +1309,7 @@ function renderInventoryImportItems(payload, options = {}) {
   const items = inventoryImportItems;
   if (options.scannerMode) {
     inventoryScannerStatus = payload.scan_status || inventoryScannerStatus || "Scanning hover tooltip.";
-    if (options.recordHistory !== false) addInventoryScannerHistory(payload);
+    if (options.recordHistory !== false) addInventoryScannerHistory(payload, countedScannerItems);
   }
   const ocrWarning = payload.ocr_available === false
     ? `<div class="state warning">${escapeHtml(payload.ocr_error || "OCR was not available.")}</div>`
@@ -1302,9 +1317,10 @@ function renderInventoryImportItems(payload, options = {}) {
   const scanProgress = renderInventoryScanProgress();
   const diagnostics = renderInventoryScannerDiagnostics(payload.diagnostics);
   const textPreview = options.scannerMode ? "" : renderOcrTextPreview(payload.ocr_text);
+  const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
   if (options.liveScan) {
     const liveMessage = items.length
-      ? stateMessage(`${items.length} item${items.length === 1 ? "" : "s"} found. Keep scanning, then Stop to review and save.`)
+      ? stateMessage(`${totalQuantity} scanned across ${items.length} unique item${items.length === 1 ? "" : "s"}. Keep scanning, then Stop to review and save.`)
       : stateMessage("Scanning. Hover the next item and wait a few seconds.");
     outputs.inventoryImport.innerHTML = `${ocrWarning}${liveMessage}${scanProgress}${diagnostics}`;
     return;
@@ -1320,7 +1336,7 @@ function renderInventoryImportItems(payload, options = {}) {
   }
   outputs.inventoryImport.innerHTML = `${ocrWarning}<div class="import-review">
     <div class="import-review-heading">
-      <h3>Found item${items.length === 1 ? "" : "s"} to review (${items.length})</h3>
+      <h3>${totalQuantity} scanned across ${items.length} unique item${items.length === 1 ? "" : "s"}</h3>
       <button type="button" data-inventory-save-all>Save All</button>
     </div>
     ${items.map((item) => `<div class="inventory-import-row">
@@ -1345,9 +1361,10 @@ function renderInventoryImportItems(payload, options = {}) {
   annotateImportedInventoryRows(outputs.inventoryImport);
 }
 
-function addInventoryScannerHistory(payload) {
+function addInventoryScannerHistory(payload, countedItems = payload.items || []) {
   const timestamp = new Date().toLocaleTimeString();
-  const items = payload.items || [];
+  const items = countedItems;
+  if ((payload.items || []).length && !items.length) return;
   if (items.length) {
     items.forEach((item) => {
       const existingIndex = inventoryScannerHistory.findIndex((entry) =>
@@ -1357,7 +1374,12 @@ function addInventoryScannerHistory(payload) {
         timestamp,
         status: "accepted",
         text: item.name,
-        detail: [item.category, item.item_type, item.item_size].filter(Boolean).join(" / "),
+        detail: [
+          Number(item.quantity || 1) > 1 ? `Quantity ${Number(item.quantity)}` : "",
+          item.category,
+          item.item_type,
+          item.item_size,
+        ].filter(Boolean).join(" / "),
       };
       if (existingIndex >= 0) {
         inventoryScannerHistory.splice(existingIndex, 1);
@@ -1563,6 +1585,9 @@ async function startInventoryScanner() {
   inventoryScannerQueue = [];
   inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
+  inventoryScannerLastCountedKey = "";
+  inventoryScannerEmptyReadStreak = 0;
+  inventoryScannerReadyToCount = true;
   inventoryScannerStream = await navigator.mediaDevices.getDisplayMedia({
     video: {
       frameRate: { ideal: 5, max: 8 },
@@ -1676,7 +1701,12 @@ async function processInventoryScannerCapture(capture) {
   if (capture.generation !== inventoryScannerGeneration) return;
   if (payload?.items?.length) {
     inventoryScannerLastHash = capture.hash;
+    inventoryScannerEmptyReadStreak = 0;
   } else {
+    inventoryScannerEmptyReadStreak += 1;
+    if (inventoryScannerEmptyReadStreak >= 2) {
+      inventoryScannerReadyToCount = true;
+    }
     inventoryScannerStatus = "No confident read yet. Processing the next captured tooltip.";
   }
 }
