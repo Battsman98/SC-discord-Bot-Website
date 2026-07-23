@@ -2232,12 +2232,12 @@ async function loadIntel(force = false, quiet = false) {
   if (!quiet) outputs.intel.innerHTML = stateMessage("Contacting direct Star Citizen sources...");
   try {
     const payload = await api("/api/updates");
+    const previewsAndLeaks = [...(payload.sneak_peeks || []), ...(payload.leaks || [])];
     const groups = [
       ["Patch Notes", "Official LIVE release notes", payload.patch_notes || [], "patch"],
-      ["PU Server Updates", "Maintenance, deployments, and service incidents", payload.pu_updates || [], "status"],
-      ["Sneak Peeks", "Official previews, roadmap updates, and development reports", payload.sneak_peeks || [], "preview"],
       ["CIG Developer Updates", "Official Spectrum announcements and developer tracker posts", payload.cig_updates || [], "developer"],
-      ["Leaks & Datamines", "Unverified community reports—treat as rumor until confirmed", payload.leaks || [], "unverified"],
+      ["PU Server Updates", "Maintenance, deployments, and service incidents", payload.pu_updates || [], "status"],
+      ["Sneak Peeks & Leaks", "Official previews and clearly marked unverified community reports", previewsAndLeaks, "preview-leaks"],
     ];
     outputs.intel.innerHTML = groups.map(([title, description, items, kind]) => intelGroup(title, description, items, kind)).join("");
     intelLoaded = true;

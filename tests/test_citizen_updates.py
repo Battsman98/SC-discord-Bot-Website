@@ -60,6 +60,11 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert 'api("/api/updates")' in javascript
     assert 'payload.cig_updates || []' in javascript
     assert "CIG Developer Updates" in javascript
+    assert "Sneak Peeks & Leaks" in javascript
+    assert "previewsAndLeaks" in javascript
+    assert javascript.index('["Patch Notes"') < javascript.index('["CIG Developer Updates"')
+    assert javascript.index('["CIG Developer Updates"') < javascript.index('["PU Server Updates"')
+    assert javascript.index('["PU Server Updates"') < javascript.index('["Sneak Peeks & Leaks"')
     assert html.index('data-tab="overview"') < html.index('data-tab="intel"') < html.index('data-tab="lookup"')
     assert html.index('data-overview-tab="intel"') < html.index('data-overview-tab="lookup"')
     assert 'intel: { theme: "aegis-intel", label: "AEGIS DYNAMICS INTELLIGENCE" }' in javascript
