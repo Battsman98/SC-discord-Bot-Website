@@ -284,7 +284,7 @@ app = FastAPI(
 )
 _RAPID_OCR = None
 _RAPID_OCR_LOCK = threading.Lock()
-_RAPID_OCR_POOL_SIZE = 2
+_RAPID_OCR_POOL_SIZE = 1
 _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_SIZE)
 _RAPID_OCR_POOL_READY = False
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
@@ -1345,7 +1345,7 @@ async def import_inventory_from_images(
         scanner_lookups = await _inventory_scanner_lookups(
             ocr_text,
             exclude_words,
-            candidate_limit=4 if live_scan else None,
+            candidate_limit=1 if live_scan else None,
         ) if ocr_text.strip() else {}
         items = await _match_inventory_scanner_text(
             ocr_text,
@@ -1361,7 +1361,7 @@ async def import_inventory_from_images(
             "ocr_error": ocr_error,
             "ocr_text": ocr_text,
             "items": items,
-            "diagnostics": None if live_scan else await _inventory_scanner_diagnostics(
+            "diagnostics": await _inventory_scanner_diagnostics(
                 ocr_text,
                 min_score,
                 exclude_words,
@@ -1852,11 +1852,16 @@ async def _inventory_scanner_lookups(
 async def _inventory_lookup_scored_matches(candidate: str, limit: int = 5) -> list[tuple[Any, float]]:
     seen: set[str] = set()
     scored: list[tuple[Any, float]] = []
-    for query in _inventory_lookup_queries(candidate):
+
+    async def lookup(query: str) -> list[Any]:
         try:
-            results = await state().sources.lookup_inventory_items(query, limit=limit)
+            return await state().sources.lookup_inventory_items(query, limit=limit)
         except Exception:
-            results = []
+            return []
+
+    queries = _inventory_lookup_queries(candidate)
+    result_groups = await asyncio.gather(*(lookup(query) for query in queries))
+    for results in result_groups:
         for result in results:
             key = _normalize_text(getattr(result, "name", ""))
             if not key or key in seen:

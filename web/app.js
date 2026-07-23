@@ -204,7 +204,7 @@ let inventoryImportItems = [];
 let inventoryScannerHistory = [];
 let inventoryScannerStatus = "";
 let inventoryScannerInFlight = 0;
-const inventoryScannerMaxInFlight = 2;
+const inventoryScannerMaxInFlight = 1;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
@@ -1322,15 +1322,15 @@ function renderInventoryImportItems(payload, options = {}) {
       <button type="button" data-inventory-save-all>Save All</button>
     </div>
     ${items.map((item) => `<div class="inventory-import-row">
-      <input class="import-name-field" data-import-name value="${escapeAttribute(item.name)}">
-      ${inventoryCategorySelect('class="import-category-field" data-import-category', item.category || "")}
-      ${inventoryTypeSelect('class="import-type-field" data-import-type', item.category || "", item.item_type || "")}
-      <input class="import-size-field" data-import-size value="${escapeAttribute(item.item_size || "")}" placeholder="Size">
-      <input class="import-quantity-field" data-import-quantity type="number" min="0" step="0.01" value="${escapeAttribute(item.quantity || 1)}" placeholder="Qty">
-      <input class="import-quality-field" data-import-quality type="number" min="0" step="0.01" value="${escapeAttribute(item.quality ?? "")}" placeholder="Quality">
-      <input class="import-scu-field" data-import-volume type="number" min="0" step="0.000001" value="${escapeAttribute(item.volume_scu ?? "")}" placeholder="SCU">
-      <input class="import-location-field" data-import-location value="${escapeAttribute(item.location)}" placeholder="Station/location">
-      <textarea class="import-notes-field" data-import-notes>${escapeHtml(scannerCandidateNotes(item))}</textarea>
+      <label class="import-name-field"><span>Name</span><input data-import-name value="${escapeAttribute(item.name)}"></label>
+      <label class="import-category-field"><span>Category</span>${inventoryCategorySelect("data-import-category", item.category || "")}</label>
+      <label class="import-type-field"><span>Type</span>${inventoryTypeSelect("data-import-type", item.category || "", item.item_type || "")}</label>
+      <label class="import-size-field"><span>Size</span><input data-import-size value="${escapeAttribute(item.item_size || "")}" placeholder="—"></label>
+      <label class="import-quantity-field"><span>Quantity</span><input data-import-quantity type="number" min="0" step="0.01" value="${escapeAttribute(item.quantity || 1)}"></label>
+      <label class="import-quality-field"><span>Quality</span><input data-import-quality type="number" min="0" step="0.01" value="${escapeAttribute(item.quality ?? "")}" placeholder="—"></label>
+      <label class="import-scu-field"><span>SCU</span><input data-import-volume type="number" min="0" step="0.000001" value="${escapeAttribute(item.volume_scu ?? "")}" placeholder="—"></label>
+      <label class="import-location-field"><span>Station / location</span><input data-import-location value="${escapeAttribute(item.location)}"></label>
+      <label class="import-notes-field"><span>Scanner notes</span><textarea data-import-notes>${escapeHtml(scannerCandidateNotes(item))}</textarea></label>
       <div class="import-row-actions">
         <small data-import-existing-status>Checking station...</small>
         <button type="button" data-inventory-import-save>Save</button>
@@ -1365,12 +1365,24 @@ function addInventoryScannerHistory(payload) {
   } else {
     const candidates = payload.diagnostics?.candidates || [];
     const best = candidates.find((candidate) => candidate.matches?.length) || candidates[0];
-    inventoryScannerHistory.unshift({
+    const suggested = best?.matches?.[0];
+    const reviewEntry = {
       timestamp,
       status: "review",
-      text: best?.text || "No item read yet",
-      detail: "Needs review",
-    });
+      text: best?.text || firstInventoryOcrLine(payload.ocr_text) || "Unread tooltip",
+      suggestedName: suggested?.name || "",
+      category: suggested?.category || "",
+      itemType: suggested?.item_type || "",
+      itemSize: suggested?.size || "",
+      detail: suggested
+        ? `Suggested: ${suggested.name} (${Math.round(Number(suggested.score || 0) * 100)}%)`
+        : "OCR text needs manual correction",
+    };
+    inventoryScannerHistory = inventoryScannerHistory.filter((entry) =>
+      !(entry.status === "review"
+        && normalizeInventoryMergeKey(entry.text) === normalizeInventoryMergeKey(reviewEntry.text))
+    );
+    inventoryScannerHistory.unshift(reviewEntry);
   }
   inventoryScannerHistory = inventoryScannerHistory.slice(0, 24);
 }
@@ -1389,14 +1401,53 @@ function renderInventoryScanProgress() {
       ${timing}
     </div>
     <ul>
-      ${inventoryScannerHistory.filter((entry) => entry.status === "accepted").map((entry) => `<li class="${entry.status}">
+      ${inventoryScannerHistory.map((entry) => `<li class="${entry.status}">
         <span>${escapeHtml(entry.timestamp)}</span>
         <strong>${escapeHtml(entry.text)}</strong>
         <small>${escapeHtml(entry.detail || entry.status)}</small>
-      </li>`).join("") || `<li class="waiting"><strong>No confirmed items yet</strong><small>Keep hovering items. Questionable reads are hidden under Scanner diagnostics.</small></li>`}
+        ${entry.status === "review" ? `<button type="button"
+          data-scanner-review-text="${escapeAttribute(entry.text)}"
+          data-scanner-review-name="${escapeAttribute(entry.suggestedName || "")}"
+          data-scanner-review-category="${escapeAttribute(entry.category || "")}"
+          data-scanner-review-type="${escapeAttribute(entry.itemType || "")}"
+          data-scanner-review-size="${escapeAttribute(entry.itemSize || "")}">Review</button>` : ""}
+      </li>`).join("") || `<li class="waiting"><strong>No scanner results yet</strong><small>Keep hovering items while frames are captured.</small></li>`}
     </ul>
   </section>`;
 }
+
+function firstInventoryOcrLine(text) {
+  return String(text || "").split(/\r?\n/).map((line) => line.trim()).find(Boolean) || "";
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-scanner-review-text]");
+  if (!button) return;
+  stopInventoryScanner(false);
+  const ocrText = button.dataset.scannerReviewText || "Unidentified item";
+  const item = {
+    name: button.dataset.scannerReviewName || ocrText,
+    category: button.dataset.scannerReviewCategory || document.querySelector("#inventoryImportCategory")?.value || null,
+    item_type: button.dataset.scannerReviewType || null,
+    item_size: button.dataset.scannerReviewSize || null,
+    location: document.querySelector("#inventoryImportLocation")?.value.trim() || "Unknown location",
+    quantity: 1,
+    quality: null,
+    volume_scu: null,
+    notes: `Needs review from scanner OCR: '${ocrText}'`,
+  };
+  const key = inventoryImportKey(item);
+  if (!inventoryImportItems.some((existing) => inventoryImportKey(existing) === key)) {
+    inventoryImportItems.push(item);
+  }
+  inventoryScannerHistory = inventoryScannerHistory.filter((entry) =>
+    !(entry.status === "review" && entry.text === ocrText)
+  );
+  renderInventoryImportItems(
+    { items: inventoryImportItems, scan_status: "Reviewing scanner result." },
+    { scannerMode: true, recordHistory: false },
+  );
+});
 
 function renderInventoryScannerDiagnostics(diagnostics) {
   if (!diagnostics) return "";

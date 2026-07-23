@@ -251,19 +251,20 @@ def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> 
 
     assert "await asyncio.to_thread(_initialize_rapid_ocr_pool)" in python
     assert "await asyncio.to_thread(_read_image_text, data)" in python
-    assert "candidate_limit=4 if live_scan else None" in python
+    assert "candidate_limit=1 if live_scan else None" in python
 
 
-def test_live_scanner_runs_two_ocr_jobs_and_reports_stage_timings() -> None:
+def test_live_scanner_avoids_cpu_contention_and_reports_stage_timings() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
 
-    assert "inventoryScannerMaxInFlight = 2" in javascript
+    assert "inventoryScannerMaxInFlight = 1" in javascript
     assert "inventoryScannerPendingHashes" in javascript
     assert '"ocr_ms": ocr_ms' in python
     assert '"match_ms": match_ms' in python
     assert '"server_ms":' in python
-    assert "_RAPID_OCR_POOL_SIZE = 2" in python
+    assert "_RAPID_OCR_POOL_SIZE = 1" in python
+    assert "result_groups = await asyncio.gather" in python
 
 
 def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
@@ -280,11 +281,25 @@ def test_scanner_review_rows_use_compact_inventory_density() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
 
-    assert 'class="import-name-field"' in javascript
-    assert 'class="import-notes-field"' in javascript
+    assert 'class="import-name-field"><span>Name</span>' in javascript
+    assert 'class="import-type-field"><span>Type</span>' in javascript
+    assert 'class="import-quantity-field"><span>Quantity</span>' in javascript
+    assert 'class="import-quality-field"><span>Quality</span>' in javascript
+    assert 'class="import-scu-field"><span>SCU</span>' in javascript
+    assert 'class="import-notes-field"><span>Scanner notes</span>' in javascript
     assert ".inventory-import-row {" in css
     assert "grid-template-columns: repeat(12, minmax(0, 1fr))" in css
     assert ".import-notes-field { grid-column: span 6; }" in css
+
+
+def test_missed_scans_can_be_opened_for_manual_review() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+
+    assert '"diagnostics": await _inventory_scanner_diagnostics(' in python
+    assert "data-scanner-review-text" in javascript
+    assert "Needs review from scanner OCR" in javascript
+    assert "stopInventoryScanner(false)" in javascript
 
 
 def test_save_all_returns_to_station_inventory_after_one_refresh() -> None:

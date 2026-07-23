@@ -1735,6 +1735,23 @@ body.hangar-modal-open {
   padding: 6px 8px;
 }
 
+.inventory-import-row > label {
+  display: grid;
+  gap: 3px;
+}
+
+.inventory-import-row > label > span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.inventory-import-row > label > input,
+.inventory-import-row > label > select,
+.inventory-import-row > label > textarea {
+  width: 100%;
+}
+
 .import-name-field { grid-column: span 4; }
 .import-category-field,
 .import-type-field { grid-column: span 2; }
@@ -1965,7 +1982,7 @@ body.hangar-modal-open {
 
 .scanner-progress li {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) minmax(120px, 0.8fr);
+  grid-template-columns: 72px minmax(0, 1fr) minmax(120px, 0.8fr) auto;
   gap: 8px;
   align-items: center;
   border: 1px solid var(--line);
@@ -2294,6 +2311,11 @@ body.hangar-modal-open {
     max-width: 180px;
     margin-bottom: 16px;
   }
+}
+
+.scanner-progress li > button {
+  min-height: 32px;
+  padding: 5px 10px;
 }
 
 @media (min-width: 761px) and (max-width: 1200px) {
