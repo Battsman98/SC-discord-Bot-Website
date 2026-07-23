@@ -241,9 +241,9 @@ def test_live_inventory_scanner_retries_missed_reads_and_only_skips_exact_frames
     assert 'imageHashDistance(inventoryScannerLastHash, capture.hash) === 0' in javascript
     assert 'if (payload?.items?.length)' in javascript
     assert 'inventoryScannerLastHash = ""' in javascript
-    assert 'Math.max(1000' in javascript
-    assert 'id="inventoryScannerSpacing" type="number" min="3000" step="500" value="3500"' in html
-    assert 'inventoryScannerSpacingInput.value = "1200"' in javascript
+    assert 'Math.max(250' in javascript
+    assert 'id="inventoryScannerSpacing" type="number" min="250" step="50" value="350"' in html
+    assert 'inventoryScannerSpacingInput.value = "350"' in javascript
 
 
 def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> None:
@@ -264,6 +264,27 @@ def test_live_scanner_runs_two_ocr_jobs_and_reports_stage_timings() -> None:
     assert '"match_ms": match_ms' in python
     assert '"server_ms":' in python
     assert "_RAPID_OCR_POOL_SIZE = 2" in python
+
+
+def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "inventoryScannerQueueLimit = 8" in javascript
+    assert "inventoryScannerCaptureBusy" in javascript
+    assert "drainInventoryScannerQueue()" in javascript
+    assert "processInventoryScannerCapture(capture)" in javascript
+    assert "inventoryScannerQueue.shift()" in javascript
+
+
+def test_scanner_review_rows_use_compact_inventory_density() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert 'class="import-name-field"' in javascript
+    assert 'class="import-notes-field"' in javascript
+    assert ".inventory-import-row {" in css
+    assert "grid-template-columns: repeat(12, minmax(0, 1fr))" in css
+    assert ".import-notes-field { grid-column: span 6; }" in css
 
 
 def test_inventory_clear_actions_use_centered_confirmation_dialog() -> None:

@@ -1709,32 +1709,52 @@ body.hangar-modal-open {
 
 .inventory-import-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.3fr) minmax(120px, 0.8fr) minmax(110px, 0.8fr) 72px minmax(150px, 1fr) 80px 80px 80px minmax(160px, 1fr) auto;
-  gap: 8px;
-  align-items: start;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+  align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--control);
-  padding: 10px;
+  padding: 7px;
   min-width: 0;
 }
 
 .inventory-import-row textarea {
-  min-height: 42px;
+  min-height: 34px;
+  height: 34px;
 }
 
 .inventory-import-row button {
-  min-height: 38px;
+  min-height: 34px;
   justify-content: center;
 }
 
+.inventory-import-row input,
+.inventory-import-row select {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.import-name-field { grid-column: span 4; }
+.import-category-field,
+.import-type-field { grid-column: span 2; }
+.import-size-field,
+.import-quantity-field,
+.import-quality-field,
+.import-scu-field { grid-column: span 1; }
+.import-location-field { grid-column: span 4; }
+.import-notes-field { grid-column: span 6; }
+
 .import-row-actions {
+  grid-column: span 2;
   display: grid;
-  gap: 8px;
-  min-width: 110px;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  min-width: 0;
 }
 
 .import-row-actions small {
+  grid-column: 1 / -1;
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.25;
@@ -2255,7 +2275,7 @@ body.hangar-modal-open {
   }
 
   .inventory-import-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
   }
 
   .import-row-actions {
@@ -2391,6 +2411,15 @@ body.hangar-modal-open {
 
   .inventory-actions button {
     width: 100%;
+  }
+
+  .inventory-import-row {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-import-row > *,
+  .import-row-actions {
+    grid-column: 1;
   }
 }
 
