@@ -1726,6 +1726,7 @@ async def trade_routing_command(
         investment,
         max_stops,
         stay_system,
+        True,
     )
     if result is None or not result.legs:
         await interaction.followup.send(

@@ -2481,6 +2481,7 @@ async def trade_routes(
     cargo_capacity_scu: float | None = Query(default=None, gt=0),
     max_stops: int = Query(default=5, ge=2, le=5),
     stay_system: str | None = None,
+    circular_only: bool = True,
 ) -> dict[str, Any]:
     capacity = cargo_capacity_scu
     if capacity is None:
@@ -2495,6 +2496,7 @@ async def trade_routes(
         investment,
         max_stops,
         stay_system,
+        circular_only,
     )
     if result is None:
         not_found("No profitable circular route found.")

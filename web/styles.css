@@ -799,6 +799,12 @@ article.tool-panel.active {
   color: var(--accent-ink);
 }
 
+.autocomplete-state {
+  padding: 9px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .trade-route-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 12px;
@@ -825,12 +831,13 @@ article.tool-panel.active {
 
 .trade-route-options {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(110px, 0.8fr) minmax(88px, 0.45fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(110px, 0.75fr) minmax(105px, 0.55fr) minmax(110px, 0.6fr);
   gap: 10px;
   align-items: end;
 }
 
-.stay-system-field {
+.stay-system-field,
+.route-type-field {
   max-width: 130px;
   justify-self: end;
 }
@@ -2377,7 +2384,8 @@ body.hangar-modal-open {
     grid-template-columns: 1fr;
   }
 
-  .stay-system-field {
+  .stay-system-field,
+  .route-type-field {
     max-width: none;
     justify-self: stretch;
   }

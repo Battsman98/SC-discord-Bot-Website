@@ -207,6 +207,9 @@ function initAutocompleteInputs() {
 
     const loadSuggestions = () => {
       window.clearTimeout(timer);
+      menu.innerHTML = '<div class="autocomplete-state">Loading suggestions…</div>';
+      menu.hidden = false;
+      input.setAttribute("aria-expanded", "true");
       timer = window.setTimeout(async () => {
         const currentRequest = ++requestNumber;
         try {
@@ -223,8 +226,9 @@ function initAutocompleteInputs() {
             return option;
           }));
           activeIndex = -1;
-          menu.hidden = values.length === 0;
-          input.setAttribute("aria-expanded", String(values.length > 0));
+          if (!values.length) menu.innerHTML = '<div class="autocomplete-state">No matching names</div>';
+          menu.hidden = false;
+          input.setAttribute("aria-expanded", "true");
         } catch {
           menu.replaceChildren();
           closeMenu();
@@ -408,7 +412,7 @@ async function handleForm(action, form) {
     }
     if (action === "trade") {
       setLoading(outputs.trade);
-      const params = queryParams(data, ["starting_point", "ship", "investment", "max_stops", "stay_system"]);
+      const params = queryParams(data, ["starting_point", "ship", "investment", "max_stops", "stay_system", "circular_only"]);
       renderCards(outputs.trade, [await api(`/api/trade/routes?${params}`)], renderTrade);
     }
     if (action === "mining") {

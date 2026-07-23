@@ -301,6 +301,7 @@ class UEXSource:
         investment: int | float,
         max_stops: int = 5,
         stay_system: str | None = None,
+        circular_only: bool = True,
     ) -> TradeRouteResult | None:
         if cargo_capacity_scu <= 0 or investment <= 0:
             return None
@@ -317,6 +318,7 @@ class UEXSource:
             max_stops,
             starting_point,
             stay_system,
+            circular_only,
         )
         return TradeRouteResult(
             ship=ship,
@@ -1458,6 +1460,7 @@ class UEXSource:
         max_stops: int,
         starting_point: str,
         stay_system: str | None = None,
+        circular_only: bool = False,
     ) -> list[TradeRouteLeg]:
         normalized_start = self._normalize(self._trade_location_value(starting_point))
         normalized_stay_system = self._normalize(stay_system)
@@ -1538,7 +1541,7 @@ class UEXSource:
                         )
                     )
 
-        return self._best_circular_route(candidates, max_stops, start_keys, investment)
+        return self._best_circular_route(candidates, max_stops, start_keys, investment, circular_only)
 
     def _best_circular_route(
         self,
@@ -1546,6 +1549,7 @@ class UEXSource:
         max_stops: int,
         start_keys: set[str],
         investment: float,
+        circular_only: bool = False,
     ) -> list[TradeRouteLeg]:
         max_stops = max(2, max_stops)
         candidates.sort(key=lambda leg: float(leg.profit), reverse=True)
@@ -1563,7 +1567,7 @@ class UEXSource:
 
         for legs in outgoing.values():
             legs.sort(key=lambda leg: float(leg.profit), reverse=True)
-            del legs[25:]
+            del legs[8:]
 
         best_route: list[TradeRouteLeg] = []
         best_profit = 0.0
@@ -1571,10 +1575,13 @@ class UEXSource:
             leg
             for leg in sorted(best_by_pair.values(), key=lambda leg: float(leg.profit), reverse=True)
             if self._terminal_key(leg.buy_terminal) in start_keys
-        ][:1000]
+        ][:60]
+        search_deadline = time.monotonic() + 0.65
 
         def search(route: list[TradeRouteLeg], start_terminal: str, visited_terminals: set[str]) -> None:
             nonlocal best_route, best_profit
+            if time.monotonic() >= search_deadline:
+                return
 
             current_terminal = self._terminal_key(route[-1].sell_terminal)
             if len(route) >= 2 and current_terminal == start_terminal:
@@ -1615,6 +1622,8 @@ class UEXSource:
                     visited_terminals.remove(added_terminal)
 
         for start_leg in start_candidates:
+            if time.monotonic() >= search_deadline:
+                break
             start_terminal = self._terminal_key(start_leg.buy_terminal)
             first_sell_terminal = self._terminal_key(start_leg.sell_terminal)
             visited = {start_terminal}
@@ -1624,6 +1633,9 @@ class UEXSource:
 
         if best_route:
             return best_route
+
+        if circular_only:
+            return []
 
         return self._best_route_with_empty_return(start_candidates, outgoing, max_stops, investment)
 

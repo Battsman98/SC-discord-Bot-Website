@@ -320,12 +320,21 @@ class SourceRegistry:
         investment: int | float,
         max_stops: int = 5,
         stay_system: str | None = None,
+        circular_only: bool = True,
     ) -> TradeRouteResult | None:
         for source in self._sources:
             lookup = getattr(source, "lookup_trade_routes", None)
             if lookup is None:
                 continue
-            result = await lookup(ship, cargo_capacity_scu, starting_point, investment, max_stops, stay_system)
+            result = await lookup(
+                ship,
+                cargo_capacity_scu,
+                starting_point,
+                investment,
+                max_stops,
+                stay_system,
+                circular_only,
+            )
             if result is not None:
                 return result
         return None
