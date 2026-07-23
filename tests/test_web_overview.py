@@ -265,8 +265,16 @@ def test_audit_tab_displays_first_party_visitor_analytics() -> None:
 def test_station_inventory_is_compact_at_partial_desktop_widths() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "20260722-compact-inventory" in html
+    assert "20260722-inventory-density" in html
     assert "@media (min-width: 761px) and (max-width: 1200px)" in css
-    assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in css
+    assert "grid-template-columns: repeat(12, minmax(0, 1fr))" in css
+    assert "grid-template-columns: minmax(180px, 4fr)" in css
+    assert "min-height: 34px" in css
     assert "min-height: 52px" in css
+    assert 'class="inventory-size-field"' in javascript
+    assert 'class="inventory-location-field"' in javascript
+    assert 'class="inventory-quantity-field"' in javascript
+    assert 'class="inventory-quality-field"' in javascript
+    assert 'class="inventory-scu-field"' in javascript

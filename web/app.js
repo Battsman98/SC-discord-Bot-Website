@@ -1037,31 +1037,31 @@ function renderInventoryItem(item) {
       <span>Name</span>
       <input data-inventory-name="${escapeAttribute(id)}" value="${escapeAttribute(item.name)}">
       </label>
-      <label>
+      <label class="inventory-category-field">
       <span>Category</span>
       ${inventoryCategorySelect(`data-inventory-category="${escapeAttribute(id)}"`, item.category || "")}
       </label>
-      <label>
+      <label class="inventory-type-field">
       <span>Type</span>
       ${inventoryTypeSelect(`data-inventory-type="${escapeAttribute(id)}"`, item.category || "", item.item_type || "")}
       </label>
-      <label>
+      <label class="inventory-size-field">
       <span>Size</span>
       <input data-inventory-size="${escapeAttribute(id)}" value="${escapeAttribute(item.item_size || "")}">
       </label>
-      <label>
+      <label class="inventory-location-field">
       <span>Station / location</span>
       <input data-inventory-location="${escapeAttribute(id)}" value="${escapeAttribute(item.location)}">
       </label>
-      <label>
+      <label class="inventory-quantity-field">
       <span>Found/Crafted Qty</span>
       <input data-inventory-quantity="${escapeAttribute(id)}" type="number" min="0" step="0.01" value="${escapeAttribute(item.quantity)}">
       </label>
-      <label>
+      <label class="inventory-quality-field">
       <span>Quality</span>
       <input data-inventory-quality="${escapeAttribute(id)}" type="number" min="0" step="0.01" value="${escapeAttribute(item.quality ?? "")}">
       </label>
-      <label>
+      <label class="inventory-scu-field">
       <span>SCU</span>
       <input data-inventory-volume="${escapeAttribute(id)}" type="number" min="0" step="0.000001" value="${escapeAttribute(item.volume_scu ?? "")}">
       </label>

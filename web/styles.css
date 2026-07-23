@@ -2211,6 +2211,22 @@ body.hangar-modal-open {
 }
 
 @media (min-width: 761px) and (max-width: 1200px) {
+  .inventory-filters {
+    grid-template-columns: minmax(180px, 4fr) minmax(145px, 3fr) minmax(120px, 2fr) minmax(120px, 2fr) minmax(68px, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .inventory-filters input,
+  .inventory-filters select,
+  .inventory-filters button,
+  .inventory-row input,
+  .inventory-row select {
+    min-height: 34px;
+    padding: 5px 8px;
+    font-size: 0.84rem;
+  }
+
   .inventory-table {
     gap: 8px;
   }
@@ -2221,12 +2237,28 @@ body.hangar-modal-open {
   }
 
   .inventory-card-main {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 6px 8px;
   }
 
   .inventory-name-field {
+    grid-column: span 5;
+  }
+
+  .inventory-category-field {
+    grid-column: span 3;
+  }
+
+  .inventory-type-field,
+  .inventory-size-field,
+  .inventory-quantity-field,
+  .inventory-quality-field,
+  .inventory-scu-field {
     grid-column: span 2;
+  }
+
+  .inventory-location-field {
+    grid-column: span 4;
   }
 
   .inventory-notes-field {
