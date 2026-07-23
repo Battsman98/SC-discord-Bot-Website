@@ -214,18 +214,18 @@ let inventoryScannerLastHash = "";
 const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
 if (inventoryScannerSpacingInput?.value === "3500") inventoryScannerSpacingInput.value = "350";
 if (inventoryScannerSpacingInput) inventoryScannerSpacingInput.min = "250";
-const inventoryScannerCropKey = "gameAssist.inventoryScannerCrop.readableWide.v3";
+const inventoryScannerCropKey = "gameAssist.inventoryScannerCrop.titleOnly.v4";
 const inventoryCategoryTypes = {
-  "Personal Weapons": ["Primary", "Sidearm", "Melee", "Attachments", "Ammunition"],
   Armor: ["Helmet", "Torso Armor", "Arm Armor", "Leg Armor", "Backpack", "Undersuit"],
   Clothing: ["Hat", "Jacket", "Shirt", "Pants", "Footwear", "Gloves"],
+  Weapons: ["Primary", "Sidearm", "Melee", "Attachments"],
   Utility: ["Medical", "Multitool", "Tool", "Mining", "Salvage", "Container"],
-  Consumables: ["Food", "Drink", "Medical"],
-  Commodities: ["Harvestable", "Ore", "Refined Material", "Commodity"],
+  Ammunition: ["Magazine", "Battery", "Ammunition"],
   Components: ["Power Plant", "Cooler", "Shield Generator", "Quantum Drive", "Jump Drive"],
-  "Ship Weapons": ["Repeater", "Cannon", "Missile Rack", "Missile", "Turret"],
-  Paints: ["Ship Paint", "Vehicle Paint"],
-  Misc: ["Flair", "Collectible", "Contract Item", "Other"],
+  Sustenance: ["Food", "Drink"],
+  Commodities: ["Harvestable", "Ore", "Refined Material", "Commodity"],
+  Other: ["Paint", "Flair", "Collectible", "Container", "Other"],
+  "Mission Items": ["Contract Item", "Mission Item"],
 };
 const inventoryCategories = Object.keys(inventoryCategoryTypes);
 const shipDisplayPrefixes = [
@@ -1547,6 +1547,12 @@ async function startInventoryScanner() {
     outputs.inventoryImport.innerHTML = errorMessage("Screen sharing is not available in this browser.");
     return;
   }
+  const category = document.querySelector("#inventoryImportCategory")?.value.trim();
+  if (!category) {
+    outputs.inventoryImport.innerHTML = errorMessage("Select the same inventory category that is active in Star Citizen before sharing the window.");
+    document.querySelector("#inventoryImportCategory")?.focus();
+    return;
+  }
   stopInventoryScanner(false);
   inventoryImportItems = [];
   inventoryScannerHistory = [];
@@ -1579,7 +1585,7 @@ async function startInventoryScanner() {
   sizeInventoryScannerOverlay();
   drawInventoryScannerOverlay();
   const empty = document.querySelector(".scanner-empty");
-  if (empty) empty.textContent = "Scanning. Hover one item at a time.";
+  if (empty) empty.textContent = "Scanning titles only. Hover one item at a time.";
   beginInventoryAutoScan();
 }
 
@@ -1681,7 +1687,7 @@ function beginInventoryAutoScan() {
     inventoryScannerCrop = defaultInventoryTooltipCrop();
     drawInventoryScannerOverlay();
   }
-  inventoryScannerStatus = "Scanning. Hover one item at a time and wait for it to appear below.";
+  inventoryScannerStatus = "Scanning item titles only. Hover one item at a time and wait for it to appear below.";
   const empty = document.querySelector(".scanner-empty");
   if (empty) empty.textContent = inventoryScannerStatus;
   outputs.inventoryImport.innerHTML = `${stateMessage(inventoryScannerStatus)}${renderInventoryScanProgress()}`;
@@ -1698,7 +1704,7 @@ function beginInventoryAutoScan() {
 }
 
 function defaultInventoryTooltipCrop() {
-  return { x: 0.23, y: 0.18, width: 0.54, height: 0.62 };
+  return { x: 0.42, y: 0.20, width: 0.33, height: 0.36 };
 }
 
 function loadInventoryScannerCrop() {
@@ -1776,7 +1782,8 @@ async function captureInventoryScannerCrop() {
   const sx = Math.round(crop.x * sourceWidth);
   const sy = Math.round(crop.y * sourceHeight);
   const sw = Math.round(crop.width * sourceWidth);
-  const sh = Math.round(crop.height * sourceHeight);
+  const fullCropHeight = Math.round(crop.height * sourceHeight);
+  const sh = Math.max(1, Math.round(fullCropHeight * inventoryScannerTextHeightRatio()));
   const maxWidth = 720;
   const scale = Math.min(1, maxWidth / Math.max(1, sw));
   const targetWidth = Math.max(1, Math.round(sw * scale));
@@ -1793,8 +1800,8 @@ async function captureInventoryScannerCrop() {
 }
 
 function inventoryScannerTextHeightRatio() {
-  const value = Number(document.querySelector("#inventoryScannerTextHeight")?.value || 55);
-  return Math.min(0.85, Math.max(0.25, value / 100));
+  const value = Number(document.querySelector("#inventoryScannerTextHeight")?.value || 25);
+  return Math.min(0.5, Math.max(0.1, value / 100));
 }
 
 function imageAverageHash(sourceCanvas) {

@@ -59,7 +59,7 @@ def test_parse_item_result_maps_fs9_to_personal_weapon_primary() -> None:
 
     assert result is not None
     assert result.name == "FS-9 LMG"
-    assert result.category == "Personal Weapons"
+    assert result.category == "Weapons"
     assert result.section == "Primary"
     assert result.size == "4"
     assert result.company_name == "Behring Applied Technology"
@@ -85,6 +85,26 @@ def test_parse_item_result_uses_displayed_medical_type_before_generic_weapon_typ
     assert result is not None
     assert result.category == "Utility"
     assert result.section == "Medical"
+
+
+def test_parse_item_result_uses_displayed_tractor_beam_as_utility() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+
+    result = source._parse_item_result(
+        {
+            "uuid": "maxlift",
+            "slug": "maxlift-aa-transport-tractor-beam",
+            "name": "MaxLift AA Transport Tractor Beam",
+            "classification": "FPS.Weapon.Small",
+            "type": "WeaponPersonal",
+            "type_label": "FPS Weapon",
+            "description_data": [{"name": "Item Type", "value": "Tractor Beam"}],
+        }
+    )
+
+    assert result is not None
+    assert result.category == "Utility"
+    assert result.section == "Tractor Beam"
 
 
 def test_parse_ship_result_includes_pledge_and_purchase_data() -> None:

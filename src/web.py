@@ -1311,6 +1311,11 @@ async def import_inventory_from_text(
 ) -> dict[str, Any]:
     del user
     if request.scanner_mode:
+        if not (request.default_category or "").strip():
+            raise HTTPException(
+                status_code=422,
+                detail="Select the matching in-game inventory category before scanning.",
+            )
         scanner_lookups = await _inventory_scanner_lookups(
             request.text, request.exclude_words, category=request.default_category
         )
@@ -1358,6 +1363,11 @@ async def import_inventory_from_images(
     user=Depends(require_user),
 ) -> dict[str, Any]:
     del user
+    if scanner_mode and not (default_category or "").strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Select the matching in-game inventory category before scanning.",
+        )
     started_at = time.perf_counter()
     ocr_started_at = time.perf_counter()
     ocr_text, ocr_error = await _ocr_blueprint_images(files)

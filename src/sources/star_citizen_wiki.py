@@ -15,7 +15,7 @@ class StarCitizenWikiSource:
     name = "Star Citizen Wiki"
     base_url = "https://api.star-citizen.wiki"
     item_catalog_page_delay_seconds = 3.1
-    item_catalog_schema_version = 2
+    item_catalog_schema_version = 3
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -1127,18 +1127,34 @@ class StarCitizenWikiSource:
         )
         if "med" in haystack.split() or "medical" in haystack:
             return "Utility", "Medical"
+        if any(term in haystack for term in ("tractor beam", "multitool", "multi tool", "gadget")):
+            return "Utility", item_type_value or sub_type_label or "Tool"
+        if any(term in haystack for term in ("ammunition", " ammo", "magazine", "battery")):
+            return "Ammunition", sub_type_label or item_type_value or None
         if "weaponpersonal" in haystack or "fps weapon" in haystack or "fps weapon" in self._normalize_name(type_label):
-            return "Personal Weapons", self._personal_weapon_type(item_type_value, classification)
+            return "Weapons", self._personal_weapon_type(item_type_value, classification)
         if "attachment" in haystack or type_code in {"FPSAttachment", "WeaponAttachment"}:
-            return "Personal Weapons", "Attachments"
+            return "Weapons", "Attachments"
         if "armor" in haystack or "armour" in haystack:
             return "Armor", sub_type_label or item_type_value or None
         if "clothing" in haystack:
             return "Clothing", sub_type_label or item_type_value or None
         if "food" in haystack or "drink" in haystack:
-            return "Consumables", sub_type_label or type_label or None
+            return "Sustenance", sub_type_label or type_label or None
         if "harvestable" in haystack:
             return "Commodities", "Harvestable"
+        if any(
+            term in haystack
+            for term in (
+                "power plant", "cooler", "shield generator", "quantum drive",
+                "jump drive", "vehicle component",
+            )
+        ):
+            return "Components", sub_type_label or item_type_value or None
+        if any(term in haystack for term in ("mission item", "contract item")):
+            return "Mission Items", sub_type_label or item_type_value or None
+        if any(term in haystack for term in ("paint", "flair", "collectible")):
+            return "Other", sub_type_label or item_type_value or None
         if type_label:
             return type_label, sub_type_label or item_type_value or None
         return None, None
