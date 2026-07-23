@@ -146,9 +146,10 @@ def test_ship_search_results_are_contained_inside_ship_search_panel() -> None:
     assert ship_form_start < lookup_output < ship_form_end
 
 
-def test_trade_route_form_has_labels_dropdown_and_autocomplete_assistance() -> None:
+def test_trade_route_form_has_six_fields_and_discord_style_results() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
 
     assert "<span>Starting location</span>" in html
     assert "<span>Ship</span>" in html
@@ -160,13 +161,13 @@ def test_trade_route_form_has_labels_dropdown_and_autocomplete_assistance() -> N
     assert '<select name="circular_only"' in html
     assert '<option value="true">Circular</option>' in html
     assert '<option value="false">Flexible</option>' in html
-    assert 'data-autocomplete-endpoint="/api/autocomplete/trade-locations"' in html
-    assert 'data-autocomplete-endpoint="/api/autocomplete/ships"' in html
-    assert "initAutocompleteInputs();" in javascript
-    assert 'menu.setAttribute("role", "listbox")' in javascript
-    assert 'option.setAttribute("role", "option")' in javascript
-    assert 'event.key === "ArrowDown"' in javascript
-    assert "Loading suggestions" in javascript
+    assert 'class="trade-route-fields"' in html
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
+    assert "Estimated Loop Profit" in javascript
+    assert "Estimated Ending Cash" in javascript
+    assert "Starting Point" in javascript
+    assert "Quantity:" in javascript
+    assert "Source:" in javascript
 
 
 def test_hangar_modal_keeps_other_ships_visible() -> None:

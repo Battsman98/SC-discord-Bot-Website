@@ -144,15 +144,15 @@
         </form>
         <form class="panel form trade-route-form" data-action="trade">
           <h2>Trade Routing</h2>
-          <label class="form-field">
-            <span>Starting location</span>
-            <input name="starting_point" placeholder="Start typing a station or terminal" autocomplete="off" data-autocomplete-endpoint="/api/autocomplete/trade-locations" required>
-          </label>
-          <label class="form-field">
-            <span>Ship</span>
-            <input name="ship" value="Ironclad Assault" autocomplete="off" data-autocomplete-endpoint="/api/autocomplete/ships" required>
-          </label>
-          <div class="trade-route-options">
+          <div class="trade-route-fields">
+            <label class="form-field">
+              <span>Starting location</span>
+              <input name="starting_point" placeholder="Station or terminal" required>
+            </label>
+            <label class="form-field">
+              <span>Ship</span>
+              <input name="ship" value="Ironclad Assault" required>
+            </label>
             <label class="form-field">
               <span>Initial profit</span>
               <input name="investment" type="number" min="1" value="1000000" required>
@@ -161,14 +161,14 @@
               <span>How many stops</span>
               <input name="max_stops" type="number" min="2" max="5" value="5" required>
             </label>
-            <label class="form-field stay-system-field">
+            <label class="form-field">
               <span>Stay in system</span>
               <select name="stay_system" aria-label="Stay in system">
                 <option value="">No</option>
                 <option value="yes">Yes</option>
               </select>
             </label>
-            <label class="form-field route-type-field">
+            <label class="form-field">
               <span>Route type</span>
               <select name="circular_only" aria-label="Route type">
                 <option value="true">Circular</option>

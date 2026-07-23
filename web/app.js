@@ -155,7 +155,6 @@ updateHomeSlideControls();
 restartHomeCarousel();
 
 initToolMenus();
-initAutocompleteInputs();
 
 document.querySelectorAll("form[data-action]").forEach((form) => {
   form.addEventListener("submit", async (event) => {
@@ -163,99 +162,6 @@ document.querySelectorAll("form[data-action]").forEach((form) => {
     await handleForm(form.dataset.action, form);
   });
 });
-
-function initAutocompleteInputs() {
-  document.querySelectorAll("[data-autocomplete-endpoint]").forEach((input) => {
-    const field = input.closest(".form-field");
-    if (!field) return;
-    field.classList.add("autocomplete-field");
-    const menu = document.createElement("div");
-    menu.className = "autocomplete-menu";
-    menu.setAttribute("role", "listbox");
-    menu.hidden = true;
-    field.append(menu);
-    input.setAttribute("aria-autocomplete", "list");
-    input.setAttribute("aria-expanded", "false");
-
-    let timer = null;
-    let activeIndex = -1;
-    let requestNumber = 0;
-
-    const closeMenu = () => {
-      menu.hidden = true;
-      input.setAttribute("aria-expanded", "false");
-      input.removeAttribute("aria-activedescendant");
-      activeIndex = -1;
-    };
-
-    const selectSuggestion = (value) => {
-      input.value = value;
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      closeMenu();
-      input.focus();
-    };
-
-    const setActiveSuggestion = (index) => {
-      const options = Array.from(menu.querySelectorAll("[role='option']"));
-      if (!options.length) return;
-      activeIndex = (index + options.length) % options.length;
-      options.forEach((option, optionIndex) => option.classList.toggle("active", optionIndex === activeIndex));
-      const active = options[activeIndex];
-      input.setAttribute("aria-activedescendant", active.id);
-      active.scrollIntoView({ block: "nearest" });
-    };
-
-    const loadSuggestions = () => {
-      window.clearTimeout(timer);
-      menu.innerHTML = '<div class="autocomplete-state">Loading suggestions…</div>';
-      menu.hidden = false;
-      input.setAttribute("aria-expanded", "true");
-      timer = window.setTimeout(async () => {
-        const currentRequest = ++requestNumber;
-        try {
-          const values = await api(`${input.dataset.autocompleteEndpoint}?query=${encodeURIComponent(input.value.trim())}`);
-          if (currentRequest !== requestNumber || document.activeElement !== input) return;
-          menu.replaceChildren(...values.map((value, index) => {
-            const option = document.createElement("button");
-            option.type = "button";
-            option.id = `autocomplete-${input.name}-${index}`;
-            option.setAttribute("role", "option");
-            option.textContent = value;
-            option.addEventListener("pointerdown", (event) => event.preventDefault());
-            option.addEventListener("click", () => selectSuggestion(value));
-            return option;
-          }));
-          activeIndex = -1;
-          if (!values.length) menu.innerHTML = '<div class="autocomplete-state">No matching names</div>';
-          menu.hidden = false;
-          input.setAttribute("aria-expanded", "true");
-        } catch {
-          menu.replaceChildren();
-          closeMenu();
-        }
-      }, 180);
-    };
-
-    input.addEventListener("input", loadSuggestions);
-    input.addEventListener("focus", loadSuggestions);
-    input.addEventListener("blur", () => window.setTimeout(closeMenu, 100));
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        if (menu.hidden) loadSuggestions();
-        else setActiveSuggestion(activeIndex + 1);
-      } else if (event.key === "ArrowUp" && !menu.hidden) {
-        event.preventDefault();
-        setActiveSuggestion(activeIndex - 1);
-      } else if (event.key === "Enter" && activeIndex >= 0 && !menu.hidden) {
-        event.preventDefault();
-        selectSuggestion(menu.querySelectorAll("[role='option']")[activeIndex].textContent);
-      } else if (event.key === "Escape") {
-        closeMenu();
-      }
-    });
-  });
-}
 
 document.querySelector("[data-action-button='clearExec']").addEventListener("click", async () => {
   await api("/api/exec/override", { method: "DELETE", admin: true });
@@ -413,7 +319,8 @@ async function handleForm(action, form) {
     if (action === "trade") {
       setLoading(outputs.trade);
       const params = queryParams(data, ["starting_point", "ship", "investment", "max_stops", "stay_system", "circular_only"]);
-      renderCards(outputs.trade, [await api(`/api/trade/routes?${params}`)], renderTrade);
+      const route = await api(`/api/trade/routes?${params}`);
+      renderCards(outputs.trade, [route], (item) => renderTrade(item, data));
     }
     if (action === "mining") {
       setLoading(outputs.mining);
@@ -718,16 +625,36 @@ function renderItem(item) {
   ]);
 }
 
-function renderTrade(route) {
+function renderTrade(route, request = {}) {
   const profit = route.legs.reduce((sum, leg) => sum + Number(leg.profit || 0), 0);
-  return card("Circular Route", [
+  const endingCash = Number(route.investment || 0) + profit;
+  const loopDescription = route.requires_empty_return_to_start
+    ? "Trade legs are chained, then return empty to the starting point because UEX does not list it as a buyer."
+    : "Each sell stop is the next buy stop, and the final sell stop returns to the start.";
+  const legs = route.legs.map((leg, index) => {
+    const buyLocation = tradeRouteLocation(leg.buy_system, leg.buy_planet, leg.buy_location, leg.buy_terminal);
+    const sellLocation = tradeRouteLocation(leg.sell_system, leg.sell_planet, leg.sell_location, leg.sell_terminal);
+    return `<div class="trade-leg"><strong>Leg ${index + 1}: ${escapeHtml(leg.commodity_name)} — ${money(leg.profit)} profit</strong><span>Buy: ${money(leg.buy_price)}/SCU at ${buyLocation}</span><span>Sell: ${money(leg.sell_price)}/SCU at ${sellLocation}</span><span>Quantity: ${number(leg.quantity_scu)} SCU | Cost: ${money(leg.investment_used)}</span></div>`;
+  }).join("");
+  const returnLine = route.requires_empty_return_to_start && route.legs.length
+    ? `<div class="trade-leg"><strong>Return</strong><span>Fly empty from ${tradeRouteLocation(route.legs.at(-1).sell_system, route.legs.at(-1).sell_planet, route.legs.at(-1).sell_location, route.legs.at(-1).sell_terminal)} back to ${escapeHtml(request.starting_point)}.</span></div>`
+    : "";
+  return card(request.circular_only === "false" ? "Flexible Route" : "Circular Route", [
     ["Ship", route.ship],
+    ["Starting Point", request.starting_point],
     ["Cargo", `${route.cargo_capacity_scu} SCU`],
-    ["Investment", money(route.investment)],
-    ["Estimated profit", money(profit)],
-    ["Legs", route.legs.map((leg) => `${escapeHtml(leg.commodity_name)}: ${escapeHtml(leg.buy_terminal)} to ${escapeHtml(leg.sell_terminal)}, ${money(leg.profit)} profit`).join("<br>")],
-    ["Empty return", route.requires_empty_return_to_start ? "Required" : "No"],
-  ]);
+    ["Starting Cash", money(route.investment)],
+    ["Max Stops", request.max_stops],
+    ["Estimated Loop Profit", money(profit)],
+    ["Estimated Ending Cash", money(endingCash)],
+    ["Stay In System", request.stay_system === "yes" ? "Yes" : "No"],
+    ["Loop", loopDescription],
+    ["Route Legs", `${legs}${returnLine}`],
+  ], `<p class="result-source">Source: ${escapeHtml(route.source_name)} average prices, stock, and demand</p>`);
+}
+
+function tradeRouteLocation(system, planet, location, terminal) {
+  return [system, planet, location || terminal].filter(Boolean).map(escapeHtml).join(" / ");
 }
 
 async function loadMe() {

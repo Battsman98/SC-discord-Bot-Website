@@ -758,63 +758,15 @@ article.tool-panel.active {
   text-transform: uppercase;
 }
 
-.autocomplete-field {
-  position: relative;
-}
-
-.autocomplete-menu {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 4px);
-  right: 0;
-  left: 0;
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 5px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--surface);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.48);
-}
-
-.autocomplete-menu[hidden] {
-  display: none;
-}
-
-.autocomplete-menu button {
-  display: block;
-  width: 100%;
-  min-height: 34px;
-  padding: 7px 9px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-}
-
-.autocomplete-menu button:hover,
-.autocomplete-menu button.active {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-.autocomplete-state {
-  padding: 9px;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
 .trade-route-form {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 12px;
   padding: 16px 18px;
 }
 
 .trade-route-form h2,
-.trade-route-form .trade-route-options,
+.trade-route-form .trade-route-fields,
 .trade-route-form > button {
-  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .trade-route-form h2 {
@@ -829,17 +781,27 @@ article.tool-panel.active {
   padding-bottom: 7px;
 }
 
-.trade-route-options {
+.trade-route-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(110px, 0.75fr) minmax(105px, 0.55fr) minmax(110px, 0.6fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   align-items: end;
 }
 
-.stay-system-field,
-.route-type-field {
-  max-width: 130px;
-  justify-self: end;
+.trade-leg {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.trade-leg:last-child {
+  border-bottom: 0;
+}
+
+.trade-leg span,
+.result-source {
+  color: var(--muted);
 }
 
 .inline-form {
@@ -2379,15 +2341,8 @@ body.hangar-modal-open {
 }
 
 @media (max-width: 680px) {
-  .trade-route-form,
-  .trade-route-options {
+  .trade-route-fields {
     grid-template-columns: 1fr;
-  }
-
-  .stay-system-field,
-  .route-type-field {
-    max-width: none;
-    justify-self: stretch;
   }
 
   .audit-controls {
