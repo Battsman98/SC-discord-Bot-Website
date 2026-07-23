@@ -758,6 +758,30 @@ article.tool-panel.active {
   text-transform: uppercase;
 }
 
+.trade-route-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  padding: 16px 18px;
+}
+
+.trade-route-form h2,
+.trade-route-form .trade-route-options,
+.trade-route-form > button {
+  grid-column: 1 / -1;
+}
+
+.trade-route-form h2 {
+  margin-bottom: 2px;
+}
+
+.trade-route-form input,
+.trade-route-form select,
+.trade-route-form > button {
+  min-height: 38px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
 .trade-route-options {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(110px, 0.8fr) minmax(88px, 0.45fr);
@@ -2154,7 +2178,7 @@ body.hangar-modal-open {
     aspect-ratio: 16 / 9;
   }
 
-  .field-row, .two-column .field-row, .trade-route-options, .inline-form, .inventory-filters {
+  .field-row, .two-column .field-row, .inline-form, .inventory-filters {
     grid-template-columns: 1fr;
   }
 
@@ -2307,6 +2331,16 @@ body.hangar-modal-open {
 }
 
 @media (max-width: 680px) {
+  .trade-route-form,
+  .trade-route-options {
+    grid-template-columns: 1fr;
+  }
+
+  .stay-system-field {
+    max-width: none;
+    justify-self: stretch;
+  }
+
   .audit-controls {
     grid-template-columns: 1fr;
   }
