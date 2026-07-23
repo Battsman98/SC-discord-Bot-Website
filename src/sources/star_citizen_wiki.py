@@ -174,13 +174,32 @@ class StarCitizenWikiSource:
 
     async def _fetch_item_catalog_page(self, page: int, page_size: int) -> dict:
         url = f"{self.base_url}/api/items?page[size]={page_size}&page[number]={page}"
+        last_error = "unknown source failure"
         for attempt in range(4):
-            payload = await self._fetch_json(url)
-            if isinstance(payload, dict) and isinstance(payload.get("data"), list):
-                return payload
+            try:
+                if getattr(self, "_session", None) is None:
+                    payload = await self._fetch_json(url)
+                else:
+                    async with self._session.get(
+                        url,
+                        headers={"Accept": "application/json"},
+                        timeout=aiohttp.ClientTimeout(total=60),
+                    ) as response:
+                        response.raise_for_status()
+                        payload = await response.json()
+                if isinstance(payload, dict) and isinstance(payload.get("data"), list):
+                    return payload
+                last_error = "source returned malformed JSON"
+            except aiohttp.ClientResponseError as exc:
+                last_error = f"HTTP {exc.status}"
+                if exc.status == 429 and attempt < 3:
+                    await asyncio.sleep(30)
+                    continue
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
             if attempt < 3:
                 await asyncio.sleep(2 ** attempt)
-        raise RuntimeError(f"Item catalog page {page} failed after four attempts.")
+        raise RuntimeError(f"Item catalog page {page} failed after four attempts ({last_error}).")
 
     async def _load_local_item_catalog(self) -> None:
         if self._local_items is not None:
