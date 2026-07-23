@@ -1451,6 +1451,16 @@ class UEXSource:
         normalized_start = self._normalize(self._trade_location_value(starting_point))
         normalized_stay_system = self._normalize(stay_system)
         start_keys = self._trade_start_keys(prices, normalized_start)
+        if normalized_stay_system in {"yes", "true", "1"}:
+            normalized_stay_system = next(
+                (
+                    self._normalize(row.get("star_system_name"))
+                    for row in prices
+                    if self._terminal_key(str(row.get("terminal_name") or "")) in start_keys
+                    and row.get("star_system_name")
+                ),
+                "",
+            )
         rows_by_commodity: dict[str, list[dict]] = {}
 
         for row in prices:

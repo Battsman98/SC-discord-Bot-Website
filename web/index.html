@@ -144,13 +144,33 @@
         </form>
         <form class="panel form" data-action="trade">
           <h2>Trade Routing</h2>
-          <input name="starting_point" placeholder="Starting terminal or location" required>
-          <input name="ship" value="Ironclad Assault" required>
-          <div class="field-row">
-            <input name="investment" type="number" min="1" value="1000000" required>
-            <input name="max_stops" type="number" min="2" max="5" value="5" required>
+          <label class="form-field">
+            <span>Starting location</span>
+            <input name="starting_point" list="tradeLocationSuggestions" placeholder="Start typing a station or terminal" autocomplete="off" data-autocomplete-endpoint="/api/autocomplete/trade-locations" data-autocomplete-list="tradeLocationSuggestions" required>
+          </label>
+          <datalist id="tradeLocationSuggestions"></datalist>
+          <label class="form-field">
+            <span>Ship</span>
+            <input name="ship" list="tradeShipSuggestions" value="Ironclad Assault" autocomplete="off" data-autocomplete-endpoint="/api/autocomplete/ships" data-autocomplete-list="tradeShipSuggestions" required>
+          </label>
+          <datalist id="tradeShipSuggestions"></datalist>
+          <div class="trade-route-options">
+            <label class="form-field">
+              <span>Initial profit</span>
+              <input name="investment" type="number" min="1" value="1000000" required>
+            </label>
+            <label class="form-field">
+              <span>How many stops</span>
+              <input name="max_stops" type="number" min="2" max="5" value="5" required>
+            </label>
+            <label class="form-field stay-system-field">
+              <span>Stay in system</span>
+              <select name="stay_system" aria-label="Stay in system">
+                <option value="">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </label>
           </div>
-          <input name="stay_system" placeholder="Stay in system">
           <button type="submit">Build Route</button>
         </form>
       </div>

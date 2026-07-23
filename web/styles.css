@@ -744,6 +744,32 @@ article.tool-panel.active {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.form-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.form-field > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.trade-route-options {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(110px, 0.8fr) minmax(88px, 0.45fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.stay-system-field {
+  max-width: 130px;
+  justify-self: end;
+}
+
 .inline-form {
   grid-template-columns: 1fr 110px auto auto;
   align-items: center;
@@ -2128,7 +2154,7 @@ body.hangar-modal-open {
     aspect-ratio: 16 / 9;
   }
 
-  .field-row, .two-column .field-row, .inline-form, .inventory-filters {
+  .field-row, .two-column .field-row, .trade-route-options, .inline-form, .inventory-filters {
     grid-template-columns: 1fr;
   }
 

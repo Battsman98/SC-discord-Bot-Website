@@ -155,6 +155,7 @@ updateHomeSlideControls();
 restartHomeCarousel();
 
 initToolMenus();
+initAutocompleteInputs();
 
 document.querySelectorAll("form[data-action]").forEach((form) => {
   form.addEventListener("submit", async (event) => {
@@ -162,6 +163,31 @@ document.querySelectorAll("form[data-action]").forEach((form) => {
     await handleForm(form.dataset.action, form);
   });
 });
+
+function initAutocompleteInputs() {
+  document.querySelectorAll("[data-autocomplete-endpoint]").forEach((input) => {
+    let timer = null;
+    const loadSuggestions = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(async () => {
+        const list = document.querySelector(`#${cssEscape(input.dataset.autocompleteList)}`);
+        if (!list) return;
+        try {
+          const values = await api(`${input.dataset.autocompleteEndpoint}?query=${encodeURIComponent(input.value.trim())}`);
+          list.replaceChildren(...values.map((value) => {
+            const option = document.createElement("option");
+            option.value = value;
+            return option;
+          }));
+        } catch {
+          list.replaceChildren();
+        }
+      }, 180);
+    };
+    input.addEventListener("input", loadSuggestions);
+    input.addEventListener("focus", loadSuggestions);
+  });
+}
 
 document.querySelector("[data-action-button='clearExec']").addEventListener("click", async () => {
   await api("/api/exec/override", { method: "DELETE", admin: true });

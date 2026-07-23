@@ -146,6 +146,22 @@ def test_ship_search_results_are_contained_inside_ship_search_panel() -> None:
     assert ship_form_start < lookup_output < ship_form_end
 
 
+def test_trade_route_form_has_labels_dropdown_and_autocomplete_assistance() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "<span>Starting location</span>" in html
+    assert "<span>Ship</span>" in html
+    assert "<span>Initial profit</span>" in html
+    assert "<span>How many stops</span>" in html
+    assert '<select name="stay_system"' in html
+    assert '<option value="">No</option>' in html
+    assert '<option value="yes">Yes</option>' in html
+    assert 'data-autocomplete-endpoint="/api/autocomplete/trade-locations"' in html
+    assert 'data-autocomplete-endpoint="/api/autocomplete/ships"' in html
+    assert "initAutocompleteInputs();" in javascript
+
+
 def test_hangar_modal_keeps_other_ships_visible() -> None:
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
 
