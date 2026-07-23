@@ -1301,6 +1301,41 @@ body.hangar-modal-open {
   margin-top: 22px;
 }
 
+.visitor-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.visitor-stat {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.visitor-stat h3,
+.visitor-stat small { margin: 0; }
+.visitor-stat strong { color: var(--accent-2); font-size: 2rem; }
+.visitor-stat span,
+.visitor-stat small,
+.visitor-daily h3 small { color: var(--muted); }
+.visitor-daily { margin-top: 18px; }
+.visitor-day {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.3fr) repeat(3, minmax(90px, 1fr));
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 760px) {
+  .visitor-summary { grid-template-columns: 1fr; }
+  .visitor-day { grid-template-columns: 1fr 1fr; }
+}
+
 .hangar-card.expanded > .hangar-name {
   display: none;
 }

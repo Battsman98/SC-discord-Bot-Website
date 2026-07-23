@@ -490,6 +490,15 @@
 
     <section id="admin" class="tab-panel">
         <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Visitor Analytics</h2>
+              <p>First-party counts from this website. Unique visitors represent browsers, not guaranteed individual people.</p>
+            </div>
+          </div>
+          <div id="visitorAnalyticsOutput" class="visitor-analytics"></div>
+        </article>
+        <article class="panel">
           <h2>Audit Events</h2>
           <div class="audit-controls">
             <label>Action type
@@ -549,6 +558,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260723-inline-wheel" defer></script>
-  <script src="/assets/app.js?v=20260723-error-trigger" defer></script>
+  <script src="/assets/app.js?v=20260723-visitor-analytics" defer></script>
 </body>
 </html>

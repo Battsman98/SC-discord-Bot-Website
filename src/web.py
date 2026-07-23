@@ -1,7 +1,9 @@
 import asyncio
 import difflib
+import hashlib
 import html
 import re
+import secrets
 from io import BytesIO
 import time
 from contextlib import asynccontextmanager
@@ -275,10 +277,42 @@ app = FastAPI(
     lifespan=lifespan,
 )
 _RAPID_OCR = None
+VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
 
 def state() -> AppState:
     return app.state.game_assist
+
+
+@app.middleware("http")
+async def track_website_visitors(request: Request, call_next):
+    response = await call_next(request)
+    if (
+        request.method == "GET"
+        and request.url.path == "/"
+        and response.status_code < 400
+        and hasattr(app.state, "game_assist")
+    ):
+        visitor_id = request.cookies.get(VISITOR_COOKIE_NAME, "")
+        new_visitor = re.fullmatch(r"[a-f0-9]{32}", visitor_id) is None
+        if new_visitor:
+            visitor_id = secrets.token_hex(16)
+        visitor_hash = hashlib.sha256(visitor_id.encode("ascii")).hexdigest()
+        user = current_user_from_request(request, state().settings)
+        try:
+            await state().cache.record_website_visit(visitor_hash, user.id if user else None)
+        except Exception:
+            pass
+        if new_visitor:
+            response.set_cookie(
+                VISITOR_COOKIE_NAME,
+                visitor_id,
+                max_age=365 * 24 * 60 * 60,
+                httponly=True,
+                secure=request.url.scheme == "https",
+                samesite="lax",
+            )
+    return response
 
 
 @app.middleware("http")
@@ -2523,6 +2557,11 @@ async def audit_recent(
     if action_type and action_type not in AUDIT_ACTION_TYPES:
         raise HTTPException(status_code=422, detail="Unknown audit action type.")
     return await state().cache.recent_audit_events(limit, action_type, sort)
+
+
+@app.get("/api/audit/visitors")
+async def audit_visitors(_: None = Depends(require_bot_admin)) -> dict[str, Any]:
+    return await state().cache.website_visitor_analytics()
 
 
 app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")

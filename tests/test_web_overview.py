@@ -218,3 +218,12 @@ def test_inventory_clear_actions_use_centered_confirmation_dialog() -> None:
     assert "window.confirm" not in javascript
     assert ".inventory-confirm-backdrop" in css
     assert "place-items: center" in css
+
+
+def test_audit_tab_displays_first_party_visitor_analytics() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="visitorAnalyticsOutput"' in html
+    assert 'api("/api/audit/visitors")' in javascript
+    assert "function renderVisitorAnalytics(data)" in javascript

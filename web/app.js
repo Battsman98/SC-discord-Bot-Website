@@ -18,6 +18,7 @@ const outputs = {
   exec: document.querySelector("#execOutput"),
   cz: document.querySelector("#czOutput"),
   audit: document.querySelector("#auditOutput"),
+  visitorAnalytics: document.querySelector("#visitorAnalyticsOutput"),
   intel: document.querySelector("#intelOutput"),
   warbonds: document.querySelector("#warbondOutput"),
 };
@@ -2317,14 +2318,46 @@ async function loadAudit() {
     });
     const actionType = document.querySelector("#auditActionType")?.value;
     if (actionType) params.set("action_type", actionType);
-    renderCards(outputs.audit, await api(`/api/audit/recent?${params}`), (event) => card(event.title, [
+    const [analytics, events] = await Promise.all([
+      api("/api/audit/visitors"),
+      api(`/api/audit/recent?${params}`),
+    ]);
+    renderVisitorAnalytics(analytics);
+    renderCards(outputs.audit, events, (event) => card(event.title, [
       ["Action type", auditActionLabel(event.action_type)],
       ["When", dateTime(event.created_at)],
       ["Fields", Object.entries(event.fields || {}).map(([key, value]) => `${key}: ${value}`).join("<br>")],
     ]));
   } catch (error) {
     outputs.audit.innerHTML = errorMessage(error.message);
+    if (outputs.visitorAnalytics) outputs.visitorAnalytics.innerHTML = errorMessage(error.message);
   }
+}
+
+function renderVisitorAnalytics(data) {
+  if (!outputs.visitorAnalytics) return;
+  const periods = [
+    ["Today", data.today],
+    ["Last 7 days", data.last_7_days],
+    ["Last 30 days", data.last_30_days],
+  ];
+  outputs.visitorAnalytics.innerHTML = `<div class="visitor-summary">
+    ${periods.map(([label, values]) => `<section class="visitor-stat">
+      <h3>${escapeHtml(label)}</h3>
+      <strong>${Number(values?.unique_visitors || 0).toLocaleString()}</strong>
+      <span>unique browsers</span>
+      <small>${Number(values?.page_views || 0).toLocaleString()} page views · ${Number(values?.signed_in_users || 0).toLocaleString()} signed-in users</small>
+    </section>`).join("")}
+  </div>
+  <div class="visitor-daily">
+    <h3>Daily activity <small>(${escapeHtml(data.timezone || "UTC")})</small></h3>
+    ${(data.daily || []).map((day) => `<div class="visitor-day">
+      <time>${escapeHtml(day.date)}</time>
+      <span>${Number(day.unique_visitors || 0).toLocaleString()} visitors</span>
+      <span>${Number(day.page_views || 0).toLocaleString()} views</span>
+      <span>${Number(day.signed_in_users || 0).toLocaleString()} signed in</span>
+    </div>`).join("") || `<p class="state">Analytics begin collecting after this deployment.</p>`}
+  </div>`;
 }
 
 function renderCrewSplit(data) {

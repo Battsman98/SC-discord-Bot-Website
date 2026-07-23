@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +80,19 @@ class SQLiteCache:
                 title TEXT NOT NULL,
                 action_type TEXT NOT NULL DEFAULT 'other',
                 fields_json TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS website_daily_visits (
+                visit_day TEXT NOT NULL,
+                visitor_hash TEXT NOT NULL,
+                user_id INTEGER,
+                page_views INTEGER NOT NULL DEFAULT 1,
+                first_seen_at INTEGER NOT NULL,
+                last_seen_at INTEGER NOT NULL,
+                PRIMARY KEY (visit_day, visitor_hash)
             )
             """
         )
@@ -265,6 +279,76 @@ class SQLiteCache:
             }
             for row in rows
         ]
+
+    async def record_website_visit(
+        self,
+        visitor_hash: str,
+        user_id: int | None = None,
+        now: int | None = None,
+    ) -> None:
+        timestamp = int(time.time()) if now is None else int(now)
+        visit_day = datetime.fromtimestamp(timestamp, timezone.utc).date().isoformat()
+        self._connection.execute(
+            """
+            INSERT INTO website_daily_visits (
+                visit_day, visitor_hash, user_id, page_views, first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, 1, ?, ?)
+            ON CONFLICT(visit_day, visitor_hash) DO UPDATE SET
+                user_id = COALESCE(excluded.user_id, website_daily_visits.user_id),
+                page_views = website_daily_visits.page_views + 1,
+                last_seen_at = excluded.last_seen_at
+            """,
+            (visit_day, visitor_hash, user_id, timestamp, timestamp),
+        )
+        self._connection.commit()
+
+    async def website_visitor_analytics(self, now: int | None = None) -> dict[str, Any]:
+        timestamp = int(time.time()) if now is None else int(now)
+        today = datetime.fromtimestamp(timestamp, timezone.utc).date()
+
+        def totals(days: int) -> dict[str, int]:
+            cutoff = (today - timedelta(days=days - 1)).isoformat()
+            row = self._connection.execute(
+                """
+                SELECT COUNT(DISTINCT visitor_hash), COALESCE(SUM(page_views), 0),
+                       COUNT(DISTINCT CASE WHEN user_id IS NOT NULL THEN user_id END)
+                FROM website_daily_visits
+                WHERE visit_day >= ?
+                """,
+                (cutoff,),
+            ).fetchone()
+            return {
+                "unique_visitors": int(row[0] or 0),
+                "page_views": int(row[1] or 0),
+                "signed_in_users": int(row[2] or 0),
+            }
+
+        daily_rows = self._connection.execute(
+            """
+            SELECT visit_day, COUNT(DISTINCT visitor_hash), SUM(page_views),
+                   COUNT(DISTINCT CASE WHEN user_id IS NOT NULL THEN user_id END)
+            FROM website_daily_visits
+            WHERE visit_day >= ?
+            GROUP BY visit_day
+            ORDER BY visit_day DESC
+            """,
+            ((today - timedelta(days=13)).isoformat(),),
+        ).fetchall()
+        return {
+            "timezone": "UTC",
+            "today": totals(1),
+            "last_7_days": totals(7),
+            "last_30_days": totals(30),
+            "daily": [
+                {
+                    "date": row[0],
+                    "unique_visitors": int(row[1] or 0),
+                    "page_views": int(row[2] or 0),
+                    "signed_in_users": int(row[3] or 0),
+                }
+                for row in daily_rows
+            ],
+        }
 
 
     async def user_blueprints(self, user_id: int) -> list[dict[str, Any]]:
