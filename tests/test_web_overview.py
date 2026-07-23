@@ -153,7 +153,7 @@ def test_trade_route_form_has_six_fields_and_discord_style_results() -> None:
 
     assert "<span>Starting location</span>" in html
     assert "<span>Ship</span>" in html
-    assert "<span>Initial profit</span>" in html
+    assert "<span>Initial investment</span>" in html
     assert "<span>How many stops</span>" in html
     assert '<select name="stay_system"' in html
     assert '<option value="">No</option>' in html
