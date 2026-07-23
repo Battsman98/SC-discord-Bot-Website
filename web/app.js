@@ -203,7 +203,10 @@ let inventoryScannerTimer = null;
 let inventoryImportItems = [];
 let inventoryScannerHistory = [];
 let inventoryScannerStatus = "";
-let inventoryScannerBusy = false;
+let inventoryScannerInFlight = 0;
+const inventoryScannerMaxInFlight = 2;
+let inventoryScannerPendingHashes = new Set();
+let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
 const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
 if (inventoryScannerSpacingInput?.value === "3500") inventoryScannerSpacingInput.value = "1200";
@@ -1349,13 +1352,17 @@ function addInventoryScannerHistory(payload) {
 }
 
 function renderInventoryScanProgress() {
-  if (!inventoryScannerHistory.length) return "";
+  const timing = inventoryScannerLastTiming
+    ? `<small class="scanner-timing">Last scan: ${Number(inventoryScannerLastTiming.request_ms || 0).toLocaleString()} ms total · ${Number(inventoryScannerLastTiming.ocr_ms || 0).toLocaleString()} ms OCR · ${Number(inventoryScannerLastTiming.match_ms || 0).toLocaleString()} ms matching</small>`
+    : "";
+  if (!inventoryScannerHistory.length) return timing;
   const acceptedCount = inventoryScannerHistory.filter((entry) => entry.status === "accepted").length;
   const reviewCount = inventoryScannerHistory.filter((entry) => entry.status === "review").length;
   return `<section class="scanner-progress">
     <div class="scanner-progress-heading">
       <h3>Scanner Results</h3>
       <span>${acceptedCount} found${reviewCount ? ` / ${reviewCount} needs review` : ""}</span>
+      ${timing}
     </div>
     <ul>
       ${inventoryScannerHistory.filter((entry) => entry.status === "accepted").map((entry) => `<li class="${entry.status}">
@@ -1467,7 +1474,9 @@ async function startInventoryScanner() {
   inventoryImportItems = [];
   inventoryScannerHistory = [];
   inventoryScannerStatus = "Scanner ready.";
-  inventoryScannerBusy = false;
+  inventoryScannerInFlight = 0;
+  inventoryScannerPendingHashes.clear();
+  inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
   inventoryScannerStream = await navigator.mediaDevices.getDisplayMedia({
     video: {
@@ -1522,7 +1531,7 @@ function stopInventoryScanner(clearOutput = true) {
 }
 
 async function scanInventoryHover() {
-  if (inventoryScannerBusy) return;
+  if (inventoryScannerInFlight >= inventoryScannerMaxInFlight) return;
   if (!inventoryScannerStream) {
     outputs.inventoryImport.innerHTML = stateMessage("Share the Star Citizen window first.");
     return;
@@ -1531,14 +1540,25 @@ async function scanInventoryHover() {
     inventoryScannerCrop = defaultInventoryTooltipCrop();
     drawInventoryScannerOverlay();
   }
-  inventoryScannerBusy = true;
+  const captureStartedAt = performance.now();
+  let pendingHash = "";
+  inventoryScannerInFlight += 1;
   try {
     const capture = await captureInventoryScannerCrop();
-    if (inventoryScannerLastHash && imageHashDistance(inventoryScannerLastHash, capture.hash) === 0) {
+    const captureMs = Math.round(performance.now() - captureStartedAt);
+    if ((inventoryScannerLastHash && imageHashDistance(inventoryScannerLastHash, capture.hash) === 0)
+      || inventoryScannerPendingHashes.has(capture.hash)) {
       outputs.inventoryImport.innerHTML = `${stateMessage("Waiting for the next item hover...")}${renderInventoryScanProgress()}`;
       return;
     }
-    const payload = await submitInventoryImages([capture.file], { scannerMode: true, append: true, liveScan: true });
+    pendingHash = capture.hash;
+    inventoryScannerPendingHashes.add(pendingHash);
+    const payload = await submitInventoryImages([capture.file], {
+      scannerMode: true,
+      append: true,
+      liveScan: true,
+      captureMs,
+    });
     if (payload?.items?.length) {
       inventoryScannerLastHash = capture.hash;
     } else {
@@ -1546,7 +1566,8 @@ async function scanInventoryHover() {
       inventoryScannerStatus = "No confident read yet. Keep the item hovered; retrying automatically.";
     }
   } finally {
-    inventoryScannerBusy = false;
+    if (pendingHash) inventoryScannerPendingHashes.delete(pendingHash);
+    inventoryScannerInFlight = Math.max(0, inventoryScannerInFlight - 1);
   }
 }
 
@@ -1776,9 +1797,17 @@ async function submitInventoryImages(files, options = {}) {
     if (excludeWords) params.set("exclude_words", excludeWords);
   }
   try {
+    const requestStartedAt = performance.now();
     const response = await fetch(`/api/me/inventory/import/images?${params}`, { method: "POST", body: formData });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || `Request failed with ${response.status}`);
+    if (options.scannerMode) {
+      inventoryScannerLastTiming = {
+        capture_ms: Number(options.captureMs || 0),
+        request_ms: Math.round(performance.now() - requestStartedAt),
+        ...(payload.performance || {}),
+      };
+    }
     if (payload.ocr_text && document.querySelector(".scanner-manual")?.open) {
       document.querySelector("#inventoryOcrText").value = payload.ocr_text;
     }

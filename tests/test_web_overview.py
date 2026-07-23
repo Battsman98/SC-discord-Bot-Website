@@ -224,9 +224,21 @@ def test_live_inventory_scanner_retries_missed_reads_and_only_skips_exact_frames
 def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> None:
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
 
-    assert "await asyncio.to_thread(_rapid_ocr_engine)" in python
+    assert "await asyncio.to_thread(_initialize_rapid_ocr_pool)" in python
     assert "await asyncio.to_thread(_read_image_text, data)" in python
     assert "candidate_limit=4 if live_scan else None" in python
+
+
+def test_live_scanner_runs_two_ocr_jobs_and_reports_stage_timings() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+
+    assert "inventoryScannerMaxInFlight = 2" in javascript
+    assert "inventoryScannerPendingHashes" in javascript
+    assert '"ocr_ms": ocr_ms' in python
+    assert '"match_ms": match_ms' in python
+    assert '"server_ms":' in python
+    assert "_RAPID_OCR_POOL_SIZE = 2" in python
 
 
 def test_inventory_clear_actions_use_centered_confirmation_dialog() -> None:

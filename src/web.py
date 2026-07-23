@@ -2,6 +2,7 @@ import asyncio
 import difflib
 import hashlib
 import html
+import queue
 import re
 import secrets
 import threading
@@ -263,7 +264,7 @@ async def lifespan(app: FastAPI):
     app.state.game_assist.updates = updates
     app.state.game_assist.warbonds = warbonds
     try:
-        await asyncio.to_thread(_rapid_ocr_engine)
+        await asyncio.to_thread(_initialize_rapid_ocr_pool)
     except Exception:
         pass
     try:
@@ -283,6 +284,9 @@ app = FastAPI(
 )
 _RAPID_OCR = None
 _RAPID_OCR_LOCK = threading.Lock()
+_RAPID_OCR_POOL_SIZE = 2
+_RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_SIZE)
+_RAPID_OCR_POOL_READY = False
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
 
@@ -1332,31 +1336,42 @@ async def import_inventory_from_images(
     user=Depends(require_user),
 ) -> dict[str, Any]:
     del user
+    started_at = time.perf_counter()
+    ocr_started_at = time.perf_counter()
     ocr_text, ocr_error = await _ocr_blueprint_images(files)
+    ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
     if scanner_mode:
+        match_started_at = time.perf_counter()
         scanner_lookups = await _inventory_scanner_lookups(
             ocr_text,
             exclude_words,
             candidate_limit=4 if live_scan else None,
         ) if ocr_text.strip() else {}
+        items = await _match_inventory_scanner_text(
+            ocr_text,
+            default_location,
+            default_category,
+            min_score,
+            exclude_words,
+            scanner_lookups,
+        ) if ocr_text.strip() else []
+        match_ms = round((time.perf_counter() - match_started_at) * 1000)
         return {
             "ocr_available": ocr_error is None,
             "ocr_error": ocr_error,
             "ocr_text": ocr_text,
-            "items": await _match_inventory_scanner_text(
-                ocr_text,
-                default_location,
-                default_category,
-                min_score,
-                exclude_words,
-                scanner_lookups,
-            ) if ocr_text.strip() else [],
+            "items": items,
             "diagnostics": None if live_scan else await _inventory_scanner_diagnostics(
                 ocr_text,
                 min_score,
                 exclude_words,
                 scanner_lookups,
             ) if ocr_text.strip() else {"candidates": [], "rejected_lines": []},
+            "performance": {
+                "ocr_ms": ocr_ms,
+                "match_ms": match_ms,
+                "server_ms": round((time.perf_counter() - started_at) * 1000),
+            },
         }
     return {
         "ocr_available": ocr_error is None,
@@ -1532,20 +1547,37 @@ def _read_image_text(image_data: bytes) -> str:
 
 def _read_image_text_with_rapidocr(image_data: bytes) -> tuple[str, str | None]:
     try:
-        engine = _rapid_ocr_engine()
+        _initialize_rapid_ocr_pool()
+        engine = _RAPID_OCR_POOL.get(timeout=30)
     except Exception as exc:
         return "", str(exc)
 
     try:
-        with _RAPID_OCR_LOCK:
-            result, _ = engine(image_data)
+        result, _ = engine(image_data)
         lines = [str(item[1]).strip() for item in result or [] if len(item) > 1 and str(item[1]).strip()]
         return "\n".join(lines), None
     except Exception as exc:
         return "", str(exc)
+    finally:
+        _RAPID_OCR_POOL.put(engine)
+
+
+def _initialize_rapid_ocr_pool() -> None:
+    """Warm independent OCR engines so two live captures can run concurrently."""
+    global _RAPID_OCR_POOL_READY
+    if _RAPID_OCR_POOL_READY:
+        return
+    from rapidocr_onnxruntime import RapidOCR
+    with _RAPID_OCR_LOCK:
+        if _RAPID_OCR_POOL_READY:
+            return
+        while _RAPID_OCR_POOL.qsize() < _RAPID_OCR_POOL_SIZE:
+            _RAPID_OCR_POOL.put(RapidOCR())
+        _RAPID_OCR_POOL_READY = True
 
 
 def _rapid_ocr_engine():
+    """Retained for compatibility with non-live OCR callers and tests."""
     global _RAPID_OCR
     if _RAPID_OCR is not None:
         return _RAPID_OCR
