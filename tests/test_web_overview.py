@@ -216,8 +216,17 @@ def test_live_inventory_scanner_retries_missed_reads_and_only_skips_exact_frames
     assert 'imageHashDistance(inventoryScannerLastHash, capture.hash) === 0' in javascript
     assert 'if (payload?.items?.length)' in javascript
     assert 'inventoryScannerLastHash = ""' in javascript
-    assert 'Math.max(3000' in javascript
+    assert 'Math.max(1000' in javascript
     assert 'id="inventoryScannerSpacing" type="number" min="3000" step="500" value="3500"' in html
+    assert 'inventoryScannerSpacingInput.value = "1200"' in javascript
+
+
+def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> None:
+    python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+
+    assert "await asyncio.to_thread(_rapid_ocr_engine)" in python
+    assert "await asyncio.to_thread(_read_image_text, data)" in python
+    assert "candidate_limit=4 if live_scan else None" in python
 
 
 def test_inventory_clear_actions_use_centered_confirmation_dialog() -> None:
@@ -239,3 +248,13 @@ def test_audit_tab_displays_first_party_visitor_analytics() -> None:
     assert 'id="visitorAnalyticsOutput"' in html
     assert 'api("/api/audit/visitors")' in javascript
     assert "function renderVisitorAnalytics(data)" in javascript
+
+
+def test_station_inventory_is_compact_at_partial_desktop_widths() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert "20260722-compact-inventory" in html
+    assert "@media (min-width: 761px) and (max-width: 1200px)" in css
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in css
+    assert "min-height: 52px" in css

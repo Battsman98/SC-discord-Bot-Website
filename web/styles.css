@@ -2210,6 +2210,44 @@ body.hangar-modal-open {
   }
 }
 
+@media (min-width: 761px) and (max-width: 1200px) {
+  .inventory-table {
+    gap: 8px;
+  }
+
+  .inventory-row {
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .inventory-card-main {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px 8px;
+  }
+
+  .inventory-name-field {
+    grid-column: span 2;
+  }
+
+  .inventory-notes-field {
+    grid-column: 1 / -1;
+  }
+
+  .inventory-row textarea {
+    min-height: 52px;
+    padding-block: 7px;
+  }
+
+  .inventory-actions {
+    grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(72px, auto));
+    gap: 6px;
+  }
+
+  .inventory-actions input {
+    grid-column: auto;
+  }
+}
+
 @media (max-width: 680px) {
   .audit-controls {
     grid-template-columns: 1fr;
