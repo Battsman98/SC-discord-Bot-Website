@@ -855,9 +855,9 @@ article.tool-panel.active {
 }
 
 body[data-mfd-theme="aegis-intel"] {
-  --bg: #050806; --surface: #101811; --surface-2: #1c281e; --line: #536b4f;
-  --text: #eef7e9; --muted: #a5b8a0; --accent: #9fca62; --accent-2: #ff795f;
-  --ambient: rgba(159, 202, 98, 0.12); --glow: rgba(159, 202, 98, 0.26); --panel-tint: rgba(255, 121, 95, 0.035);
+  --bg: #07050c; --surface: #15101d; --surface-2: #241a30; --line: #664d78;
+  --text: #f7efff; --muted: #b6a2c4; --accent: #c57cff; --accent-2: #ff5e78;
+  --ambient: rgba(197, 124, 255, 0.13); --glow: rgba(197, 124, 255, 0.28); --panel-tint: rgba(255, 94, 120, 0.04);
 }
 
 .intel-heading,

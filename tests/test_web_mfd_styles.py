@@ -37,6 +37,15 @@ def test_trade_uses_a_green_grey_market_mfd_palette() -> None:
     assert "#bf62ed" not in palette
 
 
+def test_intel_uses_a_unique_aegis_violet_and_signal_red_palette() -> None:
+    palette = CSS.split('body[data-mfd-theme="aegis-intel"]', 1)[1].split("}", 1)[0]
+
+    assert "--bg: #07050c;" in palette
+    assert "--surface: #15101d;" in palette
+    assert "--accent: #c57cff;" in palette
+    assert "--accent-2: #ff5e78;" in palette
+
+
 def test_legacy_amber_control_colors_are_not_hard_coded() -> None:
     assert "background: #2b2110;" not in CSS
     assert "border-color: rgba(228, 154, 24, 0.58);" not in CSS

@@ -290,7 +290,7 @@ def test_station_inventory_is_compact_at_partial_desktop_widths() -> None:
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "20260723-grey-market-green" in html
+    assert "20260723-aegis-intel-violet" in html
     assert "@media (min-width: 761px) and (max-width: 1200px)" in css
     assert "grid-template-columns: repeat(12, minmax(0, 1fr))" in css
     assert "grid-template-columns: minmax(180px, 4fr)" in css

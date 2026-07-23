@@ -69,7 +69,8 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert html.index('data-overview-tab="intel"') < html.index('data-overview-tab="lookup"')
     assert 'intel: { theme: "aegis-intel", label: "AEGIS DYNAMICS INTELLIGENCE" }' in javascript
     assert 'body[data-mfd-theme="aegis-intel"]' in styles
-    assert "--accent: #9fca62" in styles
+    assert "--accent: #c57cff" in styles
+    assert "--accent-2: #ff5e78" in styles
     assert 'target="_blank" rel="noreferrer">Open source</a>' in javascript
     assert 'scroll through the past three months' in javascript
     assert "5 * 60_000" in javascript
