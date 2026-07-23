@@ -137,3 +137,21 @@ def test_weekly_validation_forces_a_complete_rebuild(tmp_path: Path) -> None:
         await cache.close()
 
     asyncio.run(run())
+
+
+def test_catalog_page_retries_transient_source_failures() -> None:
+    async def run() -> None:
+        source = object.__new__(StarCitizenWikiSource)
+        source.base_url = "https://example.test"
+        responses = [None, None, {"data": [{"uuid": "ok"}]}]
+
+        async def fetch(_url: str):
+            return responses.pop(0)
+
+        source._fetch_json = fetch
+        payload = await source._fetch_item_catalog_page(3, 200)
+
+        assert payload["data"] == [{"uuid": "ok"}]
+        assert responses == []
+
+    asyncio.run(run())

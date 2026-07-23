@@ -94,7 +94,7 @@ class StarCitizenWikiSource:
                     {
                         "status": "stale" if existing_count else "unavailable",
                         "last_validation_attempt_at": now,
-                        "last_validation_error": str(exc)[:500],
+                        "last_validation_error": f"{type(exc).__name__}: {exc}"[:500],
                     }
                 )
             return await self.item_catalog_status()
@@ -118,9 +118,7 @@ class StarCitizenWikiSource:
         rows_by_uuid: dict[str, dict] = {}
         versions: set[str] = set()
         for page in range(1, last_page + 1):
-            payload = await self._fetch_json(
-                f"{self.base_url}/api/items?page[size]={page_size}&page[number]={page}"
-            )
+            payload = await self._fetch_item_catalog_page(page, page_size)
             source_rows = payload.get("data") if isinstance(payload, dict) else None
             if not isinstance(source_rows, list):
                 raise RuntimeError(f"Item catalog page {page} was unavailable.")
@@ -173,6 +171,16 @@ class StarCitizenWikiSource:
         self._local_items = None
         await self._load_local_item_catalog()
         return metadata
+
+    async def _fetch_item_catalog_page(self, page: int, page_size: int) -> dict:
+        url = f"{self.base_url}/api/items?page[size]={page_size}&page[number]={page}"
+        for attempt in range(4):
+            payload = await self._fetch_json(url)
+            if isinstance(payload, dict) and isinstance(payload.get("data"), list):
+                return payload
+            if attempt < 3:
+                await asyncio.sleep(2 ** attempt)
+        raise RuntimeError(f"Item catalog page {page} failed after four attempts.")
 
     async def _load_local_item_catalog(self) -> None:
         if self._local_items is not None:
@@ -736,7 +744,7 @@ class StarCitizenWikiSource:
                 response.raise_for_status()
                 payload = await response.json()
                 return payload if isinstance(payload, dict) else None
-        except (aiohttp.ClientError, ValueError):
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
             return None
 
     async def _fetch_pledge_price(self, data: dict) -> dict | None:

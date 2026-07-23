@@ -305,10 +305,11 @@ def state() -> AppState:
 async def _item_catalog_maintenance_loop(sources: SourceRegistry) -> None:
     while True:
         try:
-            await sources.validate_item_catalog()
+            status = await sources.validate_item_catalog()
         except Exception:
-            pass
-        await asyncio.sleep(6 * 60 * 60)
+            status = {"status": "unavailable"}
+        retry_seconds = 5 * 60 if status.get("status") in {"empty", "unavailable"} else 6 * 60 * 60
+        await asyncio.sleep(retry_seconds)
 
 
 @app.middleware("http")
