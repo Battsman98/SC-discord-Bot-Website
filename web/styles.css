@@ -784,8 +784,14 @@ article.tool-panel.active {
 .trade-route-fields {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   align-items: end;
+}
+
+.trade-route-fields .form-field,
+.trade-route-fields input,
+.trade-route-fields select {
+  width: 100%;
 }
 
 .trade-leg {

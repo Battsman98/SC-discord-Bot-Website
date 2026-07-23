@@ -33,7 +33,7 @@ def test_all_rendered_errors_and_connector_failures_trigger_hotfix_animation() -
     application = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     overlay = (WEB_DIR / "hotfix-overlay.js").read_text(encoding="utf-8")
 
-    assert 'src="/assets/app.js?v=20260723-intel-layout"' in html
+    assert 'src="/assets/app.js?v=20260723-trade-results-v2"' in html
     assert 'function errorMessage(message) {\n  notifyPotentialHotfix();' in application
     assert 'outputs.savedShips.innerHTML = connectorInstallPrompt(error.message);' in application
     connector_catch = application.split('outputs.savedShips.innerHTML = connectorInstallPrompt(error.message);', 1)[0]

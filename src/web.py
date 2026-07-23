@@ -2498,7 +2498,7 @@ async def trade_routes(
         stay_system,
         circular_only,
     )
-    if result is None:
+    if result is None or not result.legs:
         not_found("No profitable circular route found.")
     return encode(result)
 

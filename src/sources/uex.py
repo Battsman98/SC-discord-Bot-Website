@@ -1634,9 +1634,6 @@ class UEXSource:
         if best_route:
             return best_route
 
-        if circular_only:
-            return []
-
         return self._best_route_with_empty_return(start_candidates, outgoing, max_stops, investment)
 
     def _best_route_with_empty_return(
