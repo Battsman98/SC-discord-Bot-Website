@@ -1468,7 +1468,7 @@ async function startInventoryScanner() {
   inventoryScannerLastHash = "";
   inventoryScannerStream = await navigator.mediaDevices.getDisplayMedia({
     video: {
-      frameRate: { ideal: 1, max: 2 },
+      frameRate: { ideal: 5, max: 8 },
       width: { ideal: 960, max: 1280 },
       height: { ideal: 540, max: 720 },
     },
@@ -1531,12 +1531,17 @@ async function scanInventoryHover() {
   inventoryScannerBusy = true;
   try {
     const capture = await captureInventoryScannerCrop();
-    if (inventoryScannerLastHash && imageHashDistance(inventoryScannerLastHash, capture.hash) <= 6) {
+    if (inventoryScannerLastHash && imageHashDistance(inventoryScannerLastHash, capture.hash) === 0) {
       outputs.inventoryImport.innerHTML = `${stateMessage("Waiting for the next item hover...")}${renderInventoryScanProgress()}`;
       return;
     }
-    inventoryScannerLastHash = capture.hash;
-    await submitInventoryImages([capture.file], { scannerMode: true, append: true, liveScan: true });
+    const payload = await submitInventoryImages([capture.file], { scannerMode: true, append: true, liveScan: true });
+    if (payload?.items?.length) {
+      inventoryScannerLastHash = capture.hash;
+    } else {
+      inventoryScannerLastHash = "";
+      inventoryScannerStatus = "No confident read yet. Keep the item hovered; retrying automatically.";
+    }
   } finally {
     inventoryScannerBusy = false;
   }
@@ -1555,7 +1560,7 @@ async function startInventoryAutoScan() {
   if (empty) empty.textContent = inventoryScannerStatus;
   outputs.inventoryImport.innerHTML = `${stateMessage(inventoryScannerStatus)}${renderInventoryScanProgress()}`;
   await scanInventoryHover();
-  const spacing = Math.max(5000, Number(document.querySelector("#inventoryScannerSpacing")?.value || 6500));
+  const spacing = Math.max(3000, Number(document.querySelector("#inventoryScannerSpacing")?.value || 3500));
   if (inventoryScannerTimer) clearInterval(inventoryScannerTimer);
   inventoryScannerTimer = setInterval(() => {
     scanInventoryHover().catch((error) => {
@@ -1644,7 +1649,7 @@ async function captureInventoryScannerCrop() {
   const sy = Math.round(crop.y * sourceHeight);
   const sw = Math.round(crop.width * sourceWidth);
   const sh = Math.round(crop.height * sourceHeight);
-  const maxWidth = 640;
+  const maxWidth = 720;
   const scale = Math.min(1, maxWidth / Math.max(1, sw));
   const targetWidth = Math.max(1, Math.round(sw * scale));
   const targetHeight = Math.max(1, Math.round(sh * scale));
@@ -1654,7 +1659,7 @@ async function captureInventoryScannerCrop() {
   const context = canvas.getContext("2d");
   context.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   const hash = imageAverageHash(canvas);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
   if (!blob) throw new Error("Could not encode the inventory capture.");
   return { file: new File([blob], "inventory-tooltip.webp", { type: "image/webp" }), hash };
 }
@@ -1779,8 +1784,10 @@ async function submitInventoryImages(files, options = {}) {
       scannerMode: Boolean(options.scannerMode),
       liveScan: Boolean(options.liveScan),
     });
+    return payload;
   } catch (error) {
     outputs.inventoryImport.innerHTML = errorMessage(error.message);
+    return null;
   }
 }
 

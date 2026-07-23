@@ -204,8 +204,20 @@ def test_selecting_ships_opens_and_refreshes_the_hangar() -> None:
 def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert 'canvas.toBlob(resolve, "image/webp", 0.82)' in javascript
+    assert 'canvas.toBlob(resolve, "image/webp", 0.9)' in javascript
     assert 'if (options.liveScan) params.set("live_scan", "true")' in javascript
+
+
+def test_live_inventory_scanner_retries_missed_reads_and_only_skips_exact_frames() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'frameRate: { ideal: 5, max: 8 }' in javascript
+    assert 'imageHashDistance(inventoryScannerLastHash, capture.hash) === 0' in javascript
+    assert 'if (payload?.items?.length)' in javascript
+    assert 'inventoryScannerLastHash = ""' in javascript
+    assert 'Math.max(3000' in javascript
+    assert 'id="inventoryScannerSpacing" type="number" min="3000" step="500" value="3500"' in html
 
 
 def test_inventory_clear_actions_use_centered_confirmation_dialog() -> None:
