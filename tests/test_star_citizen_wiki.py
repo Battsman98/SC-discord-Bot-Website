@@ -65,6 +65,28 @@ def test_parse_item_result_maps_fs9_to_personal_weapon_primary() -> None:
     assert result.company_name == "Behring Applied Technology"
 
 
+def test_parse_item_result_uses_displayed_medical_type_before_generic_weapon_type() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+
+    result = source._parse_item_result(
+        {
+            "uuid": "paramed",
+            "slug": "paramed-medical-device",
+            "name": "ParaMed Medical Device",
+            "classification": "FPS.Weapon.Small",
+            "type": "WeaponPersonal",
+            "type_label": "FPS Weapon",
+            "sub_type": "Small",
+            "sub_type_label": "Small",
+            "description_data": [{"name": "Item Type", "value": "Medical Device"}],
+        }
+    )
+
+    assert result is not None
+    assert result.category == "Utility"
+    assert result.section == "Medical"
+
+
 def test_parse_ship_result_includes_pledge_and_purchase_data() -> None:
     source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
     ship = source._parse_ship_result(

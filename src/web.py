@@ -1311,7 +1311,9 @@ async def import_inventory_from_text(
 ) -> dict[str, Any]:
     del user
     if request.scanner_mode:
-        scanner_lookups = await _inventory_scanner_lookups(request.text, request.exclude_words)
+        scanner_lookups = await _inventory_scanner_lookups(
+            request.text, request.exclude_words, category=request.default_category
+        )
         return {
             "ocr_available": True,
             "ocr_text": request.text,
@@ -1367,6 +1369,7 @@ async def import_inventory_from_images(
             ocr_text,
             exclude_words,
             candidate_limit=1 if live_scan else None,
+            category=default_category,
         ) if ocr_text.strip() else {}
         items = await _match_inventory_scanner_text(
             ocr_text,
@@ -1851,6 +1854,7 @@ async def _inventory_scanner_lookups(
     text: str,
     exclude_words: str | None,
     candidate_limit: int | None = None,
+    category: str | None = None,
 ) -> dict[str, list[tuple[Any, float]]]:
     """Resolve each OCR candidate once for both matching and diagnostics.
 
@@ -1865,18 +1869,27 @@ async def _inventory_scanner_lookups(
 
     async def lookup(candidate: str) -> tuple[str, list[tuple[Any, float]]]:
         async with semaphore:
-            return candidate, await _inventory_lookup_scored_matches(candidate, 5)
+            matches = (
+                await _inventory_lookup_scored_matches(candidate, 5, category)
+                if category
+                else await _inventory_lookup_scored_matches(candidate, 5)
+            )
+            return candidate, matches
 
     return dict(await asyncio.gather(*(lookup(candidate) for candidate in candidates)))
 
 
-async def _inventory_lookup_scored_matches(candidate: str, limit: int = 5) -> list[tuple[Any, float]]:
+async def _inventory_lookup_scored_matches(
+    candidate: str, limit: int = 5, category: str | None = None
+) -> list[tuple[Any, float]]:
     seen: set[str] = set()
     scored: list[tuple[Any, float]] = []
 
     async def lookup(query: str) -> list[Any]:
         try:
-            return await state().sources.lookup_inventory_items(query, limit=limit)
+            return await state().sources.lookup_inventory_items(
+                query, limit=limit, category=category
+            )
         except Exception:
             return []
 

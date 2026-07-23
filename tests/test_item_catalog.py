@@ -5,14 +5,14 @@ from src.cache import SQLiteCache
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 
 
-def catalog_row(item_uuid: str, name: str) -> dict:
+def catalog_row(item_uuid: str, name: str, category: str = "Utility") -> dict:
     normalized = " ".join(name.lower().replace("-", " ").split())
     return {
         "item_uuid": item_uuid,
         "stable_id": abs(hash(item_uuid)) % 2_000_000_000,
         "item_name": name,
         "normalized_name": normalized,
-        "category": "Utility",
+        "category": category,
         "item_type": "Medical",
         "company_name": "CureLife",
         "item_size": "1",
@@ -45,6 +45,26 @@ def test_catalog_replacement_and_local_fuzzy_search(tmp_path: Path) -> None:
 
         assert exact[0].name == "ParaMed Medical Device"
         assert fuzzy[0].name == "ParaMed Medical Device"
+        await cache.close()
+
+    asyncio.run(run())
+
+
+def test_local_search_limits_matches_to_selected_category(tmp_path: Path) -> None:
+    async def run() -> None:
+        cache = await SQLiteCache.create(str(tmp_path / "catalog.sqlite3"))
+        await cache.replace_item_catalog(
+            [
+                catalog_row("utility-cutter", "Pyro RYT Multi-Tool", "Utility"),
+                catalog_row("flair-cutter", "Pyro RYT Multi-Tool Display", "Misc"),
+            ],
+            {"status": "ready", "item_count": 2},
+        )
+        source = StarCitizenWikiSource(None, cache, None)
+
+        matches = await source.lookup_inventory_items("Pyro RYT Multi Tool", 5, "Utility")
+
+        assert [item.name for item in matches] == ["Pyro RYT Multi-Tool"]
         await cache.close()
 
     asyncio.run(run())

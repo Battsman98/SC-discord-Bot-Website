@@ -15,6 +15,7 @@ class StarCitizenWikiSource:
     name = "Star Citizen Wiki"
     base_url = "https://api.star-citizen.wiki"
     item_catalog_page_delay_seconds = 3.1
+    item_catalog_schema_version = 2
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -26,15 +27,18 @@ class StarCitizenWikiSource:
         self._local_items: list[ItemLocatorResult] | None = None
         self._local_item_exact: dict[str, list[int]] = {}
         self._local_item_trigrams: dict[str, set[int]] = {}
+        self._local_item_categories: dict[str, set[int]] = {}
         self._catalog_sync_lock = asyncio.Lock()
 
-    async def lookup_inventory_items(self, query: str, limit: int = 10) -> list[ItemLocatorResult]:
+    async def lookup_inventory_items(
+        self, query: str, limit: int = 10, category: str | None = None
+    ) -> list[ItemLocatorResult]:
         normalized_query = " ".join(str(query or "").strip().split())
         if not normalized_query:
             return []
         await self._load_local_item_catalog()
         if self._local_items:
-            return self._search_local_item_catalog(normalized_query, limit)
+            return self._search_local_item_catalog(normalized_query, limit, category)
 
         cache_key = f"star-citizen-wiki:inventory-items:v1:{normalized_query.lower()}"
         cached = await self._cache.get(cache_key)
@@ -75,7 +79,18 @@ class StarCitizenWikiSource:
             last_deep = int(metadata.get("last_deep_validation_at") or 0)
             try:
                 summary = await self._fetch_item_catalog_summary()
-                deep_due = force_deep or existing_count == 0 or last_deep <= now - (7 * 86400)
+                stored_schema_version = metadata.get("schema_version")
+                schema_outdated = (
+                    int(stored_schema_version) != self.item_catalog_schema_version
+                    if stored_schema_version is not None
+                    else existing_count >= 1000
+                )
+                deep_due = (
+                    force_deep
+                    or existing_count == 0
+                    or last_deep <= now - (7 * 86400)
+                    or schema_outdated
+                )
                 changed = (
                     int(summary["item_count"]) != existing_count
                     or str(summary.get("game_version") or "") != str(metadata.get("game_version") or "")
@@ -169,6 +184,7 @@ class StarCitizenWikiSource:
             "last_validation_error": None,
             "source_name": self.name,
             "source_url": f"{self.base_url}/api/items",
+            "schema_version": self.item_catalog_schema_version,
         }
         await self._cache.replace_item_catalog(rows, metadata)
         self._local_items = None
@@ -211,6 +227,7 @@ class StarCitizenWikiSource:
         items: list[ItemLocatorResult] = []
         exact: dict[str, list[int]] = {}
         trigrams: dict[str, set[int]] = {}
+        categories: dict[str, set[int]] = {}
         for row in rows:
             item = ItemLocatorResult(
                 id=int(row["stable_id"]),
@@ -228,23 +245,34 @@ class StarCitizenWikiSource:
             items.append(item)
             normalized = str(row["normalized_name"])
             exact.setdefault(normalized, []).append(index)
+            category = self._normalize_name(row.get("category"))
+            if category:
+                categories.setdefault(category, set()).add(index)
             for trigram in self._item_name_trigrams(normalized):
                 trigrams.setdefault(trigram, set()).add(index)
         self._local_items = items
         self._local_item_exact = exact
         self._local_item_trigrams = trigrams
+        self._local_item_categories = categories
 
-    def _search_local_item_catalog(self, query: str, limit: int) -> list[ItemLocatorResult]:
+    def _search_local_item_catalog(
+        self, query: str, limit: int, category: str | None = None
+    ) -> list[ItemLocatorResult]:
         normalized = self._normalize_name(query)
         if not normalized or not self._local_items:
             return []
+        allowed_indices = self._local_item_categories.get(self._normalize_name(category)) if category else None
         exact_indices = self._local_item_exact.get(normalized, [])
+        if allowed_indices is not None:
+            exact_indices = [index for index in exact_indices if index in allowed_indices]
         if exact_indices:
             return [self._local_items[index] for index in exact_indices[:limit]]
         query_trigrams = self._item_name_trigrams(normalized)
         candidate_indices: set[int] = set()
         for trigram in query_trigrams:
             candidate_indices.update(self._local_item_trigrams.get(trigram, set()))
+        if allowed_indices is not None:
+            candidate_indices.intersection_update(allowed_indices)
         ranked = sorted(
             candidate_indices,
             key=lambda index: self._local_item_rank(normalized, query_trigrams, self._local_items[index].name),
@@ -1084,7 +1112,21 @@ class StarCitizenWikiSource:
         classification = self._string_or_none(data.get("classification")) or ""
         item_type_value = self._description_data_value(data, "Item Type") or sub_type_label or sub_type
 
-        haystack = self._normalize_name(" ".join([type_code, type_label, sub_type, sub_type_label, classification]))
+        haystack = self._normalize_name(
+            " ".join(
+                [
+                    self._string_or_none(data.get("name")) or "",
+                    type_code,
+                    type_label,
+                    sub_type,
+                    sub_type_label,
+                    classification,
+                    item_type_value or "",
+                ]
+            )
+        )
+        if "med" in haystack.split() or "medical" in haystack:
+            return "Utility", "Medical"
         if "weaponpersonal" in haystack or "fps weapon" in haystack or "fps weapon" in self._normalize_name(type_label):
             return "Personal Weapons", self._personal_weapon_type(item_type_value, classification)
         if "attachment" in haystack or type_code in {"FPSAttachment", "WeaponAttachment"}:
@@ -1093,8 +1135,6 @@ class StarCitizenWikiSource:
             return "Armor", sub_type_label or item_type_value or None
         if "clothing" in haystack:
             return "Clothing", sub_type_label or item_type_value or None
-        if "med" in haystack or "medical" in haystack:
-            return "Utility", "Medical"
         if "food" in haystack or "drink" in haystack:
             return "Consumables", sub_type_label or type_label or None
         if "harvestable" in haystack:

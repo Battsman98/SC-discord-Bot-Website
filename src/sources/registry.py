@@ -257,14 +257,17 @@ class SourceRegistry:
                 return result
         return None
 
-    async def lookup_inventory_items(self, query: str, limit: int = 10) -> list[ItemLocatorResult]:
+    async def lookup_inventory_items(
+        self, query: str, limit: int = 10, category: str | None = None
+    ) -> list[ItemLocatorResult]:
         seen: set[str] = set()
         matches: list[ItemLocatorResult] = []
         for source in self._sources:
             lookup = getattr(source, "lookup_inventory_items", None)
             if lookup is None:
                 continue
-            for result in await lookup(query, limit):
+            results = await lookup(query, limit, category) if category else await lookup(query, limit)
+            for result in results:
                 key = result.name.casefold()
                 if key in seen:
                     continue
