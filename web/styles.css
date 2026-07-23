@@ -48,9 +48,9 @@ body[data-mfd-theme="drake"] {
 }
 
 body[data-mfd-theme="grey-market"] {
-  --bg: #070509; --surface: #17121c; --surface-2: #261d2d; --line: #765984;
-  --text: #f6eaff; --muted: #b8a1c0; --accent: #bf62ed; --accent-2: #a9f86b;
-  --ambient: rgba(191, 98, 237, 0.13); --glow: rgba(191, 98, 237, 0.27); --panel-tint: rgba(169, 248, 107, 0.035);
+  --bg: #030805; --surface: #0b1710; --surface-2: #15291b; --line: #3f754d;
+  --text: #ecffef; --muted: #93b69b; --accent: #55db72; --accent-2: #b6ff67;
+  --ambient: rgba(85, 219, 114, 0.14); --glow: rgba(85, 219, 114, 0.29); --panel-tint: rgba(182, 255, 103, 0.045);
 }
 
 body[data-mfd-theme="argo"] {
