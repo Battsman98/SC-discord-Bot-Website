@@ -795,6 +795,7 @@ async function importRsiPledgesFromBrowser() {
     await loadSavedShips({ quiet: true });
     showRsiImportResult(result);
   } catch (error) {
+    notifyPotentialHotfix();
     outputs.savedShips.innerHTML = connectorInstallPrompt(error.message);
     bindConnectorPromptButtons(outputs.savedShips);
   }
@@ -2472,7 +2473,12 @@ function stateMessage(message) {
 }
 
 function errorMessage(message) {
+  notifyPotentialHotfix();
   return `<div class="error">${escapeHtml(message)}</div>`;
+}
+
+function notifyPotentialHotfix() {
+  document.dispatchEvent(new CustomEvent("hotfix:show"));
 }
 
 function escapeHtml(value) {

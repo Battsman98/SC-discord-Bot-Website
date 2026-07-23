@@ -20,7 +20,10 @@
     overlay.innerHTML = `
       <section class="hotfix-dialog" role="dialog" aria-modal="true" aria-labelledby="hotfixMessage">
         <button class="hotfix-close" type="button" aria-label="Close potential hot-fix notice">&times;</button>
-        <iframe class="hotfix-animation" src="/assets/media/wafer-transport.html" title="Wafer transport animation" sandbox="allow-scripts"></iframe>
+        <div class="hotfix-wheel-stage" role="img" aria-label="System recovery in progress">
+          <div class="hotfix-wheel" aria-hidden="true"><span></span></div>
+          <p>Re-routing services</p>
+        </div>
         <p class="hotfix-message" id="hotfixMessage">Potential Hot-Fix coming</p>
         <p class="hotfix-dismiss-note">Closes automatically in 20 seconds. Click outside to dismiss.</p>
       </section>`;
@@ -52,6 +55,7 @@
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") hidePotentialHotfix(); });
   document.addEventListener("hotfix:show", showPotentialHotfix);
   document.addEventListener("hotfix:hide", hidePotentialHotfix);
+  window.SCCompanionHotfix = Object.freeze({ show: showPotentialHotfix, hide: hidePotentialHotfix });
   window.fetch = async (...args) => {
     try {
       const response = await originalFetch(...args);
