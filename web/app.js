@@ -205,6 +205,9 @@ let inventoryScannerHistory = [];
 let inventoryScannerStatus = "";
 let inventoryScannerBusy = false;
 let inventoryScannerLastHash = "";
+const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
+if (inventoryScannerSpacingInput?.value === "3500") inventoryScannerSpacingInput.value = "1200";
+if (inventoryScannerSpacingInput) inventoryScannerSpacingInput.min = "1000";
 const inventoryScannerCropKey = "gameAssist.inventoryScannerCrop.readableWide.v3";
 const inventoryCategoryTypes = {
   "Personal Weapons": ["Primary", "Sidearm", "Melee", "Attachments", "Ammunition"],
@@ -1560,7 +1563,7 @@ async function startInventoryAutoScan() {
   if (empty) empty.textContent = inventoryScannerStatus;
   outputs.inventoryImport.innerHTML = `${stateMessage(inventoryScannerStatus)}${renderInventoryScanProgress()}`;
   await scanInventoryHover();
-  const spacing = Math.max(3000, Number(document.querySelector("#inventoryScannerSpacing")?.value || 3500));
+  const spacing = Math.max(1000, Number(document.querySelector("#inventoryScannerSpacing")?.value || 1200));
   if (inventoryScannerTimer) clearInterval(inventoryScannerTimer);
   inventoryScannerTimer = setInterval(() => {
     scanInventoryHover().catch((error) => {

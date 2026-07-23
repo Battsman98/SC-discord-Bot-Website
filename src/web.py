@@ -4,6 +4,7 @@ import hashlib
 import html
 import re
 import secrets
+import threading
 from io import BytesIO
 import time
 from contextlib import asynccontextmanager
@@ -262,6 +263,10 @@ async def lifespan(app: FastAPI):
     app.state.game_assist.updates = updates
     app.state.game_assist.warbonds = warbonds
     try:
+        await asyncio.to_thread(_rapid_ocr_engine)
+    except Exception:
+        pass
+    try:
         yield
     finally:
         await warbonds.close()
@@ -277,6 +282,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 _RAPID_OCR = None
+_RAPID_OCR_LOCK = threading.Lock()
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
 
@@ -1331,7 +1337,7 @@ async def import_inventory_from_images(
         scanner_lookups = await _inventory_scanner_lookups(
             ocr_text,
             exclude_words,
-            candidate_limit=8 if live_scan else None,
+            candidate_limit=4 if live_scan else None,
         ) if ocr_text.strip() else {}
         return {
             "ocr_available": ocr_error is None,
@@ -1507,7 +1513,7 @@ async def _ocr_blueprint_images(files: list[UploadFile]) -> tuple[str, str | Non
             continue
         try:
             Image.open(BytesIO(data)).verify()
-            texts.append(_read_image_text(data))
+            texts.append(await asyncio.to_thread(_read_image_text, data))
         except Exception as exc:
             return "\n".join(texts), f"Could not read {file.filename or 'image'}: {exc}"
     return "\n".join(texts), None
@@ -1525,20 +1531,29 @@ def _read_image_text(image_data: bytes) -> str:
 
 
 def _read_image_text_with_rapidocr(image_data: bytes) -> tuple[str, str | None]:
-    global _RAPID_OCR
     try:
-        from rapidocr_onnxruntime import RapidOCR
+        engine = _rapid_ocr_engine()
     except Exception as exc:
         return "", str(exc)
 
     try:
-        if _RAPID_OCR is None:
-            _RAPID_OCR = RapidOCR()
-        result, _ = _RAPID_OCR(image_data)
+        with _RAPID_OCR_LOCK:
+            result, _ = engine(image_data)
         lines = [str(item[1]).strip() for item in result or [] if len(item) > 1 and str(item[1]).strip()]
         return "\n".join(lines), None
     except Exception as exc:
         return "", str(exc)
+
+
+def _rapid_ocr_engine():
+    global _RAPID_OCR
+    if _RAPID_OCR is not None:
+        return _RAPID_OCR
+    from rapidocr_onnxruntime import RapidOCR
+    with _RAPID_OCR_LOCK:
+        if _RAPID_OCR is None:
+            _RAPID_OCR = RapidOCR()
+    return _RAPID_OCR
 
 
 def _read_image_text_with_tesseract(image_data: bytes) -> tuple[str, str | None]:
