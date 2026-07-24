@@ -67,7 +67,7 @@ def test_parse_blueprint_extracts_component_size_from_category() -> None:
     assert result.component_size == "Size 1"
 
 
-def test_parse_blueprint_encodes_source_url_for_quoted_names() -> None:
+def test_parse_blueprint_links_to_local_crafting_page() -> None:
     source = SCCraftToolsSource.__new__(SCCraftToolsSource)
 
     result = source._parse_blueprint(
@@ -80,24 +80,19 @@ def test_parse_blueprint_encodes_source_url_for_quoted_names() -> None:
         {},
     )
 
-    assert result.source_url == "https://sc-craft.tools/?search=P6-LR+%22Archangel%22+Sniper+Rifle"
+    assert result.source_url == "/#crafting"
+    assert result.source_name == "Local Star Citizen Game Files"
 
 
-def test_autocomplete_blueprint_filter_uses_config_hints() -> None:
+def test_autocomplete_blueprint_filter_uses_local_snapshot() -> None:
     source = SCCraftToolsSource.__new__(SCCraftToolsSource)
-    source._config = {
-        "filterHints": {
-            "category": [
-                "Armour / Salvager / Medium",
-                "Vehiclegear / Salvage",
-                "Vehiclegear / Quantumdrive / Size1",
-                "Vehiclegear / Quantumdrive / Size2",
-            ],
-            "resource": [
-                {"name": "Iron"},
-                {"name": "Copper"},
-            ],
-        }
+    source._snapshot = {
+        "items": [
+            {"category": "Armour / Salvager / Medium", "ingredients": [{"name": "Iron"}]},
+            {"category": "Vehiclegear / Salvage", "ingredients": [{"name": "Copper"}]},
+            {"category": "Vehiclegear / Quantumdrive / Size1", "ingredients": []},
+            {"category": "Vehiclegear / Quantumdrive / Size2", "ingredients": []},
+        ]
     }
 
     categories = asyncio.run(source.autocomplete_blueprint_filter("category", "veh", 5))
@@ -113,16 +108,14 @@ def test_autocomplete_blueprint_filter_uses_config_hints() -> None:
 
 def test_category_filter_values_matches_display_category() -> None:
     source = SCCraftToolsSource.__new__(SCCraftToolsSource)
-    source._config = {
-        "filterHints": {
-            "category": [
-                "Vehiclegear / Quantumdrive / Size1",
-                "Vehiclegear / Quantumdrive / Size2",
-                "Vehiclegear / Powerplant",
-                "Armour / Combat / Heavy",
-                "Armour / Engineer / Heavy",
-            ],
-        }
+    source._snapshot = {
+        "items": [
+            {"category": "Vehiclegear / Quantumdrive / Size1"},
+            {"category": "Vehiclegear / Quantumdrive / Size2"},
+            {"category": "Vehiclegear / Powerplant"},
+            {"category": "Armour / Combat / Heavy"},
+            {"category": "Armour / Engineer / Heavy"},
+        ]
     }
 
     quantum = asyncio.run(source._category_filter_values("Quantum Drive"))
@@ -168,3 +161,47 @@ def test_active_data_version_tracks_live_and_ptu_patches() -> None:
     )
 
     assert version == "LIVE-4.9.0-12232306,PTU-4.9.1-12240000"
+
+
+def test_mission_search_deduplicates_rewards_and_filters_reputation() -> None:
+    source = SCCraftToolsSource.__new__(SCCraftToolsSource)
+    source._snapshot = {
+        "items": [
+            {
+                "name": "Atlas Blueprint",
+                "version": "LIVE-4.9",
+                "missions": [{
+                    "mission_id": 42,
+                    "name": "A Call to Arms",
+                    "contractor": "CDF",
+                    "mission_type": "Bounty",
+                    "locations": "Stanton",
+                    "min_standing": {"name": "Member", "reputation": 800},
+                    "drop_chance": "0.5",
+                }],
+            },
+            {
+                "name": "VK-00 Blueprint",
+                "version": "LIVE-4.9",
+                "missions": [{
+                    "mission_id": 42,
+                    "name": "A Call to Arms",
+                    "contractor": "CDF",
+                    "mission_type": "Bounty",
+                    "locations": "Stanton",
+                    "min_standing": {"name": "Member", "reputation": 800},
+                    "drop_chance": "1",
+                }],
+            },
+        ]
+    }
+
+    results = asyncio.run(source.lookup_missions(region="stan", reputation_level="mem"))
+
+    assert len(results) == 1
+    assert results[0].name == "A Call to Arms"
+    assert results[0].min_standing_reputation == 800
+    assert [reward.name for reward in results[0].blueprint_rewards] == [
+        "Atlas Blueprint",
+        "VK-00 Blueprint",
+    ]

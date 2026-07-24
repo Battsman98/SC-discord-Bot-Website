@@ -77,6 +77,12 @@ body[data-mfd-theme="crusader"] {
   --ambient: rgba(60, 167, 232, 0.13); --glow: rgba(60, 167, 232, 0.27); --panel-tint: rgba(60, 167, 232, 0.04);
 }
 
+body[data-mfd-theme="crusader-missions"] {
+  --bg: #050d1c; --surface: #0a1830; --surface-2: #102544; --line: #315987;
+  --text: #edf7ff; --muted: #9bb7d3; --accent: #2f8fe5; --accent-2: #7ce4ff;
+  --ambient: rgba(47, 143, 229, 0.15); --glow: rgba(124, 228, 255, 0.3); --panel-tint: rgba(47, 143, 229, 0.05);
+}
+
 body[data-mfd-theme="rsi"] {
   --bg: #02070b; --surface: #0b151d; --surface-2: #152630; --line: #3d7188;
   --text: #e9f8ff; --muted: #8facbb; --accent: #32b9e6; --accent-2: #b4efff;

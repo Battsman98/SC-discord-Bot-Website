@@ -145,6 +145,27 @@ class BlueprintResult:
 
 
 @dataclass(frozen=True)
+class MissionBlueprintReward:
+    name: str
+    drop_chance: int | float | None
+
+
+@dataclass(frozen=True)
+class MissionResult:
+    mission_id: str | None
+    name: str
+    contractor: str | None
+    mission_type: str | None
+    region: str | None
+    min_standing_name: str | None
+    min_standing_reputation: int | float | None
+    version: str | None
+    blueprint_rewards: list[MissionBlueprintReward]
+    source_name: str
+    source_url: str
+
+
+@dataclass(frozen=True)
 class ItemPurchaseLocation:
     terminal_name: str
     system: str | None
@@ -256,6 +277,21 @@ class GameInfoSource(Protocol):
         ...
 
     async def autocomplete_blueprint_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        ...
+
+    async def lookup_missions(
+        self,
+        query: str | None = None,
+        region: str | None = None,
+        contractor: str | None = None,
+        reputation_level: str | None = None,
+        mission_type: str | None = None,
+        limit: int = 25,
+        page: int = 1,
+    ) -> list[MissionResult]:
+        ...
+
+    async def autocomplete_missions(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
         ...
 
     async def lookup_items(

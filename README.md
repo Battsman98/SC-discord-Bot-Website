@@ -19,6 +19,30 @@ Python Discord bot for collecting information from approved websites/APIs and se
 - `/commodity` looks up commodity pricing and locations.
 - `/industry split`, `/industry refinery`, and `/industry brief` plan crew payouts, completion times, and operation posts.
 - `/blueprint` searches crafting blueprints, materials, missions, and rep requirements.
+- `/mission` searches missions by name, region, reputation giver, reputation level, and type.
+
+Blueprint and mission searches read only from `data/blueprints_snapshot.json`.
+The running website and Discord bot do not automatically fetch or refresh this
+data; update the snapshot manually when you want to move to a newer game patch.
+
+To rebuild that snapshot manually from the installed game files:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\update_game_data_from_p4k.py
+```
+
+The importer defaults to `C:\StarCitizen\LIVE\Data.p4k`, keeps its large
+extraction cache outside the project under Local AppData, and never runs during
+website or bot startup.
+
+Authorized administrators can run the same manual import from **Audit → Game
+Database → Update Database**. The website displays the result and both website
+and Discord blueprint searches automatically reload the replaced snapshot on
+their next request.
+
+This update control is local-only because hosted servers cannot access the
+computer's `C:\StarCitizen` folder. Deployments use the most recently committed
+snapshot and clearly mark the local update control as unavailable.
 - `/trade routing` calculates UEX-based circular trade route candidates.
 - `/exec` shows the Executive Hangar clock.
 - `/execset` corrects the Executive Hangar clock for approved users.

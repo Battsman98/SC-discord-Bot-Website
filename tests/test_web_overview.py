@@ -205,6 +205,7 @@ def test_each_tool_page_has_a_manufacturer_mfd_theme() -> None:
         "trade": ("grey-market", "GREY MARKET EXCHANGE"),
         "mining": ("argo", "ARGO ASTRONAUTICS"),
         "crafting": ("anvil", "ANVIL AEROSPACE"),
+        "missions": ("crusader-missions", "CRUSADER INDUSTRIES // CONTRACTS"),
         "items": ("origin", "ORIGIN JUMPWORKS"),
         "inventory": ("rsi", "ROBERTS SPACE INDUSTRIES"),
         "timers": ("misc", "MISC INDUSTRIAL"),

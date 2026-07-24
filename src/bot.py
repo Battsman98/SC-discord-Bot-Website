@@ -19,6 +19,7 @@ from src.sources.base import (
     ItemPurchaseLocation,
     MiningLocationResult,
     MiningSystemLocations,
+    MissionResult,
     ShipResult,
     TradeRouteLeg,
     TradeRouteResult,
@@ -58,11 +59,7 @@ class GameAssistCommandTree(app_commands.CommandTree):
             return True
 
         command_name = _interaction_command_name(interaction)
-        allowed_channel_id = bot.settings.command_channel_ids.get(command_name)
-        if allowed_channel_id is None and command_name == "item search":
-            allowed_channel_id = bot.settings.command_channel_ids.get("item locator")
-        if command_name == "inventory search" and bot.inventory_channel_id:
-            allowed_channel_id = bot.inventory_channel_id
+        allowed_channel_id = _allowed_command_channel_id(bot, command_name)
         if allowed_channel_id and interaction.channel_id != allowed_channel_id:
             await interaction.response.send_message(
                 f"`/{command_name}` can only be used in <#{allowed_channel_id}>.",
@@ -117,6 +114,17 @@ class GameAssistCommandTree(app_commands.CommandTree):
             logging.warning("Could not send application-command error response")
 
 
+def _allowed_command_channel_id(bot: "GameAssistBot", command_name: str) -> int | None:
+    allowed_channel_id = bot.settings.command_channel_ids.get(command_name)
+    if allowed_channel_id is None and command_name == "mission":
+        allowed_channel_id = bot.settings.command_channel_ids.get("blueprint")
+    if allowed_channel_id is None and command_name == "item search":
+        allowed_channel_id = bot.settings.command_channel_ids.get("item locator")
+    if command_name == "inventory search" and bot.inventory_channel_id:
+        allowed_channel_id = bot.inventory_channel_id
+    return allowed_channel_id
+
+
 class GameAssistBot(commands.Bot):
     def __init__(self, settings: Settings, cache: SQLiteCache, sources: SourceRegistry) -> None:
         intents = discord.Intents.default()
@@ -147,6 +155,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(industry_group)
         self.tree.add_command(miningadd_command)
         self.tree.add_command(blueprint_command)
+        self.tree.add_command(mission_command)
         self.tree.add_command(item_group)
         self.tree.add_command(inventory_group)
         self.tree.add_command(exec_command)
@@ -1146,6 +1155,79 @@ async def blueprint_name_autocomplete(
 
     names = await bot.sources.autocomplete_blueprints(current)
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
+
+
+@app_commands.command(name="mission", description="Search Star Citizen missions and blueprint rewards.")
+@app_commands.describe(
+    name="Mission name.",
+    region="Region or star system.",
+    rep_giver="Contractor or reputation giver.",
+    rep_level="Required reputation level.",
+    mission_type="Mission category or type.",
+)
+async def mission_command(
+    interaction: discord.Interaction,
+    name: str | None = None,
+    region: str | None = None,
+    rep_giver: str | None = None,
+    rep_level: str | None = None,
+    mission_type: str | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    if not any([name, region, rep_giver, rep_level, mission_type]):
+        await interaction.response.send_message("Add a mission name or at least one filter.", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    try:
+        results = await bot.sources.lookup_missions(
+            query=name, region=region, contractor=rep_giver,
+            reputation_level=rep_level, mission_type=mission_type, limit=10,
+        )
+        if not results:
+            await interaction.followup.send("No missions found for those filters.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            embeds=[build_mission_embed(result) for result in results],
+            ephemeral=True,
+        )
+    except Exception:
+        logging.exception("Mission command failed")
+        await interaction.followup.send(
+            "Mission lookup hit an internal error. I logged the details so it can be fixed.",
+            ephemeral=True,
+        )
+
+
+@mission_command.autocomplete("name")
+@mission_command.autocomplete("region")
+@mission_command.autocomplete("rep_giver")
+@mission_command.autocomplete("rep_level")
+@mission_command.autocomplete("mission_type")
+async def mission_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+    field_map = {
+        "name": "name",
+        "region": "region",
+        "rep_giver": "contractor",
+        "rep_level": "reputation_level",
+        "mission_type": "mission_type",
+    }
+    focused = interaction.namespace
+    parameter = next(
+        (option.get("name") for option in interaction.data.get("options", []) if option.get("focused")),
+        "name",
+    )
+    del focused
+    values = await bot.sources.autocomplete_missions(field_map.get(parameter, "name"), current)
+    return [app_commands.Choice(name=value[:100], value=value[:100]) for value in values[:25]]
 
 
 @blueprint_command.autocomplete("category")
@@ -2479,6 +2561,42 @@ def build_blueprint_embed(
     return embed
 
 
+def build_mission_embed(result: MissionResult) -> discord.Embed:
+    embed = discord.Embed(
+        title=result.name,
+        url=result.source_url,
+        color=discord.Color(0x2F8FE5),
+    )
+    if result.contractor:
+        embed.add_field(name="Reputation Giver", value=result.contractor, inline=True)
+    if result.region:
+        embed.add_field(name="Region", value=result.region, inline=True)
+    if result.mission_type:
+        embed.add_field(name="Mission Type", value=result.mission_type, inline=True)
+    standing = " · ".join(filter(None, [
+        result.min_standing_name,
+        f"{result.min_standing_reputation:g} rep"
+        if result.min_standing_reputation is not None else None,
+    ]))
+    if standing:
+        embed.add_field(name="Required Reputation", value=standing, inline=False)
+    rewards = []
+    for reward in result.blueprint_rewards:
+        chance = f" ({reward.drop_chance * 100:g}%)" if reward.drop_chance is not None else ""
+        rewards.append(f"• {reward.name}{chance}")
+    embed.add_field(
+        name="Blueprint Rewards",
+        value="\n".join(rewards)[:1024] if rewards else "No blueprint reward in the current dataset.",
+        inline=False,
+    )
+    embed.set_footer(text=" · ".join(filter(None, [
+        "Crusader Industries Contract Network",
+        result.source_name,
+        result.version,
+    ])))
+    return embed
+
+
 def build_blueprint_selection_embed(
     results: list[BlueprintResult],
     category: str | None = None,
@@ -2872,6 +2990,11 @@ def build_command_channel_directory_embed(settings: Settings) -> discord.Embed:
     channel_commands: dict[int, list[str]] = {}
     for command_name, channel_id in settings.command_channel_ids.items():
         channel_commands.setdefault(channel_id, []).append(f"/{command_name}")
+    blueprint_channel = settings.command_channel_ids.get("blueprint")
+    if blueprint_channel and "mission" not in settings.command_channel_ids:
+        blueprint_commands = channel_commands.setdefault(blueprint_channel, [])
+        if "/mission" not in blueprint_commands:
+            blueprint_commands.append("/mission")
     inventory_commands = channel_commands.setdefault(INVENTORY_CHANNEL_ID, [])
     if "/inventory search" not in inventory_commands:
         inventory_commands.append("/inventory search")
