@@ -203,7 +203,7 @@ let inventoryImportItems = [];
 let inventoryScannerHistory = [];
 let inventoryScannerStatus = "";
 let inventoryScannerInFlight = 0;
-const inventoryScannerMaxInFlight = 1;
+const inventoryScannerMaxInFlight = 2;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
@@ -1422,6 +1422,7 @@ function renderInventoryScanProgress() {
     <div class="scanner-progress-heading">
       <h3>Scanner Results</h3>
       <span>${acceptedCount} found${reviewCount ? ` / ${reviewCount} needs review` : ""}</span>
+      ${reviewCount ? `<button type="button" data-scanner-dismiss-all>Remove all waiting</button>` : ""}
       ${timing}
     </div>
     <ul>
@@ -1429,12 +1430,15 @@ function renderInventoryScanProgress() {
         <span>${escapeHtml(entry.timestamp)}</span>
         <strong>${escapeHtml(entry.text)}</strong>
         <small>${escapeHtml(entry.detail || entry.status)}</small>
-        ${entry.status === "review" ? `<button type="button"
-          data-scanner-review-text="${escapeAttribute(entry.text)}"
-          data-scanner-review-name="${escapeAttribute(entry.suggestedName || "")}"
-          data-scanner-review-category="${escapeAttribute(entry.category || "")}"
-          data-scanner-review-type="${escapeAttribute(entry.itemType || "")}"
-          data-scanner-review-size="${escapeAttribute(entry.itemSize || "")}">Review</button>` : ""}
+        ${entry.status === "review" ? `<span class="scanner-review-actions">
+          <button type="button"
+            data-scanner-review-text="${escapeAttribute(entry.text)}"
+            data-scanner-review-name="${escapeAttribute(entry.suggestedName || "")}"
+            data-scanner-review-category="${escapeAttribute(entry.category || "")}"
+            data-scanner-review-type="${escapeAttribute(entry.itemType || "")}"
+            data-scanner-review-size="${escapeAttribute(entry.itemSize || "")}">Review</button>
+          <button type="button" data-scanner-dismiss-text="${escapeAttribute(entry.text)}">Remove</button>
+        </span>` : ""}
       </li>`).join("") || `<li class="waiting"><strong>No scanner results yet</strong><small>Keep hovering items while frames are captured.</small></li>`}
     </ul>
   </section>`;
@@ -1445,6 +1449,27 @@ function firstInventoryOcrLine(text) {
 }
 
 document.addEventListener("click", (event) => {
+  const dismissAll = event.target.closest("[data-scanner-dismiss-all]");
+  if (dismissAll) {
+    inventoryScannerHistory = inventoryScannerHistory.filter((entry) => entry.status !== "review");
+    renderInventoryImportItems(
+      { items: inventoryImportItems },
+      { scannerMode: true, recordHistory: false, liveScan: Boolean(inventoryScannerStream) },
+    );
+    return;
+  }
+  const dismiss = event.target.closest("[data-scanner-dismiss-text]");
+  if (dismiss) {
+    const text = dismiss.dataset.scannerDismissText || "";
+    inventoryScannerHistory = inventoryScannerHistory.filter(
+      (entry) => !(entry.status === "review" && entry.text === text),
+    );
+    renderInventoryImportItems(
+      { items: inventoryImportItems },
+      { scannerMode: true, recordHistory: false, liveScan: Boolean(inventoryScannerStream) },
+    );
+    return;
+  }
   const button = event.target.closest("[data-scanner-review-text]");
   if (!button) return;
   stopInventoryScanner(false);
