@@ -651,7 +651,7 @@ class SQLiteCache:
                 continue
             keeper = group[0]
             duplicates = group[1:]
-            quantity = max(float(row[4] or 0) for row in group)
+            quantity = sum(float(row[4] or 0) for row in group)
             quality = next((row[5] for row in group if row[5] is not None), None)
             category = next((row[2] for row in group if row[2]), None)
             item_type = next((row[6] for row in group if row[6]), None)

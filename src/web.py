@@ -270,6 +270,7 @@ async def lifespan(app: FastAPI):
     )
     try:
         await asyncio.to_thread(_initialize_rapid_ocr_pool)
+        await asyncio.to_thread(_initialize_rapid_title_ocr)
     except Exception:
         pass
     try:
@@ -295,6 +296,7 @@ _RAPID_OCR_LOCK = threading.Lock()
 _RAPID_OCR_POOL_SIZE = 1
 _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_SIZE)
 _RAPID_OCR_POOL_READY = False
+_RAPID_TITLE_OCR = None
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
 
@@ -1358,6 +1360,7 @@ async def import_inventory_from_images(
     default_category: str | None = None,
     scanner_mode: bool = False,
     live_scan: bool = False,
+    title_box: str | None = None,
     min_score: float = Query(default=0.72, ge=0, le=1),
     exclude_words: str | None = None,
     user=Depends(require_user),
@@ -1370,7 +1373,14 @@ async def import_inventory_from_images(
         )
     started_at = time.perf_counter()
     ocr_started_at = time.perf_counter()
-    ocr_text, ocr_error = await _ocr_blueprint_images(files)
+    calibration: dict[str, Any] | None = None
+    if scanner_mode and live_scan:
+        ocr_text, ocr_error, calibrated_box, fast_title = await _ocr_inventory_title_images(
+            files, title_box
+        )
+        calibration = {"title_box": calibrated_box, "fast_title": fast_title}
+    else:
+        ocr_text, ocr_error = await _ocr_blueprint_images(files)
     ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
     if scanner_mode:
         effective_min_score = max(min_score, 0.92) if live_scan else min_score
@@ -1395,6 +1405,7 @@ async def import_inventory_from_images(
             "ocr_error": ocr_error,
             "ocr_text": ocr_text,
             "items": items,
+            "calibration": calibration,
             "diagnostics": await _inventory_scanner_diagnostics(
                 ocr_text,
                 effective_min_score,
@@ -1568,6 +1579,101 @@ async def _ocr_blueprint_images(files: list[UploadFile]) -> tuple[str, str | Non
     return "\n".join(texts), None
 
 
+async def _ocr_inventory_title_images(
+    files: list[UploadFile],
+    title_box: str | None,
+) -> tuple[str, str | None, str | None, bool]:
+    for file in files[:1]:
+        data = await file.read()
+        if not data:
+            continue
+        try:
+            text, calibrated_box, used_fast = await asyncio.to_thread(
+                _read_inventory_title,
+                data,
+                title_box,
+            )
+            return text, None, calibrated_box, used_fast
+        except Exception as exc:
+            return "", f"Could not read {file.filename or 'image'}: {exc}", title_box, False
+    return "", None, title_box, False
+
+
+def _read_inventory_title(
+    image_data: bytes,
+    title_box: str | None,
+) -> tuple[str, str | None, bool]:
+    if title_box:
+        fast_text = _read_calibrated_inventory_title(image_data, title_box)
+        if fast_text:
+            return fast_text, title_box, True
+
+    _initialize_rapid_ocr_pool()
+    engine = _RAPID_OCR_POOL.get(timeout=30)
+    try:
+        result, _ = engine(image_data)
+    finally:
+        _RAPID_OCR_POOL.put(engine)
+    candidates = [
+        item for item in result or []
+        if len(item) > 1
+        and str(item[1]).strip()
+        and not _inventory_scanner_line_is_metadata(str(item[1]))
+    ]
+    if not candidates:
+        return "", None, False
+    title = str(candidates[0][1]).strip()
+    return title, _normalized_ocr_box(image_data, candidates[0][0]), False
+
+
+def _normalized_ocr_box(image_data: bytes, points: object) -> str | None:
+    try:
+        from PIL import Image
+        image = Image.open(BytesIO(image_data))
+        width, height = image.size
+        coordinates = list(points)
+        xs = [float(point[0]) for point in coordinates]
+        ys = [float(point[1]) for point in coordinates]
+        padding_x = max(2, (max(xs) - min(xs)) * 0.02)
+        padding_y = max(2, (max(ys) - min(ys)) * 0.12)
+        left = max(0, min(xs) - padding_x)
+        top = max(0, min(ys) - padding_y)
+        right = min(width, max(xs) + padding_x)
+        bottom = min(height, max(ys) + padding_y)
+        values = (left / width, top / height, (right - left) / width, (bottom - top) / height)
+        return ",".join(f"{value:.6f}" for value in values)
+    except Exception:
+        return None
+
+
+def _read_calibrated_inventory_title(image_data: bytes, title_box: str) -> str:
+    try:
+        from PIL import Image
+        values = [float(value) for value in title_box.split(",")]
+        if len(values) != 4 or any(value < 0 or value > 1 for value in values):
+            return ""
+        image = Image.open(BytesIO(image_data)).convert("RGB")
+        width, height = image.size
+        left = round(values[0] * width)
+        top = round(values[1] * height)
+        right = round((values[0] + values[2]) * width)
+        bottom = round((values[1] + values[3]) * height)
+        if right <= left or bottom <= top:
+            return ""
+        crop = image.crop((left, top, right, bottom))
+        output = BytesIO()
+        crop.save(output, format="PNG")
+        result, _ = _initialize_rapid_title_ocr()(output.getvalue())
+        text = " ".join(
+            str(item[1]).strip()
+            for item in result or []
+            if len(item) > 1 and str(item[1]).strip()
+        ).strip()
+        return "" if _inventory_scanner_line_is_metadata(text) else text
+    except Exception:
+        return ""
+
+
 def _read_image_text(image_data: bytes) -> str:
     rapid_text, rapid_error = _read_image_text_with_rapidocr(image_data)
     if rapid_text.strip() or rapid_error is None:
@@ -1597,7 +1703,7 @@ def _read_image_text_with_rapidocr(image_data: bytes) -> tuple[str, str | None]:
 
 
 def _initialize_rapid_ocr_pool() -> None:
-    """Warm independent OCR engines so two live captures can run concurrently."""
+    """Warm the full OCR engine used to calibrate the title position."""
     global _RAPID_OCR_POOL_READY
     if _RAPID_OCR_POOL_READY:
         return
@@ -1608,6 +1714,17 @@ def _initialize_rapid_ocr_pool() -> None:
         while _RAPID_OCR_POOL.qsize() < _RAPID_OCR_POOL_SIZE:
             _RAPID_OCR_POOL.put(RapidOCR())
         _RAPID_OCR_POOL_READY = True
+
+
+def _initialize_rapid_title_ocr():
+    global _RAPID_TITLE_OCR
+    if _RAPID_TITLE_OCR is not None:
+        return _RAPID_TITLE_OCR
+    from rapidocr_onnxruntime import RapidOCR
+    with _RAPID_OCR_LOCK:
+        if _RAPID_TITLE_OCR is None:
+            _RAPID_TITLE_OCR = RapidOCR(use_text_det=False, use_angle_cls=False)
+    return _RAPID_TITLE_OCR
 
 
 def _rapid_ocr_engine():

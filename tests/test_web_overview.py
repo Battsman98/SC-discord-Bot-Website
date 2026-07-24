@@ -230,7 +230,8 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
     assert 'canvas.toBlob(resolve, "image/webp", 0.9)' in javascript
-    assert 'if (options.liveScan) params.set("live_scan", "true")' in javascript
+    assert 'params.set("live_scan", "true")' in javascript
+    assert 'params.set("title_box", inventoryScannerTitleBox)' in javascript
 
 
 def test_live_inventory_scanner_retries_missed_reads_and_only_skips_exact_frames() -> None:

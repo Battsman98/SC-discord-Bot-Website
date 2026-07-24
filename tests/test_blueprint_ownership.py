@@ -429,7 +429,7 @@ def test_user_inventory_duplicate_merge_keeps_one_station_item(tmp_path) -> None
         assert len(items) == 1
         assert items[0]["name"] == "250-E Laser Pointer"
         assert items[0]["location"] == "Orison"
-        assert items[0]["quantity"] == 1
+        assert items[0]["quantity"] == 2
         await cache.close()
 
     asyncio.run(run())

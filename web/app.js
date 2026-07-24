@@ -214,6 +214,7 @@ let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
 let inventoryScannerLastCountedKey = "";
 let inventoryScannerLastCountedCaptureToken = "";
+let inventoryScannerTitleBox = "";
 let inventoryScannerEmptyReadStreak = 0;
 let inventoryScannerReadyToCount = true;
 const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
@@ -1617,6 +1618,7 @@ async function startInventoryScanner() {
   inventoryScannerLastContextHash = "";
   inventoryScannerLastCountedKey = "";
   inventoryScannerLastCountedCaptureToken = "";
+  inventoryScannerTitleBox = "";
   inventoryScannerEmptyReadStreak = 0;
   inventoryScannerReadyToCount = true;
   inventoryScannerStream = await navigator.mediaDevices.getDisplayMedia({
@@ -1746,6 +1748,9 @@ async function processInventoryScannerCapture(capture) {
     inventoryScannerLastContextHash = capture.contextHash;
     inventoryScannerEmptyReadStreak = 0;
   } else {
+    if (payload?.calibration?.fast_title) {
+      inventoryScannerTitleBox = "";
+    }
     inventoryScannerEmptyReadStreak += 1;
     if (inventoryScannerEmptyReadStreak >= 1) {
       inventoryScannerReadyToCount = true;
@@ -1995,7 +2000,10 @@ async function submitInventoryImages(files, options = {}) {
   if (category) params.set("default_category", category);
   if (options.scannerMode) {
     params.set("scanner_mode", "true");
-    if (options.liveScan) params.set("live_scan", "true");
+    if (options.liveScan) {
+      params.set("live_scan", "true");
+      if (inventoryScannerTitleBox) params.set("title_box", inventoryScannerTitleBox);
+    }
     params.set("min_score", String(Number(document.querySelector("#inventoryScannerMinScore")?.value || 0.72)));
     const excludeWords = document.querySelector("#inventoryScannerExcludeWords")?.value.trim();
     if (excludeWords) params.set("exclude_words", excludeWords);
@@ -2013,6 +2021,9 @@ async function submitInventoryImages(files, options = {}) {
         request_ms: Math.round(performance.now() - requestStartedAt),
         ...(payload.performance || {}),
       };
+      if (payload.calibration?.title_box) {
+        inventoryScannerTitleBox = payload.calibration.title_box;
+      }
     }
     if (payload.ocr_text && document.querySelector(".scanner-manual")?.open) {
       document.querySelector("#inventoryOcrText").value = payload.ocr_text;
@@ -2086,7 +2097,7 @@ async function annotateImportedInventoryRows(target) {
       const item = inventoryItemFromImportRow(row);
       const existing = await findExistingInventoryItem(item);
       if (existing) {
-        status.textContent = `Existing at station: ${existing.quantity ?? 0}. Save updates if higher.`;
+        status.textContent = `Existing at station: ${existing.quantity ?? 0}. Scanned quantity will be added.`;
         status.className = "merge";
       } else {
         status.textContent = "New at this station";
@@ -2113,7 +2124,7 @@ async function saveImportedInventoryRow(row, options = {}) {
         item_type: item.item_type || existing.item_type,
         item_size: item.item_size || existing.item_size,
         location: existing.location,
-        quantity: Math.max(Number(existing.quantity || 0), Number(item.quantity || 0)),
+        quantity: Number(existing.quantity || 0) + Number(item.quantity || 0),
         quality: item.quality ?? existing.quality,
         volume_scu: item.volume_scu ?? existing.volume_scu,
         notes: mergeInventoryNotes(existing.notes, item.notes),
