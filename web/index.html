@@ -23,6 +23,7 @@
       <button data-tab="trade">Trade</button>
       <button data-tab="mining">Mining</button>
       <button data-tab="crafting">Blueprints</button>
+      <button data-tab="missions">Missions</button>
       <button data-tab="items">Items</button>
       <button data-tab="inventory">Inventory</button>
       <button data-tab="timers">Timers</button>
@@ -40,6 +41,7 @@
         <button type="button" data-overview-tab="trade"><span>Trade</span><small>Find commodities and build routes</small></button>
         <button type="button" data-overview-tab="mining"><span>Mining</span><small>Locate materials and mining sites</small></button>
         <button type="button" data-overview-tab="crafting"><span>Blueprints</span><small>Search and manage blueprints</small></button>
+        <button type="button" data-overview-tab="missions"><span>Missions</span><small>Search contracts, reputation, and rewards</small></button>
         <button type="button" data-overview-tab="items"><span>Items</span><small>Look up equipment and components</small></button>
         <button type="button" data-overview-tab="inventory"><span>Inventory</span><small>Track items across locations</small></button>
         <button type="button" data-overview-tab="timers"><span>Timers</span><small>View event and zone timers</small></button>
@@ -287,6 +289,24 @@
       <div id="craftingOutput" class="results"></div>
     </section>
 
+    <section id="missions" class="tab-panel">
+      <form class="panel form wide" data-action="missions">
+        <h2>Mission Search</h2>
+        <p class="form-note">Mission results use the same local, manually updated game-data file as Blueprint Search.</p>
+        <div class="field-row">
+          <input name="query" placeholder="Mission name">
+          <input name="region" placeholder="Region (Stanton, Pyro)">
+          <input name="contractor" placeholder="Reputation giver">
+        </div>
+        <div class="field-row">
+          <input name="reputation_level" placeholder="Reputation level">
+          <input name="mission_type" placeholder="Mission type">
+        </div>
+        <button type="submit">Search Missions</button>
+      </form>
+      <div id="missionsOutput" class="results"></div>
+    </section>
+
     <section id="items" class="tab-panel">
       <form class="panel form wide" data-action="items">
         <h2>Item Locator</h2>
@@ -519,6 +539,16 @@
     </section>
 
     <section id="admin" class="tab-panel">
+        <article class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Game Database</h2>
+              <p>Manually rebuild mission and blueprint data from <code>C:\StarCitizen\LIVE\Data.p4k</code>.</p>
+            </div>
+            <button type="button" data-action-button="updateGameData">Update Database</button>
+          </div>
+          <div id="gameDataUpdateOutput" class="mini-output" aria-live="polite"></div>
+        </article>
         <article class="panel">
           <div class="panel-heading">
             <div>

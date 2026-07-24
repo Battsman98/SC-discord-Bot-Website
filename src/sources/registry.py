@@ -8,6 +8,7 @@ from src.sources.base import (
     GameInfoSource,
     ItemLocatorResult,
     LookupResult,
+    MissionResult,
     MiningLocationResult,
     ShipResult,
     TradeRouteResult,
@@ -243,6 +244,30 @@ class SourceRegistry:
             if lookup is None:
                 continue
             results = await lookup(query, category, section, size, limit, page)
+            if results:
+                return results
+        return []
+
+    async def lookup_missions(
+        self, query: str | None = None, region: str | None = None,
+        contractor: str | None = None, reputation_level: str | None = None,
+        mission_type: str | None = None, limit: int = 25, page: int = 1,
+    ) -> list[MissionResult]:
+        for source in self._sources:
+            lookup = getattr(source, "lookup_missions", None)
+            if lookup is None:
+                continue
+            results = await lookup(query, region, contractor, reputation_level, mission_type, limit, page)
+            if results:
+                return results
+        return []
+
+    async def autocomplete_missions(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_missions", None)
+            if autocomplete is None:
+                continue
+            results = await autocomplete(filter_name, query, limit)
             if results:
                 return results
         return []

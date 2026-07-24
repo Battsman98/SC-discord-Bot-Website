@@ -10,6 +10,7 @@ const outputs = {
   refineryTimer: document.querySelector("#refineryTimerOutput"),
   operationBrief: document.querySelector("#operationBriefOutput"),
   crafting: document.querySelector("#craftingOutput"),
+  missions: document.querySelector("#missionsOutput"),
   blueprintImport: document.querySelector("#blueprintImportOutput"),
   savedBlueprints: document.querySelector("#savedBlueprintsOutput"),
   items: document.querySelector("#itemsOutput"),
@@ -19,6 +20,7 @@ const outputs = {
   cz: document.querySelector("#czOutput"),
   audit: document.querySelector("#auditOutput"),
   visitorAnalytics: document.querySelector("#visitorAnalyticsOutput"),
+  gameDataUpdate: document.querySelector("#gameDataUpdateOutput"),
   intel: document.querySelector("#intelOutput"),
   warbonds: document.querySelector("#warbondOutput"),
 };
@@ -38,6 +40,7 @@ const mfdThemes = {
   trade: { theme: "grey-market", label: "GREY MARKET EXCHANGE" },
   mining: { theme: "argo", label: "ARGO ASTRONAUTICS" },
   crafting: { theme: "anvil", label: "ANVIL AEROSPACE" },
+  missions: { theme: "crusader-missions", label: "CRUSADER INDUSTRIES // CONTRACTS" },
   items: { theme: "origin", label: "ORIGIN JUMPWORKS" },
   inventory: { theme: "rsi", label: "ROBERTS SPACE INDUSTRIES" },
   timers: { theme: "misc", label: "MISC INDUSTRIAL" },
@@ -169,6 +172,7 @@ document.querySelector("[data-action-button='clearExec']").addEventListener("cli
 });
 
 document.querySelector("[data-action-button='refreshAudit']").addEventListener("click", loadAudit);
+document.querySelector("[data-action-button='updateGameData']")?.addEventListener("click", startGameDataUpdate);
 document.querySelector("[data-action-button='refreshIntel']")?.addEventListener("click", () => loadIntel(true));
 document.querySelector("[data-action-button='refreshWarbonds']")?.addEventListener("click", () => loadWarbonds(true));
 document.querySelector("#auditActionType")?.addEventListener("change", loadAudit);
@@ -354,6 +358,11 @@ async function handleForm(action, form) {
       const params = queryParams(data, ["query", "category", "material", "mission_type", "contractor", "location"]);
       await loadSavedBlueprints({ quiet: true });
       renderCards(outputs.crafting, await api(`/api/blueprints?${params}`), renderBlueprint);
+    }
+    if (action === "missions") {
+      setLoading(outputs.missions);
+      const params = queryParams(data, ["query", "region", "contractor", "reputation_level", "mission_type"]);
+      renderCards(outputs.missions, await api(`/api/missions?${params}`), renderMission);
     }
     if (action === "items") {
       setLoading(outputs.items);
@@ -660,6 +669,30 @@ function renderTrade(route, request = {}) {
     ["Loop", loopDescription],
     ["Route Legs", `${legs}${returnLine}`],
   ], `<p class="result-source">Source: ${escapeHtml(route.source_name)} average prices, stock, and demand</p>`);
+}
+
+function renderMission(item) {
+  const standing = [
+    item.min_standing_name,
+    item.min_standing_reputation !== null && item.min_standing_reputation !== undefined
+      ? `${number(item.min_standing_reputation)} rep`
+      : null,
+  ].filter(Boolean).join(" · ");
+  const rewards = item.blueprint_rewards?.map((reward) => {
+    const chance = reward.drop_chance === null || reward.drop_chance === undefined
+      ? ""
+      : ` (${number(Number(reward.drop_chance) * 100)}%)`;
+    return `${escapeHtml(reward.name)}${chance}`;
+  }).join("<br>");
+  return card(item.name, [
+    ["Reputation giver", item.contractor],
+    ["Region", item.region],
+    ["Mission type", item.mission_type],
+    ["Required reputation", standing],
+    ["Blueprint rewards", rewards || "No blueprint reward in the current dataset"],
+    ["Game version", item.version],
+    ["Source", link(item.source_url, item.source_name)],
+  ]);
 }
 
 function tradeRouteLocation(system, planet, location, terminal) {
@@ -2598,6 +2631,7 @@ async function loadAudit() {
       api(`/api/audit/recent?${params}`),
     ]);
     renderVisitorAnalytics(analytics);
+    await loadGameDataUpdateStatus();
     renderCards(outputs.audit, events, (event) => card(event.title, [
       ["Action type", auditActionLabel(event.action_type)],
       ["When", dateTime(event.created_at)],
@@ -2607,6 +2641,57 @@ async function loadAudit() {
     outputs.audit.innerHTML = errorMessage(error.message);
     if (outputs.visitorAnalytics) outputs.visitorAnalytics.innerHTML = errorMessage(error.message);
   }
+}
+
+let gameDataStatusTimer = null;
+
+async function startGameDataUpdate() {
+  const button = document.querySelector("[data-action-button='updateGameData']");
+  if (button) button.disabled = true;
+  try {
+    const status = await api("/api/audit/game-data/update", { method: "POST", admin: true });
+    renderGameDataUpdateStatus(status);
+    scheduleGameDataStatusPoll();
+  } catch (error) {
+    if (outputs.gameDataUpdate) outputs.gameDataUpdate.innerHTML = errorMessage(error.message);
+    if (button) button.disabled = false;
+  }
+}
+
+async function loadGameDataUpdateStatus() {
+  if (!currentUser.can_manage_admin || !outputs.gameDataUpdate) return;
+  try {
+    const status = await api("/api/audit/game-data/status");
+    renderGameDataUpdateStatus(status);
+    if (status.state === "running") scheduleGameDataStatusPoll();
+  } catch (error) {
+    outputs.gameDataUpdate.innerHTML = errorMessage(error.message);
+  }
+}
+
+function renderGameDataUpdateStatus(status) {
+  if (!outputs.gameDataUpdate) return;
+  const button = document.querySelector("[data-action-button='updateGameData']");
+  const running = status.state === "running";
+  if (button) {
+    button.disabled = running || status.available === false;
+    button.textContent = running ? "Updating..." : status.available === false ? "Local Only" : "Update Database";
+  }
+  const details = [
+    status.version && `Version: ${status.version}`,
+    status.blueprints !== undefined && `Blueprints: ${number(status.blueprints)}`,
+    status.missions !== undefined && `Missions: ${number(status.missions)}`,
+  ].filter(Boolean).join(" · ");
+  outputs.gameDataUpdate.innerHTML = `<p class="state">${escapeHtml(status.message || "Ready.")}</p>${details ? `<small>${escapeHtml(details)}</small>` : ""}`;
+}
+
+function scheduleGameDataStatusPoll() {
+  window.clearTimeout(gameDataStatusTimer);
+  gameDataStatusTimer = window.setTimeout(async () => {
+    await loadGameDataUpdateStatus();
+    const button = document.querySelector("[data-action-button='updateGameData']");
+    if (button?.disabled) scheduleGameDataStatusPoll();
+  }, 3000);
 }
 
 function renderVisitorAnalytics(data) {
@@ -2700,6 +2785,7 @@ function outputForAction(action) {
   if (action === "refineryTimer") return outputs.refineryTimer;
   if (action === "operationBrief") return outputs.operationBrief;
   if (action === "blueprints") return outputs.crafting;
+  if (action === "missions") return outputs.missions;
   if (action === "items") return outputs.items;
   if (action.startsWith("inventory")) return outputs.inventory;
   return outputs.exec;

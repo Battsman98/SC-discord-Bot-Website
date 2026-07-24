@@ -9,6 +9,7 @@ from src.bot import (
     build_command_channel_directory_embed,
     GameAssistBot,
     INVENTORY_CHANNEL_ID,
+    _allowed_command_channel_id,
     _format_interaction_options,
     _interaction_command_name,
     _message_embed_matches,
@@ -74,6 +75,7 @@ def test_command_channel_directory_groups_commands_by_channel() -> None:
             "ship": 111,
             "commodity": 222,
             "trade routing": 222,
+            "blueprint": 333,
         },
         command_prefix="!",
         database_path="data/test.sqlite3",
@@ -85,6 +87,7 @@ def test_command_channel_directory_groups_commands_by_channel() -> None:
 
     assert "<#111>: /ship" in embed.description
     assert "<#222>: /commodity, /trade routing" in embed.description
+    assert "<#333>: /blueprint, /mission" in embed.description
     assert f"<#{INVENTORY_CHANNEL_ID}>: /inventory search" in embed.description
 
 
@@ -101,6 +104,15 @@ def test_message_embed_matches_existing_embed_payload() -> None:
 def test_inventory_search_command_is_registered() -> None:
     assert inventory_group.get_command("search") is not None
     assert INVENTORY_CHANNEL_ID == 1528623944947597383
+
+
+def test_mission_command_uses_blueprint_channel_by_default() -> None:
+    bot = SimpleNamespace(
+        settings=SimpleNamespace(command_channel_ids={"blueprint": 2468}),
+        inventory_channel_id=INVENTORY_CHANNEL_ID,
+    )
+
+    assert _allowed_command_channel_id(bot, "mission") == 2468
 
 
 def test_industry_planning_commands_are_registered() -> None:

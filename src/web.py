@@ -2,9 +2,12 @@ import asyncio
 import difflib
 import hashlib
 import html
+import json
+import os
 import queue
 import re
 import secrets
+import sys
 import threading
 from io import BytesIO
 import time
@@ -168,6 +171,8 @@ class AppState:
     updates: CitizenUpdatesSource
     warbonds: WarbondTrackerSource
     item_catalog_task: asyncio.Task | None
+    game_data_update_task: asyncio.Task | None
+    game_data_update_status: dict[str, Any]
 
 
 class MiningCommunityRequest(BaseModel):
@@ -264,6 +269,17 @@ async def lifespan(app: FastAPI):
     app.state.game_assist.sources = sources
     app.state.game_assist.updates = updates
     app.state.game_assist.warbonds = warbonds
+    app.state.game_assist.game_data_update_task = None
+    local_game_available = os.name == "nt" and Path(r"C:\StarCitizen\LIVE\Data.p4k").exists()
+    app.state.game_assist.game_data_update_status = {
+        "state": "idle" if local_game_available else "unavailable",
+        "available": local_game_available,
+        "message": (
+            "Ready to update from the installed Star Citizen game files."
+            if local_game_available
+            else "Local game updates are only available on the Windows computer containing Data.p4k."
+        ),
+    }
     app.state.game_assist.item_catalog_task = asyncio.create_task(
         _item_catalog_maintenance_loop(sources),
         name="item-catalog-maintenance",
@@ -276,6 +292,11 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        game_data_task = app.state.game_assist.game_data_update_task
+        if game_data_task is not None and not game_data_task.done():
+            game_data_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await game_data_task
         app.state.game_assist.item_catalog_task.cancel()
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.item_catalog_task
@@ -398,6 +419,7 @@ def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:
         ("/api/commodities", "trade", "Website Commodity Search"),
         ("/api/trade", "trade", "Website Trade Route Search"),
         ("/api/blueprints", "blueprints", "Website Blueprint Search"),
+        ("/api/missions", "blueprints", "Website Mission Search"),
         ("/api/items", "items", "Website Item Search"),
         ("/api/exec", "timers", "Website Executive Timer Action"),
         ("/api/cz", "timers", "Website CZ Timer Action"),
@@ -418,6 +440,7 @@ def _website_has_explicit_audit(method: str, path: str) -> bool:
         path == "/api/mining/community"
         or path == "/api/exec/override"
         or path.startswith("/api/cz/timers")
+        or path == "/api/audit/game-data/update"
     )
 def _website_audit_user(user: Any) -> str:
     if user is None:
@@ -2669,6 +2692,28 @@ async def trade_routes(
     return encode(result)
 
 
+@app.get("/api/missions")
+async def missions(
+    query: str | None = None,
+    region: str | None = None,
+    contractor: str | None = None,
+    reputation_level: str | None = None,
+    mission_type: str | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    page: int = Query(default=1, ge=1),
+) -> list[dict[str, Any]]:
+    return encode(await state().sources.lookup_missions(
+        query=query, region=region, contractor=contractor,
+        reputation_level=reputation_level, mission_type=mission_type,
+        limit=limit, page=page,
+    ))
+
+
+@app.get("/api/autocomplete/missions")
+async def autocomplete_missions(filter_name: str = "name", query: str = "") -> list[str]:
+    return await state().sources.autocomplete_missions(filter_name, query)
+
+
 @app.get("/api/autocomplete/trade-locations")
 async def autocomplete_trade_locations(query: str = "") -> list[str]:
     return await state().sources.autocomplete_trade_locations(query)
@@ -2777,6 +2822,102 @@ async def audit_recent(
 @app.get("/api/audit/visitors")
 async def audit_visitors(_: None = Depends(require_bot_admin)) -> dict[str, Any]:
     return await state().cache.website_visitor_analytics()
+
+
+@app.get("/api/audit/game-data/status")
+async def game_data_update_status(_: None = Depends(require_bot_admin)) -> dict[str, Any]:
+    return dict(state().game_data_update_status)
+
+
+@app.post("/api/audit/game-data/update")
+async def start_game_data_update(
+    request: Request,
+    _: None = Depends(require_bot_admin),
+) -> dict[str, Any]:
+    if not state().game_data_update_status.get("available"):
+        raise HTTPException(
+            status_code=503,
+            detail="This server cannot access C:\\StarCitizen\\LIVE\\Data.p4k. Run the update from the local Windows website.",
+        )
+    existing = state().game_data_update_task
+    if existing is not None and not existing.done():
+        raise HTTPException(status_code=409, detail="A game database update is already running.")
+    user = current_user_from_request(request, state().settings)
+    state().game_data_update_status = {
+        "state": "running",
+        "available": True,
+        "message": "Reading Data.p4k and rebuilding the local mission and blueprint database...",
+        "started_at": int(time.time()),
+    }
+    state().game_data_update_task = asyncio.create_task(
+        _run_game_data_update(_website_audit_user(user)),
+        name="game-data-update",
+    )
+    return dict(state().game_data_update_status)
+
+
+async def _run_game_data_update(triggered_by: str) -> None:
+    script = Path(__file__).resolve().parents[1] / "scripts" / "update_game_data_from_p4k.py"
+    process = None
+    try:
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            str(script),
+            cwd=str(script.parent.parent),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=45 * 60)
+        output = stdout.decode("utf-8", errors="replace").strip()
+        error_output = stderr.decode("utf-8", errors="replace").strip()
+        if process.returncode:
+            raise RuntimeError(error_output or output or f"Importer exited with code {process.returncode}.")
+        summary = output.splitlines()[-1] if output else "Game database updated."
+        snapshot_path = Path(__file__).resolve().parents[1] / "data" / "blueprints_snapshot.json"
+        payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        status = {
+            "state": "complete",
+            "available": True,
+            "message": summary,
+            "finished_at": int(time.time()),
+            "version": (payload.get("source") or {}).get("version"),
+            "blueprints": len(payload.get("items") or []),
+            "missions": len(payload.get("missions") or []),
+        }
+        state().game_data_update_status = status
+        await state().cache.add_audit_event(
+            "Local Game Database Updated",
+            {
+                "Source": r"C:\StarCitizen\LIVE\Data.p4k",
+                "User": triggered_by,
+                "Version": status["version"] or "Unknown",
+                "Blueprints": status["blueprints"],
+                "Missions": status["missions"],
+            },
+            "admin",
+        )
+    except asyncio.TimeoutError:
+        if process is not None and process.returncode is None:
+            process.kill()
+            await process.wait()
+        state().game_data_update_status = {
+            "state": "failed",
+            "available": True,
+            "message": "The game database update exceeded 45 minutes and was stopped.",
+            "finished_at": int(time.time()),
+        }
+    except asyncio.CancelledError:
+        if process is not None and process.returncode is None:
+            process.kill()
+            await process.wait()
+        raise
+    except Exception as error:
+        state().game_data_update_status = {
+            "state": "failed",
+            "available": True,
+            "message": str(error)[:1000],
+            "finished_at": int(time.time()),
+        }
 
 
 app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")

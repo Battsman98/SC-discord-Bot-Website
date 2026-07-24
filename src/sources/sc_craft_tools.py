@@ -7,12 +7,18 @@ import aiohttp
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import BlueprintIngredient, BlueprintMission, BlueprintResult
+from src.sources.base import (
+    BlueprintIngredient,
+    BlueprintMission,
+    BlueprintResult,
+    MissionBlueprintReward,
+    MissionResult,
+)
 
 
 class SCCraftToolsSource:
-    name = "SC Craft Tools"
-    base_url = "https://sc-craft.tools"
+    name = "Local Star Citizen Game Files"
+    base_url = "/"
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -21,6 +27,7 @@ class SCCraftToolsSource:
         self._config: dict | None = None
         self._config_expires_at = 0.0
         self._snapshot: dict | None = None
+        self._snapshot_mtime_ns: int | None = None
 
     async def lookup(self, query: str):
         return None
@@ -88,64 +95,32 @@ class SCCraftToolsSource:
         if location:
             params["location"] = location
 
-        # Tie cached searches to the provider's active game data.  A patch can add
-        # blueprints for a query that previously returned no rows, so a static
-        # cache namespace can otherwise hide new content after the provider has
-        # already updated.
-        config = await self._get_config()
-        data_version = self._active_data_version(config)
-        cache_key = f"sc-craft:blueprints:v6:{data_version}:{urlencode(params, doseq=True)}"
-        cached = await self._cache.get(cache_key)
-        if isinstance(cached, list) and cached:
-            return [self._blueprint_from_cache(row) for row in cached if isinstance(row, dict)]
-        if cached == []:
-            await self._cache.delete(cache_key)
-
-        payloads = []
-        payload = await self._fetch_json(f"{self.base_url}/api/blueprints?{urlencode(params)}")
-        if isinstance(payload, dict):
-            payloads.append(payload)
-
-        pagination = payload.get("pagination") if isinstance(payload, dict) else {}
-        total_pages = self._int_or_none(pagination.get("pages") if isinstance(pagination, dict) else None) or 1
-        for page_number in range(2, total_pages + 1):
-            params["page"] = page_number
-            payload = await self._fetch_json(f"{self.base_url}/api/blueprints?{urlencode(params)}")
-            if isinstance(payload, dict):
-                payloads.append(payload)
-
-        rows = []
-        for payload in payloads:
-            payload_rows = payload.get("items") if isinstance(payload, dict) else []
-            if isinstance(payload_rows, list):
-                rows.extend(row for row in payload_rows if isinstance(row, dict))
-
-        if not rows:
-            rows = self._snapshot_rows(params)
-
-        missions = config.get("missions") if isinstance(config, dict) else {}
-        results = [
-            self._parse_blueprint(row, missions if isinstance(missions, dict) else {})
+        rows = self._snapshot_rows(params)
+        return [
+            self._parse_blueprint(row, {})
             for row in rows
             if isinstance(row, dict)
         ]
-        # Never negative-cache blueprint searches.  New patch data may arrive at
-        # any time, and retrying an empty lookup is inexpensive and self-healing.
-        if results:
-            await self._cache.set(
-                cache_key,
-                [self._blueprint_to_cache(result) for result in results],
-                self._settings.cache_ttl_seconds,
-            )
-        return results
 
     def _snapshot_rows(self, params: dict) -> list[dict]:
-        if self._snapshot is None:
-            path = Path(__file__).resolve().parents[2] / "data" / "blueprints_snapshot.json"
+        path = Path(__file__).resolve().parents[2] / "data" / "blueprints_snapshot.json"
+        try:
+            mtime_ns = path.stat().st_mtime_ns
+        except OSError:
+            mtime_ns = None
+        if (
+            getattr(self, "_snapshot", None) is None
+            or (
+                hasattr(self, "_snapshot_mtime_ns")
+                and self._snapshot_mtime_ns != mtime_ns
+            )
+        ):
             try:
                 self._snapshot = json.loads(path.read_text(encoding="utf-8"))
+                self._snapshot_mtime_ns = mtime_ns
             except (OSError, ValueError):
                 self._snapshot = {}
+                self._snapshot_mtime_ns = mtime_ns
         rows = self._snapshot.get("items") if isinstance(self._snapshot, dict) else []
         if not isinstance(rows, list):
             return []
@@ -174,16 +149,166 @@ class SCCraftToolsSource:
             matches.append(row)
         return matches
 
+    async def lookup_missions(
+        self,
+        query: str | None = None,
+        region: str | None = None,
+        contractor: str | None = None,
+        reputation_level: str | None = None,
+        mission_type: str | None = None,
+        limit: int = 25,
+        page: int = 1,
+    ) -> list[MissionResult]:
+        self._snapshot_rows({})
+        direct_rows = self._snapshot.get("missions") if isinstance(self._snapshot, dict) else []
+        if isinstance(direct_rows, list) and direct_rows:
+            return self._filter_direct_missions(
+                direct_rows, query, region, contractor, reputation_level,
+                mission_type, limit, page,
+            )
+        rows = self._snapshot_rows({})
+        missions: dict[str, dict] = {}
+        for blueprint in rows:
+            blueprint_name = self._string_or_none(blueprint.get("name"))
+            version = self._string_or_none(blueprint.get("version"))
+            for row in blueprint.get("missions", []) if isinstance(blueprint.get("missions"), list) else []:
+                if not isinstance(row, dict):
+                    continue
+                mission_name = str(row.get("name") or "Unknown mission")
+                mission_id = self._string_or_none(row.get("mission_id"))
+                key = mission_id or "|".join(
+                    self._normalize(row.get(field)) for field in ("name", "contractor", "locations")
+                )
+                standing = row.get("min_standing") if isinstance(row.get("min_standing"), dict) else {}
+                entry = missions.setdefault(key, {
+                    "mission_id": mission_id,
+                    "name": mission_name,
+                    "contractor": self._string_or_none(row.get("contractor")),
+                    "mission_type": self._string_or_none(row.get("mission_type")),
+                    "region": self._string_or_none(row.get("locations")),
+                    "min_standing_name": self._string_or_none(standing.get("name")),
+                    "min_standing_reputation": self._number_or_none(standing.get("reputation")),
+                    "version": version,
+                    "rewards": {},
+                })
+                if blueprint_name:
+                    entry["rewards"][blueprint_name] = self._number_or_none(row.get("drop_chance"))
+
+        def matches(value: object, wanted: str | None) -> bool:
+            return not wanted or self._normalize(wanted) in self._normalize(value)
+
+        results = []
+        for entry in missions.values():
+            searchable = " ".join(str(entry.get(field) or "") for field in (
+                "name", "contractor", "mission_type", "region", "min_standing_name"
+            ))
+            if not matches(searchable, query):
+                continue
+            if not matches(entry["region"], region) or not matches(entry["contractor"], contractor):
+                continue
+            if not matches(entry["min_standing_name"], reputation_level):
+                continue
+            if not matches(entry["mission_type"], mission_type):
+                continue
+            results.append(MissionResult(
+                mission_id=entry["mission_id"],
+                name=entry["name"],
+                contractor=entry["contractor"],
+                mission_type=entry["mission_type"],
+                region=entry["region"],
+                min_standing_name=entry["min_standing_name"],
+                min_standing_reputation=entry["min_standing_reputation"],
+                version=entry["version"],
+                blueprint_rewards=[
+                    MissionBlueprintReward(name=name, drop_chance=chance)
+                    for name, chance in sorted(entry["rewards"].items())
+                ],
+                source_name=self.name,
+            source_url="/#missions",
+            ))
+        results.sort(key=lambda item: (
+            self._normalize(item.contractor),
+            item.min_standing_reputation if item.min_standing_reputation is not None else -1,
+            self._normalize(item.name),
+        ))
+        offset = max(0, page - 1) * limit
+        return results[offset:offset + limit]
+
+    def _filter_direct_missions(
+        self, rows: list, query: str | None, region: str | None,
+        contractor: str | None, reputation_level: str | None,
+        mission_type: str | None, limit: int, page: int,
+    ) -> list[MissionResult]:
+        def matches(value: object, wanted: str | None) -> bool:
+            return not wanted or self._normalize(wanted) in self._normalize(value)
+
+        results = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            standing = row.get("min_standing") if isinstance(row.get("min_standing"), dict) else {}
+            searchable = " ".join(str(row.get(field) or "") for field in (
+                "name", "contractor", "mission_type", "locations"
+            ))
+            if not matches(searchable, query):
+                continue
+            if not matches(row.get("locations"), region) or not matches(row.get("contractor"), contractor):
+                continue
+            if not matches(standing.get("name"), reputation_level):
+                continue
+            if not matches(row.get("mission_type"), mission_type):
+                continue
+            rewards = row.get("blueprint_rewards") if isinstance(row.get("blueprint_rewards"), list) else []
+            results.append(MissionResult(
+                mission_id=self._string_or_none(row.get("mission_id")),
+                name=str(row.get("name") or "Unknown mission"),
+                contractor=self._string_or_none(row.get("contractor")),
+                mission_type=self._string_or_none(row.get("mission_type")),
+                region=self._string_or_none(row.get("locations")),
+                min_standing_name=self._string_or_none(standing.get("name")),
+                min_standing_reputation=self._number_or_none(standing.get("reputation")),
+                version=self._string_or_none(row.get("version")),
+                blueprint_rewards=[
+                    MissionBlueprintReward(
+                        name=str(reward.get("name") or "Unknown blueprint"),
+                        drop_chance=self._number_or_none(reward.get("drop_chance")),
+                    )
+                    for reward in rewards if isinstance(reward, dict)
+                ],
+                source_name=self.name,
+                source_url="/#missions",
+            ))
+        results.sort(key=lambda item: (
+            self._normalize(item.contractor),
+            item.min_standing_reputation if item.min_standing_reputation is not None else -1,
+            self._normalize(item.name),
+        ))
+        offset = max(0, page - 1) * limit
+        return results[offset:offset + limit]
+
+    async def autocomplete_missions(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        results = await self.lookup_missions(limit=10000)
+        attribute = {
+            "name": "name",
+            "region": "region",
+            "contractor": "contractor",
+            "reputation_level": "min_standing_name",
+            "mission_type": "mission_type",
+        }.get(filter_name, "name")
+        values = sorted({
+            str(getattr(result, attribute))
+            for result in results
+            if getattr(result, attribute)
+        })
+        normalized = self._normalize(query)
+        starts = [value for value in values if self._normalize(value).startswith(normalized)]
+        contains = [value for value in values if normalized in self._normalize(value) and value not in starts]
+        return (starts + contains)[:limit]
+
     async def autocomplete_blueprints(self, query: str, limit: int = 25) -> list[str]:
         if not query.strip():
             return []
-
-        payload = await self._fetch_json(
-            f"{self.base_url}/api/blueprints?{urlencode({'search': query, 'limit': limit, 'page': 1})}"
-        )
-        rows = payload.get("items") if isinstance(payload, dict) else []
-        if not isinstance(rows, list):
-            return []
+        rows = self._snapshot_rows({"search": query})
         return [
             str(row.get("name"))
             for row in rows
@@ -192,17 +317,27 @@ class SCCraftToolsSource:
 
     async def autocomplete_blueprint_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
         filter_name = self._api_filter_name(filter_name)
-        config = await self._get_config()
-        hints = config.get("filterHints") if isinstance(config, dict) else {}
-        values = hints.get(filter_name) if isinstance(hints, dict) else []
+        rows = self._snapshot_rows({})
         names = []
-        for value in values if isinstance(values, list) else []:
-            if isinstance(value, dict):
-                name = value.get("name")
+        for row in rows:
+            if filter_name == "category":
+                name = self._display_category(row.get("category"))
+                if name:
+                    names.append(name)
+            elif filter_name == "resource":
+                ingredients = row.get("ingredients") if isinstance(row.get("ingredients"), list) else []
+                names.extend(
+                    str(item.get("name"))
+                    for item in ingredients
+                    if isinstance(item, dict) and item.get("name")
+                )
             else:
-                name = value
-            if name:
-                names.append(self._display_category(str(name)) if filter_name == "category" else str(name))
+                missions = row.get("missions") if isinstance(row.get("missions"), list) else []
+                names.extend(
+                    str(item.get(filter_name))
+                    for item in missions
+                    if isinstance(item, dict) and item.get(filter_name)
+                )
         names = list(dict.fromkeys(names))
 
         normalized_query = self._normalize(query)
@@ -274,7 +409,7 @@ class SCCraftToolsSource:
                 if isinstance(mission, dict)
             ],
             source_name=self.name,
-            source_url=f"{self.base_url}/?{urlencode({'search': name})}",
+            source_url="/#crafting",
             component_size=self._component_size(raw_category),
         )
 
@@ -322,15 +457,11 @@ class SCCraftToolsSource:
     async def _category_filter_values(self, category: str | None) -> list[str | None]:
         if not category:
             return [None]
-
-        config = await self._get_config()
-        hints = config.get("filterHints") if isinstance(config, dict) else {}
-        values = hints.get("category") if isinstance(hints, dict) else []
-        raw_categories = []
-        for value in values if isinstance(values, list) else []:
-            raw = value.get("name") if isinstance(value, dict) else value
-            if raw:
-                raw_categories.append(str(raw))
+        raw_categories = [
+            str(row.get("category"))
+            for row in self._snapshot_rows({})
+            if row.get("category")
+        ]
 
         normalized_category = self._normalize(category)
         matches = [
