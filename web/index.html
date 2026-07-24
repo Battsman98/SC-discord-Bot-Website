@@ -357,9 +357,10 @@
           <button type="button" data-action-button="stopInventoryScanner">Stop</button>
         </div>
         <p class="scanner-timing-guide">
-          <strong>Scanning timing:</strong> Hold each item hover for about 1 second. For another copy of the same item,
-          move to the next inventory tile so its highlight changes. Results may appear a few seconds behind while
-          title scans are processed.
+          <strong>Scanning timing:</strong> The first readable item calibrates the title area and normally takes
+          5–6 seconds. The first fast scan can take up to 1 second while recognition warms; following title reads
+          typically process in about 0.1–0.2 seconds, plus network time. Hold each item hover for about 1 second.
+          For another copy of the same item, move to the next inventory tile so its highlight changes.
         </p>
         <div class="scanner-preview">
           <video id="inventoryScannerVideo" muted playsinline></video>
@@ -494,7 +495,7 @@
             <h3>Inventory</h3>
             <p><strong>Station Inventory</strong> lists saved items. Search names and notes, filter by location or category, and sort the table. Export Excel downloads a portable copy. “Clear Station” removes the selected location; “Clear All” removes every saved entry. Both ask for confirmation.</p>
             <p><strong>Add Inventory Item</strong> records an item manually with its category, type, size, location, quantity, quality, SCU volume, and notes. Item name, location, and quantity are required.</p>
-            <p><strong>Inventory Import</strong> reads item names from a shared Star Citizen window. Enter the destination, choose a category, share the game window, start scanning, and hover over each item for a few seconds. Stop when finished and review matches before importing. Advanced settings adjust scan timing, match strictness, guide position, ignored words, and manual OCR troubleshooting.</p>
+            <p><strong>Inventory Import</strong> reads item titles from a shared Star Citizen window. Enter the destination, choose the matching in-game category, and share the game window to begin scanning automatically. The first readable title calibrates in about 5–6 seconds; after warm-up, title recognition typically processes in about 0.1–0.2 seconds plus network time. Hover each item for about 1 second, then stop and review matches before importing. Advanced settings adjust scan timing, match strictness, guide position, ignored words, and manual OCR troubleshooting.</p>
           </section>
 
           <section id="guide-timers" class="guide-section">
