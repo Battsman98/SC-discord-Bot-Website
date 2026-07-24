@@ -94,6 +94,8 @@ def parse_localization(path: Path) -> dict[str, str]:
         if "=" not in line or line.lstrip().startswith(";"):
             continue
         key, value = line.split("=", 1)
+        if key.endswith(",P"):
+            key = key[:-2]
         values[key.strip().lower()] = value.strip()
     return values
 
@@ -147,7 +149,17 @@ def build_reference_names(records: Path, loc: dict[str, str]) -> dict[str, str]:
             ref = root.get("__ref")
             if not ref:
                 continue
-            name = first_localized(root, loc, "Name", "displayName", "name")
+            name = first_localized(
+                root,
+                loc,
+                "Name",
+                "displayName",
+                "name",
+                "LocalisedTypeName",
+                "IconName",
+            )
+            if not name and root.get("__type") == "MissionType":
+                name = root.tag.split(".", 1)[-1].replace("_", " ")
             if name:
                 names[ref] = name
     return names

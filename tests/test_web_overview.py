@@ -84,6 +84,30 @@ def test_overview_exposes_all_primary_destinations() -> None:
         assert f'data-overview-tab="{tab_id}"' in html
 
 
+def test_audit_game_database_is_status_only() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'id="gameDataStatusOutput"' in html
+    assert "The local website is not used." in html
+    assert "updateGameData" not in html
+    assert 'api("/api/game-data/status")' in javascript
+    assert "/api/audit/game-data/update" not in javascript
+
+
+def test_mission_filters_use_persistent_labels_and_database_dropdowns() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    mission_form = html.split('data-action="missions"', 1)[1].split("</form>", 1)[0]
+    expected_order = ("Mission Name", "Mission Giver", "Reputation", "Type", "System")
+    positions = [mission_form.index(f"<span>{label}</span>") for label in expected_order]
+    assert positions == sorted(positions)
+    assert mission_form.count("<select ") == 4
+    assert 'input name="query"' in mission_form
+    assert 'api("/api/missions/facets")' in javascript
+
+
 def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")

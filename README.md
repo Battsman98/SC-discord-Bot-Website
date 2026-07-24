@@ -25,24 +25,24 @@ Blueprint and mission searches read only from `data/blueprints_snapshot.json`.
 The running website and Discord bot do not automatically fetch or refresh this
 data; update the snapshot manually when you want to move to a newer game patch.
 
-To rebuild that snapshot manually from the installed game files:
+To update and publish that snapshot from the installed game files, double-click
+`Update Star Citizen Database.cmd` in the project folder (or use the desktop
+shortcut with the same name). The updater:
 
-```powershell
-.\.venv\Scripts\python.exe scripts\update_game_data_from_p4k.py
-```
+- reads `C:\StarCitizen\LIVE\Data.p4k`;
+- rebuilds the mission and blueprint snapshot;
+- runs the automated checks;
+- commits and pushes only the snapshot; and
+- waits for the hosted website to confirm the deployed game version.
 
 The importer defaults to `C:\StarCitizen\LIVE\Data.p4k`, keeps its large
 extraction cache outside the project under Local AppData, and never runs during
 website or bot startup.
 
-Authorized administrators can run the same manual import from **Audit → Game
-Database → Update Database**. The website displays the result and both website
-and Discord blueprint searches automatically reload the replaced snapshot on
-their next request.
+The hosted **Audit → Game Database** panel is status-only. It shows which
+snapshot the website and Discord bot are currently using; the local website is
+not part of the update process.
 
-This update control is local-only because hosted servers cannot access the
-computer's `C:\StarCitizen` folder. Deployments use the most recently committed
-snapshot and clearly mark the local update control as unavailable.
 - `/trade routing` calculates UEX-based circular trade route candidates.
 - `/exec` shows the Executive Hangar clock.
 - `/execset` corrects the Executive Hangar clock for approved users.

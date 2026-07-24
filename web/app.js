@@ -20,7 +20,7 @@ const outputs = {
   cz: document.querySelector("#czOutput"),
   audit: document.querySelector("#auditOutput"),
   visitorAnalytics: document.querySelector("#visitorAnalyticsOutput"),
-  gameDataUpdate: document.querySelector("#gameDataUpdateOutput"),
+  gameDataStatus: document.querySelector("#gameDataStatusOutput"),
   intel: document.querySelector("#intelOutput"),
   warbonds: document.querySelector("#warbondOutput"),
 };
@@ -172,7 +172,6 @@ document.querySelector("[data-action-button='clearExec']").addEventListener("cli
 });
 
 document.querySelector("[data-action-button='refreshAudit']").addEventListener("click", loadAudit);
-document.querySelector("[data-action-button='updateGameData']")?.addEventListener("click", startGameDataUpdate);
 document.querySelector("[data-action-button='refreshIntel']")?.addEventListener("click", () => loadIntel(true));
 document.querySelector("[data-action-button='refreshWarbonds']")?.addEventListener("click", () => loadWarbonds(true));
 document.querySelector("#auditActionType")?.addEventListener("change", loadAudit);
@@ -2631,7 +2630,7 @@ async function loadAudit() {
       api(`/api/audit/recent?${params}`),
     ]);
     renderVisitorAnalytics(analytics);
-    await loadGameDataUpdateStatus();
+    await loadGameDataStatus();
     renderCards(outputs.audit, events, (event) => card(event.title, [
       ["Action type", auditActionLabel(event.action_type)],
       ["When", dateTime(event.created_at)],
@@ -2643,55 +2642,24 @@ async function loadAudit() {
   }
 }
 
-let gameDataStatusTimer = null;
-
-async function startGameDataUpdate() {
-  const button = document.querySelector("[data-action-button='updateGameData']");
-  if (button) button.disabled = true;
+async function loadGameDataStatus() {
+  if (!currentUser.can_manage_admin || !outputs.gameDataStatus) return;
   try {
-    const status = await api("/api/audit/game-data/update", { method: "POST", admin: true });
-    renderGameDataUpdateStatus(status);
-    scheduleGameDataStatusPoll();
+    const status = await api("/api/game-data/status");
+    renderGameDataStatus(status);
   } catch (error) {
-    if (outputs.gameDataUpdate) outputs.gameDataUpdate.innerHTML = errorMessage(error.message);
-    if (button) button.disabled = false;
+    outputs.gameDataStatus.innerHTML = errorMessage(error.message);
   }
 }
 
-async function loadGameDataUpdateStatus() {
-  if (!currentUser.can_manage_admin || !outputs.gameDataUpdate) return;
-  try {
-    const status = await api("/api/audit/game-data/status");
-    renderGameDataUpdateStatus(status);
-    if (status.state === "running") scheduleGameDataStatusPoll();
-  } catch (error) {
-    outputs.gameDataUpdate.innerHTML = errorMessage(error.message);
-  }
-}
-
-function renderGameDataUpdateStatus(status) {
-  if (!outputs.gameDataUpdate) return;
-  const button = document.querySelector("[data-action-button='updateGameData']");
-  const running = status.state === "running";
-  if (button) {
-    button.disabled = running || status.available === false;
-    button.textContent = running ? "Updating..." : status.available === false ? "Local Only" : "Update Database";
-  }
+function renderGameDataStatus(status) {
+  if (!outputs.gameDataStatus) return;
   const details = [
     status.version && `Version: ${status.version}`,
     status.blueprints !== undefined && `Blueprints: ${number(status.blueprints)}`,
     status.missions !== undefined && `Missions: ${number(status.missions)}`,
   ].filter(Boolean).join(" · ");
-  outputs.gameDataUpdate.innerHTML = `<p class="state">${escapeHtml(status.message || "Ready.")}</p>${details ? `<small>${escapeHtml(details)}</small>` : ""}`;
-}
-
-function scheduleGameDataStatusPoll() {
-  window.clearTimeout(gameDataStatusTimer);
-  gameDataStatusTimer = window.setTimeout(async () => {
-    await loadGameDataUpdateStatus();
-    const button = document.querySelector("[data-action-button='updateGameData']");
-    if (button?.disabled) scheduleGameDataStatusPoll();
-  }, 3000);
+  outputs.gameDataStatus.innerHTML = `<p class="state">${escapeHtml(status.message || "Ready.")}</p>${details ? `<small>${escapeHtml(details)}</small>` : ""}`;
 }
 
 function renderVisitorAnalytics(data) {
@@ -2896,6 +2864,7 @@ function cssEscape(value) {
 
 loadMe();
 loadShipFacets();
+loadMissionFacets();
 loadTimers();
 setInterval(loadTimers, 60_000);
 setInterval(() => {
@@ -2919,5 +2888,25 @@ async function loadShipFacets() {
     });
   } catch (error) {
     outputs.lookup.innerHTML = errorMessage(`Could not load ship filters: ${error.message}`);
+  }
+}
+
+async function loadMissionFacets() {
+  try {
+    const facets = await api("/api/missions/facets");
+    document.querySelectorAll("[data-mission-facet]").forEach((select) => {
+      const firstOption = select.querySelector("option");
+      const values = facets[select.dataset.missionFacet] || [];
+      select.innerHTML = "";
+      if (firstOption) select.append(firstOption);
+      values.forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.append(option);
+      });
+    });
+  } catch (error) {
+    outputs.missions.innerHTML = errorMessage(`Could not load mission filters: ${error.message}`);
   }
 }
