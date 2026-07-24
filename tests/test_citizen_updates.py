@@ -63,6 +63,9 @@ def test_community_intel_includes_direct_evocati_and_unannounced_reports() -> No
       <entry><title>Help with a game crash</title>
         <link href="https://www.reddit.com/r/starcitizen/comments/crash"/>
         <updated>2026-07-24T03:04:05Z</updated><content type="html">Could this be a memory leak?</content></entry>
+      <entry><title>Streamer moderation discussion</title>
+        <link href="https://www.reddit.com/r/starcitizen/comments/streamer"/>
+        <updated>2026-07-24T04:05:06Z</updated><content type="html">An Evocati Twitch streamer was involved</content></entry>
     </feed>'''
 
     reports = CitizenUpdatesSource.parse_community_intel(community)
