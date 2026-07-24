@@ -266,16 +266,16 @@ def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> 
     assert "effective_min_score = max(min_score, 0.92) if live_scan else min_score" in python
 
 
-def test_live_scanner_uses_two_job_pipeline_and_reports_stage_timings() -> None:
+def test_live_scanner_avoids_ocr_cpu_contention_and_reports_stage_timings() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
 
-    assert "inventoryScannerMaxInFlight = 2" in javascript
+    assert "inventoryScannerMaxInFlight = 1" in javascript
     assert "inventoryScannerPendingHashes" in javascript
     assert '"ocr_ms": ocr_ms' in python
     assert '"match_ms": match_ms' in python
     assert '"server_ms":' in python
-    assert "_RAPID_OCR_POOL_SIZE = 2" in python
+    assert "_RAPID_OCR_POOL_SIZE = 1" in python
     assert "result_groups = await asyncio.gather" in python
 
 
@@ -296,6 +296,14 @@ def test_scanner_review_queue_has_individual_and_bulk_remove_actions() -> None:
     assert "data-scanner-dismiss-text" in javascript
     assert "data-scanner-dismiss-all" in javascript
     assert "Scanning timing:" in html
+
+
+def test_scanner_uses_inventory_tile_context_to_count_duplicate_titles() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "inventoryScannerLastContextHash" in javascript
+    assert "inventoryScannerLastCountedCaptureToken" in javascript
+    assert "contextHash = imageAverageHash(contextCanvas, 24)" in javascript
 
 
 def test_scanner_review_rows_use_compact_inventory_density() -> None:

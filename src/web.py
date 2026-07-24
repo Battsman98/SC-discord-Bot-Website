@@ -292,7 +292,7 @@ app = FastAPI(
 )
 _RAPID_OCR = None
 _RAPID_OCR_LOCK = threading.Lock()
-_RAPID_OCR_POOL_SIZE = 2
+_RAPID_OCR_POOL_SIZE = 1
 _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_SIZE)
 _RAPID_OCR_POOL_READY = False
 VISITOR_COOKIE_NAME = "sc_companion_visitor"

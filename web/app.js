@@ -203,7 +203,7 @@ let inventoryImportItems = [];
 let inventoryScannerHistory = [];
 let inventoryScannerStatus = "";
 let inventoryScannerInFlight = 0;
-const inventoryScannerMaxInFlight = 2;
+const inventoryScannerMaxInFlight = 1;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
@@ -211,7 +211,9 @@ const inventoryScannerQueueLimit = 8;
 let inventoryScannerGeneration = 0;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
+let inventoryScannerLastContextHash = "";
 let inventoryScannerLastCountedKey = "";
+let inventoryScannerLastCountedCaptureToken = "";
 let inventoryScannerEmptyReadStreak = 0;
 let inventoryScannerReadyToCount = true;
 const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
@@ -1289,7 +1291,8 @@ function renderInventoryImportItems(payload, options = {}) {
       const existing = inventoryImportItems.find((candidate) => inventoryImportKey(candidate) === key);
       const shouldCount = !options.scannerMode
         || inventoryScannerReadyToCount
-        || inventoryScannerLastCountedKey !== key;
+        || inventoryScannerLastCountedKey !== key
+        || (options.captureToken && inventoryScannerLastCountedCaptureToken !== options.captureToken);
       if (!existing) {
         inventoryImportItems.push(item);
         countedScannerItems.push(item);
@@ -1299,6 +1302,7 @@ function renderInventoryImportItems(payload, options = {}) {
       }
       if (options.scannerMode && shouldCount) {
         inventoryScannerLastCountedKey = key;
+        inventoryScannerLastCountedCaptureToken = options.captureToken || "";
         inventoryScannerReadyToCount = false;
         inventoryScannerEmptyReadStreak = 0;
       }
@@ -1610,7 +1614,9 @@ async function startInventoryScanner() {
   inventoryScannerQueue = [];
   inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
+  inventoryScannerLastContextHash = "";
   inventoryScannerLastCountedKey = "";
+  inventoryScannerLastCountedCaptureToken = "";
   inventoryScannerEmptyReadStreak = 0;
   inventoryScannerReadyToCount = true;
   inventoryScannerStream = await navigator.mediaDevices.getDisplayMedia({
@@ -1683,12 +1689,22 @@ async function scanInventoryHover() {
   try {
     const capture = await captureInventoryScannerCrop();
     const captureMs = Math.round(performance.now() - captureStartedAt);
-    if ((inventoryScannerLastHash && imageHashDistance(inventoryScannerLastHash, capture.hash) === 0)
-      || inventoryScannerPendingHashes.has(capture.hash)
-      || inventoryScannerQueue.some((queued) => imageHashDistance(queued.hash, capture.hash) <= 2)) {
+    const captureToken = `${capture.hash}:${capture.contextHash}`;
+    if ((inventoryScannerLastHash
+        && imageHashDistance(inventoryScannerLastHash, capture.hash) === 0
+        && imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) === 0)
+      || inventoryScannerPendingHashes.has(captureToken)
+      || inventoryScannerQueue.some((queued) =>
+        imageHashDistance(queued.hash, capture.hash) === 0
+        && imageHashDistance(queued.contextHash, capture.contextHash) === 0)) {
       return;
     }
-    inventoryScannerQueue.push({ ...capture, captureMs, generation: inventoryScannerGeneration });
+    inventoryScannerQueue.push({
+      ...capture,
+      captureToken,
+      captureMs,
+      generation: inventoryScannerGeneration,
+    });
     if (inventoryScannerQueue.length > inventoryScannerQueueLimit) inventoryScannerQueue.shift();
     drainInventoryScannerQueue();
   } finally {
@@ -1700,7 +1716,7 @@ function drainInventoryScannerQueue() {
   while (inventoryScannerInFlight < inventoryScannerMaxInFlight && inventoryScannerQueue.length) {
     const capture = inventoryScannerQueue.shift();
     inventoryScannerInFlight += 1;
-    inventoryScannerPendingHashes.add(capture.hash);
+    inventoryScannerPendingHashes.add(capture.captureToken);
     processInventoryScannerCapture(capture)
       .catch((error) => {
         if (capture.generation === inventoryScannerGeneration) {
@@ -1708,7 +1724,7 @@ function drainInventoryScannerQueue() {
         }
       })
       .finally(() => {
-        inventoryScannerPendingHashes.delete(capture.hash);
+        inventoryScannerPendingHashes.delete(capture.captureToken);
         inventoryScannerInFlight = Math.max(0, inventoryScannerInFlight - 1);
         drainInventoryScannerQueue();
       });
@@ -1721,17 +1737,20 @@ async function processInventoryScannerCapture(capture) {
     append: true,
     liveScan: true,
     captureMs: capture.captureMs,
+    captureToken: capture.captureToken,
     scannerGeneration: capture.generation,
   });
   if (capture.generation !== inventoryScannerGeneration) return;
   if (payload?.items?.length) {
     inventoryScannerLastHash = capture.hash;
+    inventoryScannerLastContextHash = capture.contextHash;
     inventoryScannerEmptyReadStreak = 0;
   } else {
     inventoryScannerEmptyReadStreak += 1;
     if (inventoryScannerEmptyReadStreak >= 1) {
       inventoryScannerReadyToCount = true;
       inventoryScannerLastHash = "";
+      inventoryScannerLastContextHash = "";
     }
     inventoryScannerStatus = "No confident read yet. Processing the next captured tooltip.";
   }
@@ -1850,9 +1869,28 @@ async function captureInventoryScannerCrop() {
   const context = canvas.getContext("2d");
   context.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   const hash = imageAverageHash(canvas);
+  const contextCanvas = document.createElement("canvas");
+  contextCanvas.width = 360;
+  contextCanvas.height = 540;
+  contextCanvas.getContext("2d").drawImage(
+    video,
+    Math.round(sourceWidth * 0.70),
+    Math.round(sourceHeight * 0.08),
+    Math.round(sourceWidth * 0.29),
+    Math.round(sourceHeight * 0.84),
+    0,
+    0,
+    contextCanvas.width,
+    contextCanvas.height,
+  );
+  const contextHash = imageAverageHash(contextCanvas, 24);
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
   if (!blob) throw new Error("Could not encode the inventory capture.");
-  return { file: new File([blob], "inventory-tooltip.webp", { type: "image/webp" }), hash };
+  return {
+    file: new File([blob], "inventory-tooltip.webp", { type: "image/webp" }),
+    hash,
+    contextHash,
+  };
 }
 
 function inventoryScannerTextHeightRatio() {
@@ -1860,8 +1898,7 @@ function inventoryScannerTextHeightRatio() {
   return Math.min(0.5, Math.max(0.1, value / 100));
 }
 
-function imageAverageHash(sourceCanvas) {
-  const size = 16;
+function imageAverageHash(sourceCanvas, size = 16) {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -1984,6 +2021,7 @@ async function submitInventoryImages(files, options = {}) {
       append: Boolean(options.append),
       scannerMode: Boolean(options.scannerMode),
       liveScan: Boolean(options.liveScan),
+      captureToken: options.captureToken || "",
     });
     return payload;
   } catch (error) {
