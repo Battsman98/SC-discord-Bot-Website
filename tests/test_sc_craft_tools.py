@@ -80,8 +80,8 @@ def test_parse_blueprint_links_to_local_crafting_page() -> None:
         {},
     )
 
-    assert result.source_url == "/#crafting"
-    assert result.source_name == "Local Star Citizen Game Files"
+    assert result.source_url == ""
+    assert result.source_name == ""
 
 
 def test_autocomplete_blueprint_filter_uses_local_snapshot() -> None:

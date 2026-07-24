@@ -17,8 +17,8 @@ from src.sources.base import (
 
 
 class SCCraftToolsSource:
-    name = "Local Star Citizen Game Files"
-    base_url = "/"
+    name = ""
+    base_url = ""
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -224,7 +224,7 @@ class SCCraftToolsSource:
                     for name, chance in sorted(entry["rewards"].items())
                 ],
                 source_name=self.name,
-            source_url="/#missions",
+            source_url="",
             ))
         results.sort(key=lambda item: (
             self._normalize(item.contractor),
@@ -276,7 +276,7 @@ class SCCraftToolsSource:
                     for reward in rewards if isinstance(reward, dict)
                 ],
                 source_name=self.name,
-                source_url="/#missions",
+                source_url="",
             ))
         results.sort(key=lambda item: (
             self._normalize(item.contractor),
@@ -409,7 +409,7 @@ class SCCraftToolsSource:
                 if isinstance(mission, dict)
             ],
             source_name=self.name,
-            source_url="/#crafting",
+            source_url="",
             component_size=self._component_size(raw_category),
         )
 

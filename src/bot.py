@@ -2544,7 +2544,6 @@ def build_blueprint_embed(
     embed = discord.Embed(
         title=result.name,
         description="\n".join(line for line in description if line),
-        url=result.source_url,
         color=discord.Color.dark_gold(),
     )
     embed.add_field(name="Materials", value=_format_blueprint_ingredients(result.ingredients), inline=False)
