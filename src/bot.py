@@ -2557,14 +2557,13 @@ def build_blueprint_embed(
         value=_format_blueprint_missions(result.missions, page=mission_page),
         inline=False,
     )
-    embed.set_footer(text=f"Source: {result.source_name} | {result.version or 'Current version'}")
+    embed.set_footer(text=result.version or "Current version")
     return embed
 
 
 def build_mission_embed(result: MissionResult) -> discord.Embed:
     embed = discord.Embed(
         title=result.name,
-        url=result.source_url,
         color=discord.Color(0x2F8FE5),
     )
     if result.contractor:
@@ -2591,7 +2590,6 @@ def build_mission_embed(result: MissionResult) -> discord.Embed:
     )
     embed.set_footer(text=" · ".join(filter(None, [
         "Crusader Industries Contract Network",
-        result.source_name,
         result.version,
     ])))
     return embed

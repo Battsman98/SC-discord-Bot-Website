@@ -593,7 +593,6 @@ function renderBlueprint(item) {
     ["Tiers", item.tiers],
     ["Ingredients", item.ingredients?.map((ing) => escapeHtml(`${ing.quantity || ""} ${ing.unit || ""} ${ing.name}`.trim())).join("<br>")],
     ["Missions", item.missions?.slice(0, 8).map((mission) => `${escapeHtml(mission.contractor || "Unknown")}: ${escapeHtml(mission.name)}`).join("<br>")],
-    ["Source", link(item.source_url, item.source_name)],
   ], `<div class="card-actions">${action}</div>`);
 }
 
@@ -690,7 +689,6 @@ function renderMission(item) {
     ["Required reputation", standing],
     ["Blueprint rewards", rewards || "No blueprint reward in the current dataset"],
     ["Game version", item.version],
-    ["Source", link(item.source_url, item.source_name)],
   ]);
 }
 

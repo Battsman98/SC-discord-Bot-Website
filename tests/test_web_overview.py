@@ -108,6 +108,19 @@ def test_mission_filters_use_persistent_labels_and_database_dropdowns() -> None:
     assert 'api("/api/missions/facets")' in javascript
 
 
+def test_mission_and_blueprint_results_do_not_display_game_file_source() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    blueprint_renderer = javascript.split("function renderBlueprint(item)", 1)[1].split(
+        "function renderBlueprintImportMatches", 1
+    )[0]
+    mission_renderer = javascript.split("function renderMission(item)", 1)[1].split(
+        "function tradeRouteLocation", 1
+    )[0]
+
+    assert '["Source"' not in blueprint_renderer
+    assert '["Source"' not in mission_renderer
+
+
 def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
