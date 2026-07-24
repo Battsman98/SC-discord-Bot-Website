@@ -1704,8 +1704,9 @@ async function processInventoryScannerCapture(capture) {
     inventoryScannerEmptyReadStreak = 0;
   } else {
     inventoryScannerEmptyReadStreak += 1;
-    if (inventoryScannerEmptyReadStreak >= 2) {
+    if (inventoryScannerEmptyReadStreak >= 1) {
       inventoryScannerReadyToCount = true;
+      inventoryScannerLastHash = "";
     }
     inventoryScannerStatus = "No confident read yet. Processing the next captured tooltip.";
   }
