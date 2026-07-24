@@ -28,7 +28,7 @@ COMMUNITY_INTEL_URL = (
     "&restrict_sr=on&sort=new"
 )
 UPDATE_LOOKBACK_DAYS = 90
-COMMUNITY_INTEL_BACKUP_KEY = "citizen-updates:last-good-community-intel:v1"
+COMMUNITY_INTEL_BACKUP_KEY = "citizen-updates:last-good-community-intel:v2"
 
 
 class CitizenUpdatesSource:
@@ -45,7 +45,7 @@ class CitizenUpdatesSource:
         await self._session.close()
 
     async def get_updates(self) -> dict:
-        cache_key = "citizen-updates:direct-sources:v7:broader-community-intel"
+        cache_key = "citizen-updates:direct-sources:v8:filtered-community-intel"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, dict):
             return cached
