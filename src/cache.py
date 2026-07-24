@@ -98,6 +98,15 @@ class SQLiteCache:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS website_active_visitors (
+                visitor_hash TEXT PRIMARY KEY,
+                user_id INTEGER,
+                last_seen_at INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS user_blueprints (
                 user_id INTEGER NOT NULL,
                 blueprint_name TEXT NOT NULL,
@@ -332,9 +341,42 @@ class SQLiteCache:
         )
         self._connection.commit()
 
+    async def touch_website_activity(
+        self,
+        visitor_hash: str,
+        user_id: int | None = None,
+        now: int | None = None,
+    ) -> None:
+        timestamp = int(time.time()) if now is None else int(now)
+        self._connection.execute(
+            """
+            INSERT INTO website_active_visitors (visitor_hash, user_id, last_seen_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(visitor_hash) DO UPDATE SET
+                user_id = COALESCE(excluded.user_id, website_active_visitors.user_id),
+                last_seen_at = excluded.last_seen_at
+            """,
+            (visitor_hash, user_id, timestamp),
+        )
+        self._connection.execute(
+            "DELETE FROM website_active_visitors WHERE last_seen_at < ?",
+            (timestamp - 24 * 60 * 60,),
+        )
+        self._connection.commit()
+
     async def website_visitor_analytics(self, now: int | None = None) -> dict[str, Any]:
         timestamp = int(time.time()) if now is None else int(now)
         today = datetime.fromtimestamp(timestamp, timezone.utc).date()
+        active_window_minutes = 5
+        active_row = self._connection.execute(
+            """
+            SELECT COUNT(DISTINCT visitor_hash),
+                   COUNT(DISTINCT CASE WHEN user_id IS NOT NULL THEN user_id END)
+            FROM website_active_visitors
+            WHERE last_seen_at >= ?
+            """,
+            (timestamp - active_window_minutes * 60,),
+        ).fetchone()
 
         def totals(days: int) -> dict[str, int]:
             cutoff = (today - timedelta(days=days - 1)).isoformat()
@@ -366,6 +408,11 @@ class SQLiteCache:
         ).fetchall()
         return {
             "timezone": "UTC",
+            "active_now": {
+                "unique_visitors": int(active_row[0] or 0),
+                "signed_in_users": int(active_row[1] or 0),
+                "window_minutes": active_window_minutes,
+            },
             "today": totals(1),
             "last_7_days": totals(7),
             "last_30_days": totals(30),

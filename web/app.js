@@ -2669,7 +2669,18 @@ function renderVisitorAnalytics(data) {
     ["Last 7 days", data.last_7_days],
     ["Last 30 days", data.last_30_days],
   ];
-  outputs.visitorAnalytics.innerHTML = `<div class="visitor-summary">
+  const active = data.active_now || {};
+  outputs.visitorAnalytics.innerHTML = `<div class="active-visitor-stat">
+    <div>
+      <span class="active-visitor-indicator" aria-hidden="true"></span>
+      <h3>Active now</h3>
+      <small>Seen within the last ${Number(active.window_minutes || 5)} minutes</small>
+    </div>
+    <strong>${Number(active.unique_visitors || 0).toLocaleString()}</strong>
+    <span>active browsers</span>
+    <small>${Number(active.signed_in_users || 0).toLocaleString()} signed-in users</small>
+  </div>
+  <div class="visitor-summary">
     ${periods.map(([label, values]) => `<section class="visitor-stat">
       <h3>${escapeHtml(label)}</h3>
       <strong>${Number(values?.unique_visitors || 0).toLocaleString()}</strong>
@@ -2686,6 +2697,15 @@ function renderVisitorAnalytics(data) {
       <span>${Number(day.signed_in_users || 0).toLocaleString()} signed in</span>
     </div>`).join("") || `<p class="state">Analytics begin collecting after this deployment.</p>`}
   </div>`;
+}
+
+function sendActivityHeartbeat() {
+  if (document.visibilityState !== "visible") return;
+  void fetch("/api/activity", {
+    method: "POST",
+    credentials: "same-origin",
+    keepalive: true,
+  }).catch(() => {});
 }
 
 function renderCrewSplit(data) {
@@ -2863,6 +2883,9 @@ function cssEscape(value) {
 }
 
 loadMe();
+sendActivityHeartbeat();
+setInterval(sendActivityHeartbeat, 60_000);
+document.addEventListener("visibilitychange", sendActivityHeartbeat);
 loadShipFacets();
 loadMissionFacets();
 loadTimers();

@@ -318,12 +318,9 @@ async def _item_catalog_maintenance_loop(sources: SourceRegistry) -> None:
 @app.middleware("http")
 async def track_website_visitors(request: Request, call_next):
     response = await call_next(request)
-    if (
-        request.method == "GET"
-        and request.url.path == "/"
-        and response.status_code < 400
-        and hasattr(app.state, "game_assist")
-    ):
+    is_page_visit = request.method == "GET" and request.url.path == "/"
+    is_activity_ping = request.method == "POST" and request.url.path == "/api/activity"
+    if (is_page_visit or is_activity_ping) and response.status_code < 400 and hasattr(app.state, "game_assist"):
         visitor_id = request.cookies.get(VISITOR_COOKIE_NAME, "")
         new_visitor = re.fullmatch(r"[a-f0-9]{32}", visitor_id) is None
         if new_visitor:
@@ -331,7 +328,9 @@ async def track_website_visitors(request: Request, call_next):
         visitor_hash = hashlib.sha256(visitor_id.encode("ascii")).hexdigest()
         user = current_user_from_request(request, state().settings)
         try:
-            await state().cache.record_website_visit(visitor_hash, user.id if user else None)
+            if is_page_visit:
+                await state().cache.record_website_visit(visitor_hash, user.id if user else None)
+            await state().cache.touch_website_activity(visitor_hash, user.id if user else None)
         except Exception:
             pass
         if new_visitor:
@@ -525,6 +524,11 @@ async def me(request: Request) -> dict[str, Any]:
         "can_manage_changes": user.can_manage_changes,
         "can_manage_admin": user.can_manage_admin,
     }
+
+
+@app.post("/api/activity", status_code=204)
+async def website_activity() -> None:
+    return None
 
 
 @app.get("/auth/discord/login")
