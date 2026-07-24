@@ -60,6 +60,9 @@ def test_community_intel_includes_direct_evocati_and_unannounced_reports() -> No
       <entry><title>New vehicle discussion</title>
         <link href="https://www.reddit.com/r/starcitizen/comments/vehicle"/>
         <updated>2026-07-24T02:03:04Z</updated><content type="html">Possible unannounced ship spotted</content></entry>
+      <entry><title>Help with a game crash</title>
+        <link href="https://www.reddit.com/r/starcitizen/comments/crash"/>
+        <updated>2026-07-24T03:04:05Z</updated><content type="html">Could this be a memory leak?</content></entry>
     </feed>'''
 
     reports = CitizenUpdatesSource.parse_community_intel(community)

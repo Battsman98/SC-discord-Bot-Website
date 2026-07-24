@@ -214,11 +214,18 @@ class CitizenUpdatesSource:
             title = _clean("".join(title_node.itertext()))
             content = entry.find("{*}content")
             content_html = "".join(content.itertext()) if content is not None else ""
-            searchable = f"{title} {content_html}".lower()
-            if not any(word in searchable for word in (
+            title_searchable = title.lower()
+            content_searchable = content_html.lower()
+            title_matches = any(word in title_searchable for word in (
                 "leak", "datamine", "data mine", "spoiler", "pipeline",
                 "evocati", "sneak peek", "unannounced", "teaser",
-            )):
+            ))
+            content_matches = any(phrase in content_searchable for phrase in (
+                "unannounced ship", "unannounced vehicle", "evocati",
+                "sneak peek", "game files", "datamined", "data mined",
+                "pipeline leak",
+            ))
+            if not title_matches and not content_matches:
                 continue
             updated = entry.find("{*}updated")
             summary = _clean(BeautifulSoup(content_html, "html.parser").get_text(" ", strip=True))
