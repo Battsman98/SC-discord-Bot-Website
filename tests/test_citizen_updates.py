@@ -2,7 +2,13 @@ from pathlib import Path
 
 from datetime import datetime, timezone
 
-from src.sources.citizen_updates import COMM_LINK_ARCHIVE_URLS, UPDATE_LOOKBACK_DAYS, CitizenUpdatesSource, _within_lookback
+from src.sources.citizen_updates import (
+    COMM_LINK_ARCHIVE_URLS,
+    COMMUNITY_INTEL_URL,
+    UPDATE_LOOKBACK_DAYS,
+    CitizenUpdatesSource,
+    _within_lookback,
+)
 from src.web import _website_audit_metadata
 
 
@@ -46,6 +52,24 @@ def test_direct_source_parsers_keep_official_and_unverified_items_separate() -> 
     assert developer_updates[0]["source"] == "RSI Developer Tracker · Freyja-CIG"
 
 
+def test_community_intel_includes_direct_evocati_and_unannounced_reports() -> None:
+    community = '''<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+      <entry><title>Evocati testing begins tonight</title>
+        <link href="https://www.reddit.com/r/starcitizen/comments/evocati"/>
+        <updated>2026-07-24T01:02:03Z</updated><content type="html">Public test report</content></entry>
+      <entry><title>New vehicle discussion</title>
+        <link href="https://www.reddit.com/r/starcitizen/comments/vehicle"/>
+        <updated>2026-07-24T02:03:04Z</updated><content type="html">Possible unannounced ship spotted</content></entry>
+    </feed>'''
+
+    reports = CitizenUpdatesSource.parse_community_intel(community)
+
+    assert [report["title"] for report in reports] == [
+        "Evocati testing begins tonight",
+        "New vehicle discussion",
+    ]
+
+
 def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
     javascript = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
@@ -62,6 +86,8 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert "CIG Developer Updates" in javascript
     assert "Sneak Peeks & Leaks" in javascript
     assert "previewsAndLeaks" in javascript
+    assert "intelPublishedTime(right.published) - intelPublishedTime(left.published)" in javascript
+    assert "Sources checked automatically at" in javascript
     assert javascript.index('["Patch Notes"') < javascript.index('["CIG Developer Updates"')
     assert javascript.index('["CIG Developer Updates"') < javascript.index('["PU Server Updates"')
     assert javascript.index('["PU Server Updates"') < javascript.index('["Sneak Peeks & Leaks"')
@@ -80,6 +106,8 @@ def test_intel_tab_and_direct_source_disclosure_are_present() -> None:
     assert UPDATE_LOOKBACK_DAYS == 90
     assert len(COMM_LINK_ARCHIVE_URLS) == 4
     assert all("robertsspaceindustries.com/en/comm-link" in url for url in COMM_LINK_ARCHIVE_URLS)
+    assert "evocati" in COMMUNITY_INTEL_URL
+    assert "unannounced" in COMMUNITY_INTEL_URL
 
 
 def test_direct_source_defaults_retain_a_three_month_sized_history() -> None:

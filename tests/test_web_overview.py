@@ -119,7 +119,7 @@ def test_mission_and_blueprint_results_do_not_display_game_file_source() -> None
 
     assert '["Source"' not in blueprint_renderer
     assert '["Source"' not in mission_renderer
-    assert "hide-local-sources" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "20260724-intel-direct-refresh" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
 
 def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:

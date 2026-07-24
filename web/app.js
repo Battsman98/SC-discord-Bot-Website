@@ -2498,7 +2498,8 @@ async function loadIntel(force = false, quiet = false) {
   if (!quiet) outputs.intel.innerHTML = stateMessage("Contacting direct Star Citizen sources...");
   try {
     const payload = await api("/api/updates");
-    const previewsAndLeaks = [...(payload.sneak_peeks || []), ...(payload.leaks || [])];
+    const previewsAndLeaks = [...(payload.sneak_peeks || []), ...(payload.leaks || [])]
+      .sort((left, right) => intelPublishedTime(right.published) - intelPublishedTime(left.published));
     const groups = [
       ["Patch Notes", "Official LIVE release notes", payload.patch_notes || [], "patch"],
       ["CIG Developer Updates", "Official Spectrum announcements and developer tracker posts", payload.cig_updates || [], "developer"],
@@ -2508,10 +2509,31 @@ async function loadIntel(force = false, quiet = false) {
     outputs.intel.innerHTML = groups.map(([title, description, items, kind]) => intelGroup(title, description, items, kind)).join("");
     intelLoaded = true;
     const updatedAt = document.querySelector("#intelUpdatedAt");
-    if (updatedAt) updatedAt.textContent = `Updated automatically at ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`;
+    const sourceUpdatedAt = payload.updated_at ? new Date(payload.updated_at) : new Date();
+    if (updatedAt) updatedAt.textContent = `Sources checked automatically at ${sourceUpdatedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`;
   } catch (error) {
     if (!quiet) outputs.intel.innerHTML = errorMessage(`Could not load direct-source updates: ${error.message}`);
   }
+}
+
+function intelPublishedTime(value) {
+  const text = String(value || "").trim().toLowerCase();
+  const absolute = Date.parse(text);
+  if (Number.isFinite(absolute)) return absolute;
+  if (text === "today") return Date.now();
+  if (text === "yesterday") return Date.now() - 24 * 60 * 60 * 1000;
+  const relative = text.match(/^(\d+|a|an|one)\s+(minute|hour|day|week|month|year)s?\s+ago$/);
+  if (!relative) return 0;
+  const amount = ["a", "an", "one"].includes(relative[1]) ? 1 : Number(relative[1]);
+  const unitMilliseconds = {
+    minute: 60 * 1000,
+    hour: 60 * 60 * 1000,
+    day: 24 * 60 * 60 * 1000,
+    week: 7 * 24 * 60 * 60 * 1000,
+    month: 30 * 24 * 60 * 60 * 1000,
+    year: 365 * 24 * 60 * 60 * 1000,
+  };
+  return Date.now() - amount * unitMilliseconds[relative[2]];
 }
 
 let warbondsLoaded = false;

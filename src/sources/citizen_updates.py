@@ -22,8 +22,13 @@ COMM_LINK_ARCHIVE_URLS = (
 )
 STATUS_URL = "https://status.robertsspaceindustries.com/"
 DEV_TRACKER_URL = f"{RSI_BASE}/community/devtracker"
-COMMUNITY_INTEL_URL = "https://www.reddit.com/r/starcitizen/search.rss?q=leak%20OR%20datamine%20OR%20spoiler&restrict_sr=on&sort=new"
+COMMUNITY_INTEL_URL = (
+    "https://www.reddit.com/r/starcitizen/search.rss"
+    "?q=leak%20OR%20datamine%20OR%20spoiler%20OR%20evocati%20OR%20sneak%20OR%20unannounced%20OR%20pipeline"
+    "&restrict_sr=on&sort=new"
+)
 UPDATE_LOOKBACK_DAYS = 90
+COMMUNITY_INTEL_BACKUP_KEY = "citizen-updates:last-good-community-intel:v1"
 
 
 class CitizenUpdatesSource:
@@ -40,7 +45,7 @@ class CitizenUpdatesSource:
         await self._session.close()
 
     async def get_updates(self) -> dict:
-        cache_key = "citizen-updates:direct-sources:v6:official-devtracker"
+        cache_key = "citizen-updates:direct-sources:v7:broader-community-intel"
         cached = await self._cache.get(cache_key)
         if isinstance(cached, dict):
             return cached
@@ -58,13 +63,20 @@ class CitizenUpdatesSource:
             page if isinstance(page, str) else "" for page in pages
         ]
         comm_link_history = "\n".join((comm_link, *comm_link_archives))
+        community_intel = _within_lookback(self.parse_community_intel(community))
+        if community_intel:
+            await self._cache.set(COMMUNITY_INTEL_BACKUP_KEY, community_intel, 7 * 24 * 60 * 60)
+        else:
+            backup = await self._cache.get(COMMUNITY_INTEL_BACKUP_KEY)
+            community_intel = backup if isinstance(backup, list) else []
         payload = {
             "patch_notes": _within_lookback(self.parse_patch_notes(development)),
             "pu_updates": _within_lookback(self.parse_status_updates(status)),
             "sneak_peeks": _within_lookback(self.parse_comm_link_updates(comm_link_history)),
             "cig_updates": _within_lookback(self.parse_dev_tracker_updates(dev_tracker)),
-            "leaks": _within_lookback(self.parse_community_intel(community)),
+            "leaks": community_intel,
             "lookback_days": UPDATE_LOOKBACK_DAYS,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "sources": {
                 "patch_notes": DEVELOPMENT_URL,
                 "pu_updates": STATUS_URL,
@@ -200,11 +212,15 @@ class CitizenUpdatesSource:
             if title_node is None or link_node is None:
                 continue
             title = _clean("".join(title_node.itertext()))
-            if not any(word in title.lower() for word in ("leak", "datamine", "spoiler", "pipeline")):
-                continue
-            updated = entry.find("{*}updated")
             content = entry.find("{*}content")
             content_html = "".join(content.itertext()) if content is not None else ""
+            searchable = f"{title} {content_html}".lower()
+            if not any(word in searchable for word in (
+                "leak", "datamine", "data mine", "spoiler", "pipeline",
+                "evocati", "sneak peek", "unannounced", "teaser",
+            )):
+                continue
+            updated = entry.find("{*}updated")
             summary = _clean(BeautifulSoup(content_html, "html.parser").get_text(" ", strip=True))
             rows.append(_item(
                 title,
