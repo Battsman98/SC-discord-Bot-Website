@@ -324,10 +324,10 @@ def test_live_inventory_scanner_retries_missed_reads_without_collapsing_adjacent
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
     assert 'frameRate: { ideal: 5, max: 8 }' in javascript
-    assert "const sameCountedTile = capture.tileToken" in javascript
-    assert "const samePendingTile = capture.tileToken" in javascript
-    assert "const sameQueuedTile = capture.tileToken" in javascript
-    assert "if (sameCountedTile || samePendingTile || sameQueuedTile)" in javascript
+    assert "const samePendingTile = capture.tileToken" not in javascript
+    assert "const sameQueuedTile = capture.tileToken" not in javascript
+    assert "const sameCountedTile = capture.tileToken" not in javascript
+    assert "let sh = Math.max(1, fullCropHeight)" in javascript
     assert "&& (!capture.tileToken" not in javascript
     assert 'if (payload?.items?.length)' in javascript
     assert 'inventoryScannerLastHash = ""' in javascript
@@ -346,7 +346,6 @@ def test_live_inventory_scanner_keeps_fast_calibration_and_places_confirmed_resu
     assert "inventoryScannerEmptyReadStreak >= 8" in javascript
     assert "requestTitleBox = inventoryScannerTitleBox" in javascript
     assert 'requestTitleBox = "0,0,1,1"' not in javascript
-    assert "queued.tileToken === capture.tileToken" in javascript
     assert 'addInventoryScannerHistory(payload, countedScannerItems, options.captureToken || "")' in javascript
     assert "entry.captureToken === captureToken" in javascript
     assert "titleBox: capture.requestTitleBox" in javascript
@@ -369,7 +368,10 @@ def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> 
 
     assert "await asyncio.to_thread(_initialize_rapid_ocr_pool)" in python
     assert "await asyncio.to_thread(_read_image_text, data)" in python
-    assert "candidate_limit=1 if live_scan else None" in python
+    assert "candidate_limit=1," in python
+    assert "for candidate_box in _inventory_title_boxes(title_box)" in python
+    assert "if candidate_items:" in python
+    assert "attempts=%r" in python
     assert "effective_min_score = max(min_score, 0.88) if live_scan else min_score" in python
 
 

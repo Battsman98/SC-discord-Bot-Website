@@ -1810,15 +1810,6 @@ async function scanInventoryHover() {
     const capture = await captureInventoryScannerCrop();
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const captureToken = `${capture.hash}:${capture.tileToken || capture.contextHash}`;
-    const sameCountedTile = capture.tileToken
-      && capture.tileToken === inventoryScannerLastCountedCaptureToken;
-    const samePendingTile = capture.tileToken
-      && [...inventoryScannerPendingHashes].some((token) => token.endsWith(`:${capture.tileToken}`));
-    const sameQueuedTile = capture.tileToken
-      && inventoryScannerQueue.some((queued) => queued.tileToken === capture.tileToken);
-    if (sameCountedTile || samePendingTile || sameQueuedTile) {
-      return;
-    }
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
@@ -1997,7 +1988,7 @@ async function captureInventoryScannerCrop() {
   let sy = Math.round(crop.y * sourceHeight);
   let sw = Math.round(crop.width * sourceWidth);
   const fullCropHeight = Math.round(crop.height * sourceHeight);
-  let sh = Math.max(1, Math.round(fullCropHeight * inventoryScannerTextHeightRatio()));
+  let sh = Math.max(1, fullCropHeight);
   let requestTitleBox;
   const calibratedValues = inventoryScannerTitleBox
     ? inventoryScannerTitleBox.split(",").map((value) => Number(value))

@@ -531,6 +531,28 @@ def test_inventory_title_does_not_calibrate_to_scanner_chrome(monkeypatch) -> No
     assert used_fast is True
 
 
+def test_inventory_scanner_preserves_internal_item_key_for_catalog_alias_matching() -> None:
+    raw_key = "item_Namebehrsrife_ballstic_03_store"
+
+    candidates = web_module._inventory_scanner_text_candidates(raw_key)
+
+    assert candidates[0] == raw_key
+    assert web_module._inventory_match_confidence(
+        candidates[0],
+        "item_Namebehr_rifle_ballistic_03_store01",
+    ) >= 0.88
+
+
+def test_inventory_title_regions_ignore_stale_calibration_and_cover_full_frame() -> None:
+    stale = "0.300000,0.230000,0.380000,0.055000"
+
+    boxes = web_module._inventory_title_boxes(stale)
+
+    assert boxes[0] == web_module._DEFAULT_INVENTORY_TITLE_BOX
+    assert boxes[1] == stale
+    assert any(float(box.split(",")[1]) >= 0.5 for box in boxes)
+
+
 def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
     assert _inventory_catalog_item_type("Navoi Boot and Pants Striker", "Clothing") == "Footwear"
     assert _inventory_catalog_item_type("ThermoWave Gloves ASD Edition", "Clothing") == "Gloves"

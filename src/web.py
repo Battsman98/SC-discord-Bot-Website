@@ -315,7 +315,7 @@ async def lifespan(app: FastAPI):
     )
     try:
         await asyncio.to_thread(_initialize_rapid_ocr_pool)
-        await asyncio.to_thread(_initialize_rapid_title_ocr)
+        await asyncio.to_thread(_warm_rapid_title_ocr)
     except Exception:
         pass
     try:
@@ -344,13 +344,19 @@ _RAPID_OCR_POOL_READY = False
 _RAPID_TITLE_OCR_POOL_SIZE = max(1, int(os.getenv("INVENTORY_SCANNER_WORKERS", "2")))
 _RAPID_TITLE_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_TITLE_OCR_POOL_SIZE)
 _RAPID_TITLE_OCR_POOL_READY = False
-_DEFAULT_INVENTORY_TITLE_BOX = "0.300000,0.500000,0.380000,0.055000"
+_DEFAULT_INVENTORY_TITLE_BOX = "0.300000,0.245000,0.380000,0.027500"
 _INVENTORY_TITLE_FALLBACK_BOXES = (
-    "0.300000,0.410000,0.380000,0.055000",
-    "0.300000,0.590000,0.380000,0.055000",
-    "0.300000,0.320000,0.380000,0.055000",
-    "0.300000,0.230000,0.380000,0.055000",
-    "0.525000,0.381500,0.275000,0.037000",
+    "0.300000,0.250000,0.380000,0.027500",
+    "0.300000,0.205000,0.380000,0.027500",
+    "0.300000,0.295000,0.380000,0.027500",
+    "0.300000,0.340000,0.380000,0.027500",
+    "0.300000,0.160000,0.380000,0.027500",
+    "0.300000,0.385000,0.380000,0.027500",
+    "0.300000,0.430000,0.380000,0.027500",
+    "0.300000,0.475000,0.380000,0.027500",
+    "0.300000,0.520000,0.380000,0.027500",
+    "0.300000,0.565000,0.380000,0.027500",
+    "0.300000,0.610000,0.380000,0.027500",
 )
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
@@ -1481,39 +1487,87 @@ async def _import_inventory_scanner_images(
     started_at = time.perf_counter()
     ocr_started_at = time.perf_counter()
     calibration: dict[str, Any] | None = None
-    if live_scan:
-        ocr_text, ocr_error, calibrated_box, fast_title = await _ocr_inventory_title_images(
-            files, title_box
-        )
-        calibration = {"title_box": calibrated_box, "fast_title": fast_title}
-    else:
-        ocr_text, ocr_error = await _ocr_blueprint_images(files)
-    ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
     effective_min_score = max(min_score, 0.88) if live_scan else min_score
+    if not live_scan:
+        ocr_text, ocr_error = await _ocr_blueprint_images(files)
+        scanner_lookups = await _inventory_scanner_lookups(
+            ocr_text,
+            exclude_words,
+            category=default_category,
+            item_type=default_item_type,
+        ) if ocr_text.strip() else {}
+        items = await _match_inventory_scanner_text(
+            ocr_text,
+            default_location,
+            default_category,
+            effective_min_score,
+            exclude_words,
+            scanner_lookups,
+        ) if ocr_text.strip() else []
+        attempted_titles: list[tuple[str, str]] = []
+    else:
+        image_data, ocr_error = await _read_inventory_scanner_image(files)
+        ocr_text = ""
+        scanner_lookups: dict[str, list[tuple[Any, float]]] = {}
+        items: list[dict[str, Any]] = []
+        attempted_titles = []
+        best_review: tuple[float, str, str, dict[str, list[tuple[Any, float]]]] | None = None
+        for candidate_box in _inventory_title_boxes(title_box):
+            candidate_text = await asyncio.to_thread(
+                _read_calibrated_inventory_title,
+                image_data,
+                candidate_box,
+            ) if image_data else ""
+            if not _inventory_title_candidate_is_plausible(candidate_text):
+                continue
+            attempted_titles.append((candidate_text, candidate_box))
+            candidate_lookups = await _inventory_scanner_lookups(
+                candidate_text,
+                exclude_words,
+                candidate_limit=1,
+                category=default_category,
+                item_type=default_item_type,
+            )
+            candidate_items = await _match_inventory_scanner_text(
+                candidate_text,
+                default_location,
+                default_category,
+                effective_min_score,
+                exclude_words,
+                candidate_lookups,
+            )
+            best_score = max(
+                (
+                    score
+                    for matches in candidate_lookups.values()
+                    for _, score in matches
+                ),
+                default=0.0,
+            )
+            if best_review is None or best_score > best_review[0]:
+                best_review = (best_score, candidate_text, candidate_box, candidate_lookups)
+            if candidate_items:
+                ocr_text = candidate_text
+                scanner_lookups = candidate_lookups
+                items = candidate_items
+                calibration = {"title_box": candidate_box, "fast_title": True}
+                break
+        if not items and best_review is not None:
+            _, ocr_text, candidate_box, scanner_lookups = best_review
+            calibration = {"title_box": candidate_box, "fast_title": False}
+        elif calibration is None:
+            calibration = {"title_box": None, "fast_title": False}
+    ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
     match_started_at = time.perf_counter()
-    scanner_lookups = await _inventory_scanner_lookups(
-        ocr_text,
-        exclude_words,
-        candidate_limit=1 if live_scan else None,
-        category=default_category,
-        item_type=default_item_type,
-    ) if ocr_text.strip() else {}
-    items = await _match_inventory_scanner_text(
-        ocr_text,
-        default_location,
-        default_category,
-        effective_min_score,
-        exclude_words,
-        scanner_lookups,
-    ) if ocr_text.strip() else []
     match_ms = round((time.perf_counter() - match_started_at) * 1000)
     logging.info(
-        "Inventory scanner scan_id=%s category=%r type=%r ocr=%r matches=%r queue_ms=%d ocr_ms=%d match_ms=%d",
+        "Inventory scanner scan_id=%s category=%r type=%r ocr=%r matches=%r attempts=%r queue_ms=%d ocr_ms=%d match_ms=%d",
         scan_id,
         default_category,
         default_item_type,
         " | ".join(ocr_text.splitlines())[:500],
         [item.get("name") for item in items],
+        [(text[:120], box) for text, box in attempted_titles],
         queue_ms,
         ocr_ms,
         match_ms,
@@ -1706,6 +1760,37 @@ async def _ocr_inventory_title_images(
     return "", None, title_box, False
 
 
+async def _ocr_inventory_title_candidates(
+    files: list[UploadFile],
+    title_box: str | None,
+) -> tuple[list[tuple[str, str]], str | None]:
+    for file in files[:1]:
+        data = await file.read()
+        if not data:
+            continue
+        try:
+            candidates = await asyncio.to_thread(
+                _read_inventory_title_candidates,
+                data,
+                title_box,
+            )
+            return candidates, None
+        except Exception as exc:
+            return [], f"Could not read {file.filename or 'image'}: {exc}"
+    return [], None
+
+
+async def _read_inventory_scanner_image(
+    files: list[UploadFile],
+) -> tuple[bytes, str | None]:
+    for file in files[:1]:
+        data = await file.read()
+        if not data:
+            continue
+        return data, None
+    return b"", None
+
+
 def _read_inventory_title(
     image_data: bytes,
     title_box: str | None,
@@ -1730,6 +1815,43 @@ def _read_inventory_title(
     # back to full-frame detection takes several seconds and skips items that
     # users hover for the required one-second interval.
     return "", title_box, False
+
+
+def _read_inventory_title_candidates(
+    image_data: bytes,
+    title_box: str | None,
+) -> list[tuple[str, str]]:
+    candidate_boxes = (
+        _DEFAULT_INVENTORY_TITLE_BOX,
+        title_box,
+        *_INVENTORY_TITLE_FALLBACK_BOXES,
+    )
+    attempted_boxes: set[str] = set()
+    seen_text: set[str] = set()
+    candidates: list[tuple[str, str]] = []
+    for candidate_box in candidate_boxes:
+        if not candidate_box or candidate_box in attempted_boxes:
+            continue
+        attempted_boxes.add(candidate_box)
+        text = _read_calibrated_inventory_title(image_data, candidate_box)
+        normalized = _normalize_text(text)
+        if not _inventory_title_candidate_is_plausible(text) or normalized in seen_text:
+            continue
+        seen_text.add(normalized)
+        candidates.append((text, candidate_box))
+    return candidates
+
+
+def _inventory_title_boxes(title_box: str | None) -> tuple[str, ...]:
+    boxes: list[str] = []
+    for candidate_box in (
+        _DEFAULT_INVENTORY_TITLE_BOX,
+        title_box,
+        *_INVENTORY_TITLE_FALLBACK_BOXES,
+    ):
+        if candidate_box and candidate_box not in boxes:
+            boxes.append(candidate_box)
+    return tuple(boxes)
 
 
 def _inventory_title_candidate_is_plausible(text: str) -> bool:
@@ -2021,6 +2143,16 @@ def _initialize_rapid_title_ocr():
             _RAPID_TITLE_OCR_POOL.put(RapidOCR(use_text_det=False, use_angle_cls=False))
         _RAPID_TITLE_OCR_POOL_READY = True
     return None
+
+
+def _warm_rapid_title_ocr() -> None:
+    from PIL import Image
+
+    _initialize_rapid_title_ocr()
+    image = Image.new("RGB", (320, 48), "black")
+    output = BytesIO()
+    image.save(output, format="PNG")
+    _run_rapid_title_ocr(output.getvalue())
 
 
 def _run_rapid_title_ocr(image_data: bytes, engine: Any | None = None) -> tuple[Any, Any]:
@@ -2475,7 +2607,14 @@ def _inventory_scanner_text_candidates(text: str, exclude_words: set[str] | None
     exclude_words = exclude_words or set()
     candidates: list[str] = []
     seen: set[str] = set()
-    lines = [_clean_inventory_ocr_line(line) for line in re.split(r"[\r\n]+", text)]
+    raw_lines = [line.strip() for line in re.split(r"[\r\n]+", text) if line.strip()]
+    # Some game builds expose an internal localization key instead of a
+    # display title. Preserve its separators for class-name alias matching;
+    # generic OCR cleanup would otherwise lower an otherwise exact match.
+    for raw_line in raw_lines:
+        if re.search(r"(?i)item[\W_]*name", raw_line):
+            _add_inventory_candidate(candidates, seen, raw_line, exclude_words)
+    lines = [_clean_inventory_ocr_line(line) for line in raw_lines]
     lines = [line for line in lines if line]
     blocks = _inventory_tooltip_blocks(lines)
 
@@ -2989,6 +3128,8 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
     replacements = {
         r"\bmed\s+pen\b": "MedPen",
         r"\bchemozaly\b": "Hemozal",
+        r"\bbloodino\b": "Bloodline",
+        r"\bmulti[- ]?tooi\b": "Multi-Tool",
         r"\bkilshot\b": "Killshot",
         r"\bkillshot\b": "Killshot",
         r"\brrie\b": "Rifle",
