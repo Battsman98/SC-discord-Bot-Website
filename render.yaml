@@ -55,3 +55,7 @@ services:
         value: "300"
       - key: MAINTENANCE_RESTART_SECONDS
         value: "86400"
+      - key: INVENTORY_SCANNER_WORKERS
+        value: "2"
+      - key: INVENTORY_SCANNER_CAPACITY
+        value: "4"

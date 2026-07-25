@@ -5,6 +5,7 @@ from io import BytesIO
 from types import SimpleNamespace
 
 from PIL import Image
+import pytest
 
 import src.web as web_module
 from src.cache import SQLiteCache
@@ -580,7 +581,7 @@ def test_inventory_title_ocr_prefers_upper_hover_tooltip_over_equipped_item() ->
     ) == hover_title
 
 
-def test_shared_inventory_title_ocr_serializes_concurrent_users() -> None:
+def test_inventory_title_ocr_allows_independent_engines_to_run_concurrently() -> None:
     active_calls = 0
     max_active_calls = 0
     state_lock = threading.Lock()
@@ -604,7 +605,55 @@ def test_shared_inventory_title_ocr_serializes_concurrent_users() -> None:
     for thread in threads:
         thread.join()
 
-    assert max_active_calls == 1
+    assert max_active_calls == 2
+
+
+def test_inventory_scanner_gate_runs_two_and_queues_two_without_user_overlap() -> None:
+    async def run() -> None:
+        gate = web_module.InventoryScannerGate(worker_count=2, capacity=4)
+        active = 0
+        max_active = 0
+        entered: list[int] = []
+
+        async def scan(user_id: int) -> None:
+            nonlocal active, max_active
+            async with gate.admit(user_id) as (scan_id, queue_ms):
+                assert scan_id
+                assert queue_ms >= 0
+                active += 1
+                max_active = max(max_active, active)
+                entered.append(user_id)
+                await asyncio.sleep(0.02)
+                active -= 1
+
+        await asyncio.gather(*(scan(user_id) for user_id in range(1, 5)))
+        assert max_active == 2
+        assert sorted(entered) == [1, 2, 3, 4]
+
+    asyncio.run(run())
+
+
+def test_inventory_scanner_gate_rejects_overlapping_scan_for_same_user() -> None:
+    async def run() -> None:
+        gate = web_module.InventoryScannerGate(worker_count=1, capacity=4)
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def first_scan() -> None:
+            async with gate.admit(42):
+                entered.set()
+                await release.wait()
+
+        task = asyncio.create_task(first_scan())
+        await entered.wait()
+        with pytest.raises(web_module.HTTPException) as error:
+            async with gate.admit(42):
+                pass
+        assert error.value.status_code == 409
+        release.set()
+        await task
+
+    asyncio.run(run())
 
 
 def test_inventory_match_prefers_named_multitool_variant_over_generic_item() -> None:

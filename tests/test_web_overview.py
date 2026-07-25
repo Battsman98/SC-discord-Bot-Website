@@ -382,7 +382,9 @@ def test_live_scanner_avoids_ocr_cpu_contention_and_reports_stage_timings() -> N
     assert '"ocr_ms": ocr_ms' in python
     assert '"match_ms": match_ms' in python
     assert '"server_ms":' in python
+    assert 'INVENTORY_SCANNER_WORKERS", "2"' in python
     assert "_RAPID_OCR_POOL_SIZE = 1" in python
+    assert '"queue_ms": queue_ms' in python
     assert "result_groups = await asyncio.gather" in python
 
 

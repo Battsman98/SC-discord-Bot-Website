@@ -4,6 +4,7 @@ import hashlib
 import html
 import json
 import logging
+import os
 import queue
 import re
 import secrets
@@ -170,6 +171,43 @@ class AppState:
     updates: CitizenUpdatesSource
     warbonds: WarbondTrackerSource
     item_catalog_task: asyncio.Task | None
+    scanner_gate: "InventoryScannerGate"
+
+
+class InventoryScannerGate:
+    """Bound live OCR concurrency while keeping each admitted scan user-bound."""
+
+    def __init__(self, worker_count: int = 2, capacity: int = 4) -> None:
+        self.worker_count = max(1, worker_count)
+        self.capacity = max(self.worker_count, capacity)
+        self._workers = asyncio.Semaphore(self.worker_count)
+        self._state_lock = asyncio.Lock()
+        self._admitted_users: set[int] = set()
+
+    @asynccontextmanager
+    async def admit(self, user_id: int):
+        scan_id = secrets.token_urlsafe(12)
+        async with self._state_lock:
+            if user_id in self._admitted_users:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This account already has an inventory scan in progress.",
+                )
+            if len(self._admitted_users) >= self.capacity:
+                raise HTTPException(
+                    status_code=429,
+                    detail="The inventory scanner is busy. Try again in a few seconds.",
+                    headers={"Retry-After": "2"},
+                )
+            self._admitted_users.add(user_id)
+
+        queued_at = time.perf_counter()
+        try:
+            async with self._workers:
+                yield scan_id, round((time.perf_counter() - queued_at) * 1000)
+        finally:
+            async with self._state_lock:
+                self._admitted_users.discard(user_id)
 
 
 class MiningCommunityRequest(BaseModel):
@@ -267,6 +305,10 @@ async def lifespan(app: FastAPI):
     app.state.game_assist.sources = sources
     app.state.game_assist.updates = updates
     app.state.game_assist.warbonds = warbonds
+    app.state.game_assist.scanner_gate = InventoryScannerGate(
+        worker_count=int(os.getenv("INVENTORY_SCANNER_WORKERS", "2")),
+        capacity=int(os.getenv("INVENTORY_SCANNER_CAPACITY", "4")),
+    )
     app.state.game_assist.item_catalog_task = asyncio.create_task(
         _item_catalog_maintenance_loop(sources),
         name="item-catalog-maintenance",
@@ -299,8 +341,9 @@ _RAPID_OCR_LOCK = threading.Lock()
 _RAPID_OCR_POOL_SIZE = 1
 _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_SIZE)
 _RAPID_OCR_POOL_READY = False
-_RAPID_TITLE_OCR = None
-_RAPID_TITLE_OCR_RUN_LOCK = threading.Lock()
+_RAPID_TITLE_OCR_POOL_SIZE = max(1, int(os.getenv("INVENTORY_SCANNER_WORKERS", "2")))
+_RAPID_TITLE_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_TITLE_OCR_POOL_SIZE)
+_RAPID_TITLE_OCR_POOL_READY = False
 _DEFAULT_INVENTORY_TITLE_BOX = "0.300000,0.500000,0.380000,0.055000"
 _INVENTORY_TITLE_FALLBACK_BOXES = (
     "0.300000,0.410000,0.380000,0.055000",
@@ -1388,16 +1431,53 @@ async def import_inventory_from_images(
     exclude_words: str | None = None,
     user=Depends(require_user),
 ) -> dict[str, Any]:
-    del user
     if scanner_mode and not (default_category or "").strip():
         raise HTTPException(
             status_code=422,
             detail="Select the matching in-game inventory category before scanning.",
         )
+    if scanner_mode:
+        async with state().scanner_gate.admit(user.id) as (scan_id, queue_ms):
+            return await _import_inventory_scanner_images(
+                files,
+                default_location,
+                default_category,
+                default_item_type,
+                live_scan,
+                title_box,
+                min_score,
+                exclude_words,
+                scan_id,
+                queue_ms,
+            )
+
+    ocr_text, ocr_error = await _ocr_blueprint_images(files)
+    return {
+        "ocr_available": ocr_error is None,
+        "ocr_error": ocr_error,
+        "ocr_text": ocr_text,
+        "items": await _enrich_inventory_items(
+            _inventory_items_from_text(ocr_text, default_location, default_category)
+        ) if ocr_text.strip() else [],
+    }
+
+
+async def _import_inventory_scanner_images(
+    files: list[UploadFile],
+    default_location: str | None,
+    default_category: str | None,
+    default_item_type: str | None,
+    live_scan: bool,
+    title_box: str | None,
+    min_score: float,
+    exclude_words: str | None,
+    scan_id: str,
+    queue_ms: int,
+) -> dict[str, Any]:
     started_at = time.perf_counter()
     ocr_started_at = time.perf_counter()
     calibration: dict[str, Any] | None = None
-    if scanner_mode and live_scan:
+    if live_scan:
         ocr_text, ocr_error, calibrated_box, fast_title = await _ocr_inventory_title_images(
             files, title_box
         )
@@ -1405,64 +1485,54 @@ async def import_inventory_from_images(
     else:
         ocr_text, ocr_error = await _ocr_blueprint_images(files)
     ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
-    if scanner_mode:
-        effective_min_score = max(min_score, 0.88) if live_scan else min_score
-        match_started_at = time.perf_counter()
-        scanner_lookups = await _inventory_scanner_lookups(
-            ocr_text,
-            exclude_words,
-            candidate_limit=1 if live_scan else None,
-            category=default_category,
-            item_type=default_item_type,
-        ) if ocr_text.strip() else {}
-        items = await _match_inventory_scanner_text(
-            ocr_text,
-            default_location,
-            default_category,
-            effective_min_score,
-            exclude_words,
-            scanner_lookups,
-        ) if ocr_text.strip() else []
-        match_ms = round((time.perf_counter() - match_started_at) * 1000)
-        logging.info(
-            "Inventory scanner category=%r type=%r ocr=%r matches=%r ocr_ms=%d match_ms=%d",
-            default_category,
-            default_item_type,
-            " | ".join(ocr_text.splitlines())[:500],
-            [item.get("name") for item in items],
-            ocr_ms,
-            match_ms,
-        )
-        return {
-            "ocr_available": ocr_error is None,
-            "ocr_error": ocr_error,
-            "ocr_text": ocr_text,
-            "items": items,
-            "calibration": calibration,
-            "diagnostics": await _inventory_scanner_diagnostics(
-                ocr_text,
-                effective_min_score,
-                exclude_words,
-                scanner_lookups,
-            ) if ocr_text.strip() else {"candidates": [], "rejected_lines": []},
-            "performance": {
-                "ocr_ms": ocr_ms,
-                "match_ms": match_ms,
-                "server_ms": round((time.perf_counter() - started_at) * 1000),
-            },
-        }
+    effective_min_score = max(min_score, 0.88) if live_scan else min_score
+    match_started_at = time.perf_counter()
+    scanner_lookups = await _inventory_scanner_lookups(
+        ocr_text,
+        exclude_words,
+        candidate_limit=1 if live_scan else None,
+        category=default_category,
+        item_type=default_item_type,
+    ) if ocr_text.strip() else {}
+    items = await _match_inventory_scanner_text(
+        ocr_text,
+        default_location,
+        default_category,
+        effective_min_score,
+        exclude_words,
+        scanner_lookups,
+    ) if ocr_text.strip() else []
+    match_ms = round((time.perf_counter() - match_started_at) * 1000)
+    logging.info(
+        "Inventory scanner scan_id=%s category=%r type=%r ocr=%r matches=%r queue_ms=%d ocr_ms=%d match_ms=%d",
+        scan_id,
+        default_category,
+        default_item_type,
+        " | ".join(ocr_text.splitlines())[:500],
+        [item.get("name") for item in items],
+        queue_ms,
+        ocr_ms,
+        match_ms,
+    )
     return {
+        "scan_id": scan_id,
         "ocr_available": ocr_error is None,
         "ocr_error": ocr_error,
         "ocr_text": ocr_text,
-        "items": await _enrich_inventory_items(
-            _inventory_items_from_text(
-                ocr_text,
-                default_location,
-                default_category,
-                first_match=scanner_mode,
-            )
-        ) if ocr_text.strip() else [],
+        "items": items,
+        "calibration": calibration,
+        "diagnostics": await _inventory_scanner_diagnostics(
+            ocr_text,
+            effective_min_score,
+            exclude_words,
+            scanner_lookups,
+        ) if ocr_text.strip() else {"candidates": [], "rejected_lines": []},
+        "performance": {
+            "queue_ms": queue_ms,
+            "ocr_ms": ocr_ms,
+            "match_ms": match_ms,
+            "server_ms": round((time.perf_counter() - started_at) * 1000),
+        },
     }
 
 
@@ -1936,25 +2006,29 @@ def _initialize_rapid_ocr_pool() -> None:
 
 
 def _initialize_rapid_title_ocr():
-    global _RAPID_TITLE_OCR
-    if _RAPID_TITLE_OCR is not None:
-        return _RAPID_TITLE_OCR
+    global _RAPID_TITLE_OCR_POOL_READY
+    if _RAPID_TITLE_OCR_POOL_READY:
+        return None
     from rapidocr_onnxruntime import RapidOCR
     with _RAPID_OCR_LOCK:
-        if _RAPID_TITLE_OCR is None:
-            _RAPID_TITLE_OCR = RapidOCR(use_text_det=False, use_angle_cls=False)
-    return _RAPID_TITLE_OCR
+        if _RAPID_TITLE_OCR_POOL_READY:
+            return None
+        while _RAPID_TITLE_OCR_POOL.qsize() < _RAPID_TITLE_OCR_POOL_SIZE:
+            _RAPID_TITLE_OCR_POOL.put(RapidOCR(use_text_det=False, use_angle_cls=False))
+        _RAPID_TITLE_OCR_POOL_READY = True
+    return None
 
 
 def _run_rapid_title_ocr(image_data: bytes, engine: Any | None = None) -> tuple[Any, Any]:
-    """Run the shared recognition-only OCR engine one request at a time.
-
-    RapidOCR's ONNX session is reused to keep live scans fast, but the session
-    is not safe to invoke concurrently from separate asyncio worker threads.
-    """
-    title_engine = engine or _initialize_rapid_title_ocr()
-    with _RAPID_TITLE_OCR_RUN_LOCK:
+    """Run recognition with a dedicated pooled engine per concurrent request."""
+    if engine is not None:
+        return engine(image_data)
+    _initialize_rapid_title_ocr()
+    title_engine = _RAPID_TITLE_OCR_POOL.get(timeout=30)
+    try:
         return title_engine(image_data)
+    finally:
+        _RAPID_TITLE_OCR_POOL.put(title_engine)
 
 
 def _rapid_ocr_engine():
