@@ -213,6 +213,8 @@ let inventoryScannerQueue = [];
 const inventoryScannerQueueLimit = 24;
 let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
+let inventoryScannerPendingMatchKey = "";
+let inventoryScannerPendingMatchCount = 0;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
@@ -1652,6 +1654,8 @@ async function startInventoryScanner() {
   inventoryScannerCaptureBusy = false;
   inventoryScannerQueue = [];
   inventoryScannerStopping = false;
+  inventoryScannerPendingMatchKey = "";
+  inventoryScannerPendingMatchCount = 0;
   inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
   inventoryScannerLastContextHash = "";
@@ -1801,16 +1805,40 @@ async function processInventoryScannerCapture(capture) {
     captureMs: capture.captureMs,
     captureToken: capture.captureToken,
     scannerGeneration: capture.generation,
+    deferRender: true,
   });
   if (capture.generation !== inventoryScannerGeneration) return;
   if (payload?.items?.length) {
-    inventoryScannerLastHash = capture.hash;
-    inventoryScannerLastContextHash = capture.contextHash;
-    inventoryScannerEmptyReadStreak = 0;
-  } else {
-    if (payload?.calibration?.fast_title) {
-      inventoryScannerTitleBox = "";
+    const candidate = payload.items[0];
+    const candidateKey = inventoryImportKey(candidate);
+    if (candidateKey === inventoryScannerPendingMatchKey) {
+      inventoryScannerPendingMatchCount += 1;
+    } else {
+      inventoryScannerPendingMatchKey = candidateKey;
+      inventoryScannerPendingMatchCount = 1;
     }
+    inventoryScannerEmptyReadStreak = 0;
+    if (inventoryScannerPendingMatchCount >= 2) {
+      renderInventoryImportItems(payload, {
+        append: true,
+        scannerMode: true,
+        liveScan: Boolean(inventoryScannerStream),
+        captureToken: capture.captureToken,
+      });
+      inventoryScannerLastHash = capture.hash;
+      inventoryScannerLastContextHash = capture.contextHash;
+      inventoryScannerPendingMatchKey = "";
+      inventoryScannerPendingMatchCount = 0;
+    } else {
+      inventoryScannerStatus = `Confirming ${candidate.name}. Keep the pointer still for one more read.`;
+      renderInventoryImportItems(
+        { items: inventoryImportItems, scan_status: inventoryScannerStatus },
+        { scannerMode: true, recordHistory: false, liveScan: Boolean(inventoryScannerStream) },
+      );
+    }
+  } else {
+    inventoryScannerPendingMatchKey = "";
+    inventoryScannerPendingMatchCount = 0;
     inventoryScannerEmptyReadStreak += 1;
     if (inventoryScannerEmptyReadStreak >= 1) {
       inventoryScannerReadyToCount = true;
@@ -1959,8 +1987,8 @@ async function captureInventoryScannerCrop() {
 }
 
 function inventoryScannerTextHeightRatio() {
-  const value = Number(document.querySelector("#inventoryScannerTextHeight")?.value || 25);
-  return Math.min(0.5, Math.max(0.1, value / 100));
+  const value = Number(document.querySelector("#inventoryScannerTextHeight")?.value || 50);
+  return Math.min(1, Math.max(0.3, value / 100));
 }
 
 function imageAverageHash(sourceCanvas, size = 16) {
@@ -2062,7 +2090,6 @@ async function submitInventoryImages(files, options = {}) {
     params.set("scanner_mode", "true");
     if (options.liveScan) {
       params.set("live_scan", "true");
-      if (inventoryScannerTitleBox) params.set("title_box", inventoryScannerTitleBox);
     }
     params.set("min_score", String(Number(document.querySelector("#inventoryScannerMinScore")?.value || 0.72)));
     const excludeWords = document.querySelector("#inventoryScannerExcludeWords")?.value.trim();
@@ -2088,12 +2115,14 @@ async function submitInventoryImages(files, options = {}) {
     if (payload.ocr_text && document.querySelector(".scanner-manual")?.open) {
       document.querySelector("#inventoryOcrText").value = payload.ocr_text;
     }
-    renderInventoryImportItems(payload, {
-      append: Boolean(options.append),
-      scannerMode: Boolean(options.scannerMode),
-      liveScan: Boolean(options.liveScan),
-      captureToken: options.captureToken || "",
-    });
+    if (!options.deferRender) {
+      renderInventoryImportItems(payload, {
+        append: Boolean(options.append),
+        scannerMode: Boolean(options.scannerMode),
+        liveScan: Boolean(options.liveScan),
+        captureToken: options.captureToken || "",
+      });
+    }
     return payload;
   } catch (error) {
     if (options.scannerGeneration !== undefined

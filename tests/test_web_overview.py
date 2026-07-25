@@ -270,7 +270,10 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
 
     assert 'canvas.toBlob(resolve, "image/webp", 0.9)' in javascript
     assert 'params.set("live_scan", "true")' in javascript
-    assert 'params.set("title_box", inventoryScannerTitleBox)' in javascript
+    assert 'params.set("title_box", inventoryScannerTitleBox)' not in javascript
+    assert 'id="inventoryScannerTextHeight" type="number" min="30" max="100" step="5" value="50"' in (
+        WEB_DIR / "index.html"
+    ).read_text(encoding="utf-8")
 
 
 def test_live_inventory_scanner_retries_missed_reads_and_collapses_near_duplicate_frames() -> None:
@@ -327,6 +330,8 @@ def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     assert "inventoryScannerCaptureBusy" in javascript
     assert "drainInventoryScannerQueue()" in javascript
     assert "processInventoryScannerCapture(capture)" in javascript
+    assert "inventoryScannerPendingMatchCount >= 2" in javascript
+    assert "deferRender: true" in javascript
     assert "inventoryScannerQueue.shift()" in javascript
 
 

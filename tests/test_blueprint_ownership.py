@@ -1,5 +1,8 @@
 import asyncio
+from io import BytesIO
 from types import SimpleNamespace
+
+from PIL import Image
 
 import src.web as web_module
 from src.cache import SQLiteCache
@@ -13,6 +16,7 @@ from src.web import (
     _inventory_catalog_item_type,
     _inventory_item_from_tooltip_text,
     _inventory_match_confidence,
+    _read_inventory_title_bands,
     _inventory_scanner_accepted_matches,
     _inventory_scanner_diagnostics,
     _inventory_scanner_lookups,
@@ -719,6 +723,26 @@ def test_inventory_match_confidence_scores_catalog_names() -> None:
     assert _inventory_match_confidence("FS-9 LMG", "FS-9 LMG") == 1
     assert _inventory_match_confidence("FS-9", "FS-9 LMG") >= 0.58
     assert _inventory_match_confidence("Effective Range", "FS-9 LMG") == 0
+
+
+def test_inventory_title_bands_keep_titles_and_reject_metadata(monkeypatch) -> None:
+    calls = 0
+
+    def fake_engine(_image):
+        nonlocal calls
+        calls += 1
+        text = "Volume: 8000 uSCU" if calls == 1 else "Venture Core"
+        return [[None, text]], None
+
+    monkeypatch.setattr(web_module, "_initialize_rapid_title_ocr", lambda: fake_engine)
+    image = Image.new("RGB", (240, 120), "black")
+    output = BytesIO()
+    image.save(output, format="PNG")
+
+    text = _read_inventory_title_bands(output.getvalue())
+
+    assert "Venture Core" in text
+    assert "Volume" not in text
 
 
 def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:

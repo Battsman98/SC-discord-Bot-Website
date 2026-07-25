@@ -1609,10 +1609,10 @@ def _read_inventory_title(
     image_data: bytes,
     title_box: str | None,
 ) -> tuple[str, str | None, bool]:
-    if title_box:
-        fast_text = _read_calibrated_inventory_title(image_data, title_box)
-        if fast_text:
-            return fast_text, title_box, True
+    del title_box
+    fast_text = _read_inventory_title_bands(image_data)
+    if fast_text:
+        return fast_text, None, True
 
     _initialize_rapid_ocr_pool()
     engine = _RAPID_OCR_POOL.get(timeout=30)
@@ -1624,7 +1624,50 @@ def _read_inventory_title(
     if candidate is None:
         return "", None, False
     title = str(candidate[1]).strip()
-    return title, _normalized_ocr_box(image_data, candidate[0]), False
+    return title, None, False
+
+
+def _read_inventory_title_bands(image_data: bytes) -> str:
+    """Read overlapping horizontal lines without assuming a fixed tooltip position."""
+    try:
+        from PIL import Image
+
+        image = Image.open(BytesIO(image_data)).convert("RGB")
+        width, height = image.size
+        if width < 2 or height < 2:
+            return ""
+        engine = _initialize_rapid_title_ocr()
+        band_height = min(height, 32)
+        step = 16
+        texts: list[str] = []
+        seen: set[str] = set()
+        for top in range(0, max(1, height - band_height + step), step):
+            bottom = min(height, top + band_height)
+            if bottom - top < 16:
+                continue
+            band = image.crop((0, top, width, bottom))
+            band = band.resize((width * 2, (bottom - top) * 2))
+            output = BytesIO()
+            band.save(output, format="PNG")
+            result, _ = engine(output.getvalue())
+            text = " ".join(
+                str(item[1]).strip()
+                for item in result or []
+                if len(item) > 1 and str(item[1]).strip()
+            ).strip()
+            normalized = _normalize_text(text)
+            if (
+                not text
+                or len(normalized) < 3
+                or normalized in seen
+                or _inventory_scanner_line_is_metadata(text)
+            ):
+                continue
+            seen.add(normalized)
+            texts.append(text)
+        return "\n".join(texts)
+    except Exception:
+        return ""
 
 
 def _top_inventory_ocr_candidate(result: object) -> Any | None:

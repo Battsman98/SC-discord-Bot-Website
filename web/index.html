@@ -400,9 +400,10 @@
           <button type="button" data-action-button="stopInventoryScanner">Stop</button>
         </div>
         <p class="scanner-timing-guide">
-          <strong>Scanning timing:</strong> The first readable item calibrates the title area and normally takes
-          5–6 seconds. The first fast scan can take up to 1 second while recognition warms; following title reads
-          typically process in about 0.1–0.2 seconds, plus network time. Hold each item hover for about 1 second.
+          <strong>Scanning timing:</strong> Each capture now searches the tooltip for its title instead of reusing
+          a fixed position. An item is added after the same catalog title is read twice. Hold each item steady until
+          the confirmation message clears, normally about 1.5–2.5 seconds after warm-up. The first item can take
+          about 3–5 seconds while recognition warms.
           For another copy of the same item, move to the next inventory tile so its highlight changes.
         </p>
         <div class="scanner-preview">
@@ -423,7 +424,7 @@
             </label>
             <label>
               Title band height
-              <input id="inventoryScannerTextHeight" type="number" min="10" max="50" step="5" value="25">
+              <input id="inventoryScannerTextHeight" type="number" min="30" max="100" step="5" value="50">
             </label>
             <input id="inventoryScannerExcludeWords" placeholder="Ignore words">
           </div>
