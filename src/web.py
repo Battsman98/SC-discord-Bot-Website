@@ -550,6 +550,10 @@ async def health() -> dict[str, Any]:
         "database_path": settings.database_path,
         "discord_auth_enabled": discord_auth_configured(settings),
         "legacy_admin_token_enabled": bool(settings.web_admin_token),
+        "inventory_scanner": {
+            "workers": state().scanner_gate.worker_count,
+            "capacity": state().scanner_gate.capacity,
+        },
         "item_catalog": catalog,
         "configured_channels": {
             "commands": settings.commands_channel_id,
