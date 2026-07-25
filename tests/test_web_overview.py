@@ -277,6 +277,7 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     assert 'id="inventoryImportType"' in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert 'params.set("default_item_type", itemType)' in javascript
     assert 'default_item_type: document.querySelector("#inventoryImportType")?.value || null' in javascript
+    assert "scanner-title-bands-v2" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
 
 def test_live_inventory_scanner_retries_missed_reads_and_collapses_near_duplicate_frames() -> None:

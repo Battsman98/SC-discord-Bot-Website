@@ -319,6 +319,8 @@ async def _item_catalog_maintenance_loop(sources: SourceRegistry) -> None:
 @app.middleware("http")
 async def track_website_visitors(request: Request, call_next):
     response = await call_next(request)
+    if request.url.path in {"/assets/app.js", "/assets/styles.css"}:
+        response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
     is_page_visit = request.method == "GET" and request.url.path == "/"
     is_activity_ping = request.method == "POST" and request.url.path == "/api/activity"
     if (is_page_visit or is_activity_ping) and response.status_code < 400 and hasattr(app.state, "game_assist"):
