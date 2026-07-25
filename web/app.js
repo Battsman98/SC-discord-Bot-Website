@@ -1453,7 +1453,7 @@ function addInventoryScannerHistory(payload, countedItems = payload.items || [])
     );
     inventoryScannerHistory.unshift(reviewEntry);
   }
-  inventoryScannerHistory = inventoryScannerHistory.slice(0, 24);
+  inventoryScannerHistory = inventoryScannerHistory.slice(0, 100);
 }
 
 function renderInventoryScanProgress() {
@@ -1463,6 +1463,10 @@ function renderInventoryScanProgress() {
   if (!inventoryScannerHistory.length) return timing;
   const acceptedCount = inventoryScannerHistory.filter((entry) => entry.status === "accepted").length;
   const reviewCount = inventoryScannerHistory.filter((entry) => entry.status === "review").length;
+  const orderedHistory = [
+    ...inventoryScannerHistory.filter((entry) => entry.status !== "accepted"),
+    ...inventoryScannerHistory.filter((entry) => entry.status === "accepted"),
+  ];
   return `<section class="scanner-progress">
     <div class="scanner-progress-heading">
       <h3>Scanner Results</h3>
@@ -1471,7 +1475,7 @@ function renderInventoryScanProgress() {
       ${timing}
     </div>
     <ul>
-      ${inventoryScannerHistory.map((entry) => `<li class="${entry.status}">
+      ${orderedHistory.map((entry) => `<li class="${entry.status}">
         <span>${escapeHtml(entry.timestamp)}</span>
         <strong>${escapeHtml(entry.text)}</strong>
         <small>${escapeHtml(entry.detail || entry.status)}</small>
@@ -1804,6 +1808,7 @@ async function processInventoryScannerCapture(capture) {
     captureToken: capture.captureToken,
     scannerGeneration: capture.generation,
     deferRender: true,
+    titleBox: capture.requestTitleBox,
   });
   if (capture.generation !== inventoryScannerGeneration) return;
   if (payload?.items?.length) {
@@ -1815,10 +1820,10 @@ async function processInventoryScannerCapture(capture) {
       ? `Recognized: ${names.join(", ")}. Move to the next item.`
       : "Item recognized. Move to the next item.";
   } else {
-    if (payload?.calibration?.fast_title) {
+    inventoryScannerEmptyReadStreak += 1;
+    if (payload?.calibration?.fast_title && inventoryScannerEmptyReadStreak >= 3) {
       inventoryScannerTitleBox = "";
     }
-    inventoryScannerEmptyReadStreak += 1;
     inventoryScannerStatus = "No confident read yet. Processing the next captured tooltip.";
   }
   if (payload) {
@@ -1930,11 +1935,27 @@ async function captureInventoryScannerCrop() {
   const sourceWidth = video.videoWidth;
   const sourceHeight = video.videoHeight;
   const crop = inventoryScannerCrop || { x: 0, y: 0, width: 1, height: 1 };
-  const sx = Math.round(crop.x * sourceWidth);
-  const sy = Math.round(crop.y * sourceHeight);
-  const sw = Math.round(crop.width * sourceWidth);
+  let sx = Math.round(crop.x * sourceWidth);
+  let sy = Math.round(crop.y * sourceHeight);
+  let sw = Math.round(crop.width * sourceWidth);
   const fullCropHeight = Math.round(crop.height * sourceHeight);
-  const sh = Math.max(1, Math.round(fullCropHeight * inventoryScannerTextHeightRatio()));
+  let sh = Math.max(1, Math.round(fullCropHeight * inventoryScannerTextHeightRatio()));
+  let requestTitleBox;
+  const calibratedValues = inventoryScannerTitleBox
+    ? inventoryScannerTitleBox.split(",").map((value) => Number(value))
+    : [];
+  if (calibratedValues.length === 4
+    && calibratedValues.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+    && calibratedValues[2] > 0
+    && calibratedValues[3] > 0) {
+    const originalWidth = sw;
+    const originalHeight = sh;
+    sx += Math.round(calibratedValues[0] * originalWidth);
+    sy += Math.round(calibratedValues[1] * originalHeight);
+    sw = Math.max(1, Math.round(calibratedValues[2] * originalWidth));
+    sh = Math.max(1, Math.round(calibratedValues[3] * originalHeight));
+    requestTitleBox = "0,0,1,1";
+  }
   const maxWidth = 1280;
   const scale = Math.min(1, maxWidth / Math.max(1, sw));
   const targetWidth = Math.max(1, Math.round(sw * scale));
@@ -1968,6 +1989,7 @@ async function captureInventoryScannerCrop() {
     hash,
     contextHash,
     tileToken,
+    requestTitleBox,
   };
 }
 
@@ -2127,7 +2149,10 @@ async function submitInventoryImages(files, options = {}) {
     params.set("scanner_mode", "true");
     if (options.liveScan) {
       params.set("live_scan", "true");
-      if (inventoryScannerTitleBox) params.set("title_box", inventoryScannerTitleBox);
+      const requestTitleBox = options.titleBox !== undefined
+        ? options.titleBox
+        : inventoryScannerTitleBox;
+      if (requestTitleBox) params.set("title_box", requestTitleBox);
     }
     params.set("min_score", String(Number(document.querySelector("#inventoryScannerMinScore")?.value || 0.72)));
     const excludeWords = document.querySelector("#inventoryScannerExcludeWords")?.value.trim();
@@ -2146,7 +2171,7 @@ async function submitInventoryImages(files, options = {}) {
         request_ms: Math.round(performance.now() - requestStartedAt),
         ...(payload.performance || {}),
       };
-      if (payload.calibration?.title_box) {
+      if (payload.calibration?.title_box && options.titleBox === undefined) {
         inventoryScannerTitleBox = payload.calibration.title_box;
       }
     }

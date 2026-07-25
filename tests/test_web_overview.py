@@ -270,7 +270,8 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
 
     assert 'canvas.toBlob(resolve, "image/webp", 0.9)' in javascript
     assert 'params.set("live_scan", "true")' in javascript
-    assert 'params.set("title_box", inventoryScannerTitleBox)' in javascript
+    assert "requestTitleBox = options.titleBox !== undefined" in javascript
+    assert 'params.set("title_box", requestTitleBox)' in javascript
     assert 'id="inventoryScannerTextHeight" type="number" min="30" max="100" step="5" value="65"' in (
         WEB_DIR / "index.html"
     ).read_text(encoding="utf-8")
@@ -307,6 +308,19 @@ def test_live_inventory_scanner_retries_missed_reads_and_collapses_near_duplicat
     assert 'Math.max(250' in javascript
     assert 'id="inventoryScannerSpacing" type="number" min="250" step="50" value="350"' in html
     assert 'inventoryScannerSpacingInput.value = "350"' in javascript
+
+
+def test_live_inventory_scanner_keeps_fast_calibration_and_places_confirmed_results_last() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "inventoryScannerHistory.slice(0, 100)" in javascript
+    assert 'entry.status !== "accepted"' in javascript
+    assert 'entry.status === "accepted"' in javascript
+    assert "orderedHistory.map" in javascript
+    assert "inventoryScannerEmptyReadStreak >= 3" in javascript
+    assert 'requestTitleBox = "0,0,1,1"' in javascript
+    assert "titleBox: capture.requestTitleBox" in javascript
+    assert "payload.calibration?.title_box && options.titleBox === undefined" in javascript
 
 
 def test_window_share_auto_starts_scanning_and_stop_ignores_late_results() -> None:
