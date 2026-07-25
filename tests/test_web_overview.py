@@ -292,7 +292,7 @@ def test_form_controls_receive_persistent_labels_above_their_blocks() -> None:
     assert 'id="inventoryImportType"' in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert 'params.set("default_item_type", itemType)' in javascript
     assert 'default_item_type: document.querySelector("#inventoryImportType")?.value || null' in javascript
-    assert "tooltip-anchor-v5" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "persistent-labels-v6" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert "inventoryTypeOptions(category, validCurrent" in javascript
 
 
