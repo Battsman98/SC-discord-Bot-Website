@@ -1374,6 +1374,7 @@ function renderInventoryImportItems(payload, options = {}) {
       <h3>${totalQuantity} scanned across ${items.length} unique item${items.length === 1 ? "" : "s"}</h3>
       <button type="button" data-inventory-save-all>Save All</button>
     </div>
+    <div class="import-review-list" tabindex="0" aria-label="Scanned items to review">
     ${items.map((item) => `<div class="inventory-import-row">
       <label class="import-name-field"><span>Name</span><input data-import-name value="${escapeAttribute(item.name)}"></label>
       <label class="import-category-field"><span>Category</span>${inventoryCategorySelect("data-import-category", item.category || "")}</label>
@@ -1390,6 +1391,7 @@ function renderInventoryImportItems(payload, options = {}) {
         <button type="button" data-inventory-import-remove>Remove</button>
       </div>
     </div>`).join("")}
+    </div>
   </div>${scanProgress}${diagnostics}${textPreview}`;
   bindInventoryCategoryMenus(outputs.inventoryImport);
   bindInventoryImportButtons(outputs.inventoryImport);

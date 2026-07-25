@@ -1761,6 +1761,23 @@ body.hangar-modal-open {
   margin: 0;
 }
 
+.import-review-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(46vh, 430px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 5px;
+}
+
+.import-review-list:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
 .inventory-import-row {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));

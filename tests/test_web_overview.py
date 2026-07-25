@@ -357,7 +357,10 @@ def test_scanner_review_rows_use_compact_inventory_density() -> None:
     assert 'class="import-quality-field"><span>Quality</span>' in javascript
     assert 'class="import-scu-field"><span>SCU</span>' in javascript
     assert 'class="import-notes-field"><span>Scanner notes</span>' in javascript
+    assert 'class="import-review-list"' in javascript
     assert ".inventory-import-row {" in css
+    assert ".import-review-list {" in css
+    assert "overflow-y: auto" in css
     assert "grid-template-columns: repeat(12, minmax(0, 1fr))" in css
     assert ".import-notes-field { grid-column: span 6; }" in css
 
