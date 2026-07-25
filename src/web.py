@@ -1640,11 +1640,12 @@ def _read_inventory_title(
     fast_text = _read_calibrated_inventory_title(image_data, active_box)
     if fast_text:
         return fast_text, active_box, True
-    if not title_box:
-        for fallback_box in _INVENTORY_TITLE_FALLBACK_BOXES:
-            fast_text = _read_calibrated_inventory_title(image_data, fallback_box)
-            if fast_text:
-                return fast_text, fallback_box, True
+    for fallback_box in _INVENTORY_TITLE_FALLBACK_BOXES:
+        if fallback_box == active_box:
+            continue
+        fast_text = _read_calibrated_inventory_title(image_data, fallback_box)
+        if fast_text:
+            return fast_text, fallback_box, True
     # Keep live requests bounded to the title-only recognition path. Falling
     # back to full-frame detection takes several seconds and skips items that
     # users hover for the required one-second interval.

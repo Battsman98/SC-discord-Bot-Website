@@ -495,6 +495,25 @@ def test_inventory_title_uses_bounded_fallback_bands_when_default_misses(monkeyp
     assert len(attempted_boxes) == 3
 
 
+def test_inventory_title_recalibrates_when_previous_title_position_misses(monkeypatch) -> None:
+    attempted_boxes: list[str] = []
+
+    def fake_read(_image_data: bytes, title_box: str) -> str:
+        attempted_boxes.append(title_box)
+        return "JS-400" if len(attempted_boxes) == 2 else ""
+
+    monkeypatch.setattr(web_module, "_read_calibrated_inventory_title", fake_read)
+
+    text, calibrated_box, used_fast = web_module._read_inventory_title(
+        b"image",
+        "0.525000,0.381500,0.275000,0.037000",
+    )
+
+    assert text == "JS-400"
+    assert calibrated_box == attempted_boxes[1]
+    assert used_fast is True
+
+
 def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
     assert _inventory_catalog_item_type("Navoi Boot and Pants Striker", "Clothing") == "Footwear"
     assert _inventory_catalog_item_type("ThermoWave Gloves ASD Edition", "Clothing") == "Gloves"

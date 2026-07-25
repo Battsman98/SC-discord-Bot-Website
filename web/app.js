@@ -1776,11 +1776,14 @@ async function scanInventoryHover() {
     const captureToken = `${capture.hash}:${capture.tileToken || capture.contextHash}`;
     if ((inventoryScannerLastHash
         && imageHashDistance(inventoryScannerLastHash, capture.hash) <= 2
-        && imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) <= 4)
+        && imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) <= 4
+        && (!capture.tileToken
+          || capture.tileToken === inventoryScannerLastCountedCaptureToken))
       || inventoryScannerPendingHashes.has(captureToken)
       || inventoryScannerQueue.some((queued) =>
         imageHashDistance(queued.hash, capture.hash) <= 2
-        && imageHashDistance(queued.contextHash, capture.contextHash) <= 4)) {
+        && imageHashDistance(queued.contextHash, capture.contextHash) <= 4
+        && queued.tileToken === capture.tileToken)) {
       return;
     }
     inventoryScannerQueue.push({
@@ -1970,19 +1973,7 @@ async function captureInventoryScannerCrop() {
     && calibratedValues.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
     && calibratedValues[2] > 0
     && calibratedValues[3] > 0) {
-    const originalWidth = sw;
-    const originalHeight = sh;
-    const verticalPadding = Math.max(0.004, calibratedValues[3] * 0.15);
-    const paddedTop = Math.max(0, calibratedValues[1] - verticalPadding);
-    const paddedBottom = Math.min(
-      1,
-      calibratedValues[1] + calibratedValues[3] + verticalPadding,
-    );
-    sx += Math.round(calibratedValues[0] * originalWidth);
-    sy += Math.round(paddedTop * originalHeight);
-    sw = Math.max(1, Math.round(calibratedValues[2] * originalWidth));
-    sh = Math.max(1, Math.round((paddedBottom - paddedTop) * originalHeight));
-    requestTitleBox = "0,0,1,1";
+    requestTitleBox = inventoryScannerTitleBox;
   }
   const maxWidth = 1280;
   const scale = Math.min(1, maxWidth / Math.max(1, sw));

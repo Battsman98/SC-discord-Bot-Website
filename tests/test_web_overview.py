@@ -341,10 +341,11 @@ def test_live_inventory_scanner_keeps_fast_calibration_and_places_confirmed_resu
     assert 'entry.status === "accepted"' in javascript
     assert "orderedHistory.map" in javascript
     assert "inventoryScannerEmptyReadStreak >= 8" in javascript
-    assert "const verticalPadding = Math.max(0.004, calibratedValues[3] * 0.15)" in javascript
+    assert "requestTitleBox = inventoryScannerTitleBox" in javascript
+    assert 'requestTitleBox = "0,0,1,1"' not in javascript
+    assert "queued.tileToken === capture.tileToken" in javascript
     assert 'addInventoryScannerHistory(payload, countedScannerItems, options.captureToken || "")' in javascript
     assert "entry.captureToken === captureToken" in javascript
-    assert 'requestTitleBox = "0,0,1,1"' in javascript
     assert "titleBox: capture.requestTitleBox" in javascript
     assert "payload.calibration?.title_box && options.titleBox === undefined" in javascript
 
