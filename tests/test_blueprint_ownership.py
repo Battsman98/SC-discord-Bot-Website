@@ -832,8 +832,12 @@ def test_inventory_scanner_optional_type_filter_restricts_catalog_matches(monkey
         sidearm = await _inventory_scanner_lookups(
             "Coda Pistol", None, candidate_limit=1, category="Weapons", item_type="Sidearm"
         )
+        fallback = await _inventory_scanner_lookups(
+            "FS-9 LMG", None, candidate_limit=1, category="Weapons", item_type="Undersuit"
+        )
 
         assert [result.name for result, _score in next(iter(primary.values()))] == ["FS-9 LMG"]
         assert [result.name for result, _score in next(iter(sidearm.values()))] == ["Coda Pistol"]
+        assert len(next(iter(fallback.values()))) == 2
 
     asyncio.run(run())

@@ -3,6 +3,7 @@ import difflib
 import hashlib
 import html
 import json
+import logging
 import queue
 import re
 import secrets
@@ -1414,6 +1415,15 @@ async def import_inventory_from_images(
             scanner_lookups,
         ) if ocr_text.strip() else []
         match_ms = round((time.perf_counter() - match_started_at) * 1000)
+        logging.info(
+            "Inventory scanner category=%r type=%r ocr=%r matches=%r ocr_ms=%d match_ms=%d",
+            default_category,
+            default_item_type,
+            " | ".join(ocr_text.splitlines())[:500],
+            [item.get("name") for item in items],
+            ocr_ms,
+            match_ms,
+        )
         return {
             "ocr_available": ocr_error is None,
             "ocr_error": ocr_error,
@@ -2143,7 +2153,7 @@ async def _inventory_scanner_lookups(
             )
             selected_type = _normalize_text(item_type or "")
             if selected_type:
-                matches = [
+                typed_matches = [
                     (result, score)
                     for result, score in matches
                     if selected_type in {
@@ -2157,6 +2167,8 @@ async def _inventory_scanner_lookups(
                         ),
                     }
                 ]
+                if typed_matches:
+                    matches = typed_matches
             return candidate, matches
 
     return dict(await asyncio.gather(*(lookup(candidate) for candidate in candidates)))

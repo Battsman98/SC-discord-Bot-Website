@@ -1817,8 +1817,9 @@ async function processInventoryScannerCapture(capture) {
       inventoryScannerPendingMatchKey = candidateKey;
       inventoryScannerPendingMatchCount = 1;
     }
+    const requiredConfirmations = Number(candidate.confidence || 0) >= 0.97 ? 1 : 2;
     inventoryScannerEmptyReadStreak = 0;
-    if (inventoryScannerPendingMatchCount >= 2) {
+    if (inventoryScannerPendingMatchCount >= requiredConfirmations) {
       renderInventoryImportItems(payload, {
         append: true,
         scannerMode: true,

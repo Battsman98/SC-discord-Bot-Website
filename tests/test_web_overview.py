@@ -119,7 +119,7 @@ def test_mission_and_blueprint_results_do_not_display_game_file_source() -> None
 
     assert '["Source"' not in blueprint_renderer
     assert '["Source"' not in mission_renderer
-    assert "20260724-scanner-title-bands-v2" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "20260724-scanner-title-bands-v3" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
 
 def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:
@@ -277,7 +277,7 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     assert 'id="inventoryImportType"' in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert 'params.set("default_item_type", itemType)' in javascript
     assert 'default_item_type: document.querySelector("#inventoryImportType")?.value || null' in javascript
-    assert "scanner-title-bands-v2" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "scanner-title-bands-v3" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
 
 def test_live_inventory_scanner_retries_missed_reads_and_collapses_near_duplicate_frames() -> None:
@@ -334,7 +334,8 @@ def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     assert "inventoryScannerCaptureBusy" in javascript
     assert "drainInventoryScannerQueue()" in javascript
     assert "processInventoryScannerCapture(capture)" in javascript
-    assert "inventoryScannerPendingMatchCount >= 2" in javascript
+    assert "inventoryScannerPendingMatchCount >= requiredConfirmations" in javascript
+    assert "Number(candidate.confidence || 0) >= 0.97 ? 1 : 2" in javascript
     assert "deferRender: true" in javascript
     assert "inventoryScannerQueue.shift()" in javascript
 
