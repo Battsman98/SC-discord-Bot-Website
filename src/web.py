@@ -301,6 +301,7 @@ _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_
 _RAPID_OCR_POOL_READY = False
 _RAPID_TITLE_OCR = None
 _RAPID_TITLE_OCR_RUN_LOCK = threading.Lock()
+_DEFAULT_INVENTORY_TITLE_BOX = "0.525000,0.381500,0.275000,0.037000"
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
 
@@ -1628,26 +1629,14 @@ def _read_inventory_title(
     image_data: bytes,
     title_box: str | None,
 ) -> tuple[str, str | None, bool]:
-    if title_box:
-        fast_text = _read_calibrated_inventory_title(image_data, title_box)
-        if fast_text:
-            return fast_text, title_box, True
-
-    _initialize_rapid_ocr_pool()
-    engine = _RAPID_OCR_POOL.get(timeout=30)
-    try:
-        result, _ = engine(image_data)
-    finally:
-        _RAPID_OCR_POOL.put(engine)
-    candidate = _top_inventory_ocr_candidate(result)
-    if candidate is None:
-        return "", None, False
-    recovered_title = _read_title_above_volume_anchor(image_data, result, candidate)
-    if recovered_title is not None:
-        title, points = recovered_title
-        return title, _normalized_ocr_box(image_data, points), False
-    title = str(candidate[1]).strip()
-    return title, _normalized_ocr_box(image_data, candidate[0]), False
+    active_box = title_box or _DEFAULT_INVENTORY_TITLE_BOX
+    fast_text = _read_calibrated_inventory_title(image_data, active_box)
+    if fast_text:
+        return fast_text, active_box, True
+    # Keep live requests bounded to the title-only recognition path. Falling
+    # back to full-frame detection takes several seconds and skips items that
+    # users hover for the required one-second interval.
+    return "", title_box, False
 
 
 def _read_inventory_title_bands(image_data: bytes) -> str:
@@ -1776,7 +1765,13 @@ def _read_title_above_volume_anchor(
     # When detection found a line immediately above Volume, it is already the
     # strongest title read. Recognition-only recovery is for faint/missed titles.
     if -anchor_height <= anchor_top - candidate_bottom <= anchor_height * 1.5:
-        return None
+        text = str(selected_candidate[1]).strip()
+        if not text or _inventory_scanner_line_is_metadata(text):
+            return None
+        return text, [
+            [float(point[0]), float(point[1])]
+            for point in selected_candidate[0]
+        ]
 
     try:
         from PIL import Image
@@ -1844,6 +1839,7 @@ def _read_calibrated_inventory_title(image_data: bytes, title_box: str) -> str:
         if right <= left or bottom <= top:
             return ""
         crop = image.crop((left, top, right, bottom))
+        crop = crop.resize((crop.width * 3, crop.height * 3))
         output = BytesIO()
         crop.save(output, format="PNG")
         result, _ = _run_rapid_title_ocr(output.getvalue())
@@ -2132,6 +2128,23 @@ def _inventory_catalog_item_type(name: str, category: str | None) -> str | None:
             ("Battery", ("battery",)),
             ("Ammunition", ("ammunition", "ammo")),
         ),
+        "Components": (
+            ("Power Plant", ("power plant", "powerplant")),
+            ("Cooler", ("cooler",)),
+            ("Shield Generator", ("shield generator",)),
+            ("Quantum Drive", ("quantum drive",)),
+            ("Jump Module", ("jump module", "jump drive")),
+            ("Life Support Generator", ("life support generator", "life support")),
+            ("Radar", ("radar",)),
+            ("Computer", ("computer",)),
+            ("Flight Blade", ("flight blade",)),
+            ("Battery", ("battery",)),
+            ("Fuel Intake", ("fuel intake",)),
+            ("Quantum Fuel Tank", ("quantum fuel tank",)),
+            ("Fuel Tank", ("fuel tank",)),
+            ("Main Thruster", ("main thruster",)),
+            ("Maneuvering Thruster", ("maneuvering thruster",)),
+        ),
         "Sustenance": (
             ("Drink", ("drink", "water", "soda")),
             ("Food", ("food",)),
@@ -2309,7 +2322,13 @@ async def _inventory_lookup_scored_matches(
             if not key or key in seen:
                 continue
             seen.add(key)
-            scored.append((result, _inventory_match_confidence(candidate, result.name)))
+            names = (result.name, *getattr(result, "catalog_aliases", ()))
+            scored.append(
+                (
+                    result,
+                    max(_inventory_match_confidence(candidate, name) for name in names),
+                )
+            )
     return sorted(scored, key=lambda item: (-item[1], item[0].name.lower()))[:limit]
 
 
@@ -2395,6 +2414,7 @@ def _inventory_scanner_line_is_metadata(line: str) -> bool:
     normalized = _normalize_text(line)
     if not normalized:
         return True
+    compact = normalized.replace(" ", "")
     blocked_exact = {
         "inventory",
         "personal all",
@@ -2405,7 +2425,17 @@ def _inventory_scanner_line_is_metadata(line: str) -> bool:
         "clear filters",
         "empty",
     }
-    if normalized in blocked_exact:
+    blocked_compact = {
+        "inventory",
+        "personalall",
+        "personalbackpack",
+        "locallocal",
+        "lootingview",
+        "moveall",
+        "clearfilters",
+        "empty",
+    }
+    if normalized in blocked_exact or compact in blocked_compact:
         return True
     blocked_prefixes = (
         "volume",
@@ -2447,16 +2477,23 @@ def _inventory_scanner_line_is_metadata(line: str) -> bool:
 def _inventory_match_confidence(candidate: str, item_name: str) -> float:
     if _inventory_scanner_line_is_metadata(candidate):
         return 0
-    candidate_norm = _normalize_text(candidate)
-    item_norm = _normalize_text(item_name)
+    candidate_norm = _normalize_text(_strip_inventory_item_prefix(candidate))
+    item_norm = _normalize_text(_strip_inventory_item_prefix(item_name))
     if not candidate_norm or not item_norm:
         return 0
     if candidate_norm == item_norm:
         return 1
+    suffix_score = _inventory_distinctive_suffix_score(candidate_norm, item_norm)
     if item_norm in candidate_norm:
         extra_words = set(candidate_norm.split()) - set(item_norm.split())
         ceiling = 0.88 if extra_words else 0.96
-        return min(ceiling, len(item_norm) / max(len(candidate_norm), 1) + 0.25)
+        containment_score = min(
+            ceiling,
+            len(item_norm) / max(len(candidate_norm), 1) + 0.25,
+        )
+        if suffix_score >= 0.82:
+            return max(containment_score, min(0.99, 0.9 + ((suffix_score - 0.82) * 0.5)))
+        return containment_score
     if candidate_norm in item_norm:
         return min(0.9, len(candidate_norm) / max(len(item_norm), 1) + 0.2)
     candidate_words = set(candidate_norm.split())
@@ -2473,7 +2510,6 @@ def _inventory_match_confidence(candidate: str, item_name: str) -> float:
         item_norm.replace(" ", ""),
     ).ratio()
     score = max(word_score, typo_score * 0.95, compact_typo_score * 0.99)
-    suffix_score = _inventory_distinctive_suffix_score(candidate_norm, item_norm)
     if suffix_score >= 0.82:
         score = max(score, min(0.99, 0.9 + ((suffix_score - 0.82) * 0.5)))
     candidate_family = _inventory_name_family(candidate_norm)
@@ -2486,12 +2522,18 @@ def _inventory_match_confidence(candidate: str, item_name: str) -> float:
     item_numbers = set(re.findall(r"\d+", item_norm))
     if candidate_numbers and item_numbers and not (candidate_numbers & item_numbers):
         score = min(score, 0.65)
-    return score
+    # Stabilize threshold comparisons such as an intended 0.88 score that
+    # binary floating point otherwise represents as 0.8799999999999999.
+    return round(score, 6)
 
 
 def _inventory_distinctive_suffix_score(candidate_norm: str, item_norm: str) -> float:
     item_words = item_norm.split()
     if not item_words:
+        return 0
+    # Multi-word catalog names frequently share generic type suffixes such as
+    # "Rifle" or "Multi-Tool". Those suffixes cannot identify a variant.
+    if len(item_words) > 1:
         return 0
     suffix = item_words[-1]
     if len(suffix) < 5 or not suffix.isalpha():
@@ -2499,10 +2541,17 @@ def _inventory_distinctive_suffix_score(candidate_norm: str, item_norm: str) -> 
     candidate_words = candidate_norm.split()
     candidate_tail = candidate_words[-1] if candidate_words else candidate_norm
     compact_candidate = candidate_norm.replace(" ", "")
-    trailing_candidate = compact_candidate[-max(len(suffix) + 2, len(suffix)):]
+    trailing_scores = [
+        difflib.SequenceMatcher(
+            None,
+            compact_candidate[-length:],
+            suffix,
+        ).ratio()
+        for length in range(max(3, len(suffix) - 2), len(suffix) + 3)
+        if len(compact_candidate) >= length
+    ]
     return max(
-        difflib.SequenceMatcher(None, candidate_tail, suffix).ratio(),
-        difflib.SequenceMatcher(None, trailing_candidate, suffix).ratio(),
+        [difflib.SequenceMatcher(None, candidate_tail, suffix).ratio(), *trailing_scores]
     )
 
 
@@ -2810,6 +2859,7 @@ def _clean_inventory_ocr_line(value: str) -> str:
 
 
 def _normalize_inventory_tooltip_name(value: str) -> str:
+    value = _strip_inventory_item_prefix(value)
     value = re.sub(r"([a-z])([A-Z])", r"\1 \2", value)
     value = value.replace("KopionHorn", "Kopion Horn")
     value = re.sub(r'(\w)"', r'\1 "', value)
@@ -2818,6 +2868,8 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
     value = re.sub(r"(\d+)x([A-Z])", r"\1x \2", value)
     value = " ".join(value.split())
     replacements = {
+        r"\bmed\s+pen\b": "MedPen",
+        r"\bchemozaly\b": "Hemozal",
         r"\bkilshot\b": "Killshot",
         r"\bkillshot\b": "Killshot",
         r"\brrie\b": "Rifle",
@@ -2832,6 +2884,17 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
     for pattern, replacement in replacements.items():
         value = re.sub(pattern, replacement, value, flags=re.IGNORECASE)
     return " ".join(value.split())
+
+
+def _strip_inventory_item_prefix(value: str) -> str:
+    """Remove the optional in-game class/grade prefix before catalog matching."""
+    return re.sub(
+        r"^\s*[a-z]{2,5}\s*(?:[/|\\]\s*)?\d+\s*[/|\\]\s*[a-z]\s*",
+        "",
+        str(value or ""),
+        count=1,
+        flags=re.IGNORECASE,
+    ).strip()
 
 
 def _inventory_is_noisy_header(value: str) -> bool:

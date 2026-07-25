@@ -231,7 +231,23 @@ const inventoryCategoryTypes = {
   Weapons: ["Primary", "Sidearm", "Melee", "Attachments"],
   Utility: ["Medical", "Multitool", "Tool", "Mining", "Salvage", "Container"],
   Ammunition: ["Magazine", "Battery", "Ammunition"],
-  Components: ["Power Plant", "Cooler", "Shield Generator", "Quantum Drive", "Jump Drive"],
+  Components: [
+    "Power Plant",
+    "Cooler",
+    "Shield Generator",
+    "Quantum Drive",
+    "Jump Module",
+    "Life Support Generator",
+    "Radar",
+    "Computer",
+    "Flight Blade",
+    "Battery",
+    "Fuel Intake",
+    "Fuel Tank",
+    "Quantum Fuel Tank",
+    "Main Thruster",
+    "Maneuvering Thruster",
+  ],
   Sustenance: ["Food", "Drink"],
   Commodities: ["Harvestable", "Ore", "Refined Material", "Commodity"],
   Other: ["Paint", "Flair", "Collectible", "Container", "Other"],
@@ -1352,7 +1368,9 @@ function renderInventoryImportItems(payload, options = {}) {
   const items = inventoryImportItems;
   if (options.scannerMode) {
     inventoryScannerStatus = payload.scan_status || inventoryScannerStatus || "Scanning hover tooltip.";
-    if (options.recordHistory !== false) addInventoryScannerHistory(payload, countedScannerItems);
+    if (options.recordHistory !== false) {
+      addInventoryScannerHistory(payload, countedScannerItems, options.captureToken || "");
+    }
   }
   const ocrWarning = payload.ocr_available === false
     ? `<div class="state warning">${escapeHtml(payload.ocr_error || "OCR was not available.")}</div>`
@@ -1406,7 +1424,7 @@ function renderInventoryImportItems(payload, options = {}) {
   annotateImportedInventoryRows(outputs.inventoryImport);
 }
 
-function addInventoryScannerHistory(payload, countedItems = payload.items || []) {
+function addInventoryScannerHistory(payload, countedItems = payload.items || [], captureToken = "") {
   const timestamp = new Date().toLocaleTimeString();
   const items = countedItems;
   if ((payload.items || []).length && !items.length) return;
@@ -1439,6 +1457,7 @@ function addInventoryScannerHistory(payload, countedItems = payload.items || [])
       timestamp,
       status: "review",
       text: best?.text || firstInventoryOcrLine(payload.ocr_text) || "Unread tooltip",
+      captureToken,
       suggestedName: suggested?.name || "",
       category: suggested?.category || "",
       itemType: suggested?.item_type || "",
@@ -1449,7 +1468,8 @@ function addInventoryScannerHistory(payload, countedItems = payload.items || [])
     };
     inventoryScannerHistory = inventoryScannerHistory.filter((entry) =>
       !(entry.status === "review"
-        && normalizeInventoryMergeKey(entry.text) === normalizeInventoryMergeKey(reviewEntry.text))
+        && normalizeInventoryMergeKey(entry.text) === normalizeInventoryMergeKey(reviewEntry.text)
+        && (!captureToken || entry.captureToken === captureToken))
     );
     inventoryScannerHistory.unshift(reviewEntry);
   }
@@ -1821,7 +1841,10 @@ async function processInventoryScannerCapture(capture) {
       : "Item recognized. Move to the next item.";
   } else {
     inventoryScannerEmptyReadStreak += 1;
-    if (payload?.calibration?.fast_title && inventoryScannerEmptyReadStreak >= 3) {
+    if (inventoryScannerEmptyReadStreak >= 3) {
+      inventoryScannerReadyToCount = true;
+    }
+    if (payload?.calibration?.fast_title && inventoryScannerEmptyReadStreak >= 8) {
       inventoryScannerTitleBox = "";
     }
     inventoryScannerStatus = "No confident read yet. Processing the next captured tooltip.";
@@ -1950,10 +1973,16 @@ async function captureInventoryScannerCrop() {
     && calibratedValues[3] > 0) {
     const originalWidth = sw;
     const originalHeight = sh;
+    const verticalPadding = Math.max(0.004, calibratedValues[3] * 0.15);
+    const paddedTop = Math.max(0, calibratedValues[1] - verticalPadding);
+    const paddedBottom = Math.min(
+      1,
+      calibratedValues[1] + calibratedValues[3] + verticalPadding,
+    );
     sx += Math.round(calibratedValues[0] * originalWidth);
-    sy += Math.round(calibratedValues[1] * originalHeight);
+    sy += Math.round(paddedTop * originalHeight);
     sw = Math.max(1, Math.round(calibratedValues[2] * originalWidth));
-    sh = Math.max(1, Math.round(calibratedValues[3] * originalHeight));
+    sh = Math.max(1, Math.round((paddedBottom - paddedTop) * originalHeight));
     requestTitleBox = "0,0,1,1";
   }
   const maxWidth = 1280;

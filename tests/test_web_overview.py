@@ -277,6 +277,30 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     ).read_text(encoding="utf-8")
 
 
+def test_component_type_filter_includes_current_ship_component_groups() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    component_types = (
+        "Power Plant",
+        "Cooler",
+        "Shield Generator",
+        "Quantum Drive",
+        "Jump Module",
+        "Life Support Generator",
+        "Radar",
+        "Computer",
+        "Flight Blade",
+        "Battery",
+        "Fuel Intake",
+        "Fuel Tank",
+        "Quantum Fuel Tank",
+        "Main Thruster",
+        "Maneuvering Thruster",
+    )
+    for item_type in component_types:
+        assert f'"{item_type}"' in javascript
+
+
 def test_form_controls_receive_persistent_labels_above_their_blocks() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
@@ -317,7 +341,10 @@ def test_live_inventory_scanner_keeps_fast_calibration_and_places_confirmed_resu
     assert 'entry.status !== "accepted"' in javascript
     assert 'entry.status === "accepted"' in javascript
     assert "orderedHistory.map" in javascript
-    assert "inventoryScannerEmptyReadStreak >= 3" in javascript
+    assert "inventoryScannerEmptyReadStreak >= 8" in javascript
+    assert "const verticalPadding = Math.max(0.004, calibratedValues[3] * 0.15)" in javascript
+    assert 'addInventoryScannerHistory(payload, countedScannerItems, options.captureToken || "")' in javascript
+    assert "entry.captureToken === captureToken" in javascript
     assert 'requestTitleBox = "0,0,1,1"' in javascript
     assert "titleBox: capture.requestTitleBox" in javascript
     assert "payload.calibration?.title_box && options.titleBox === undefined" in javascript

@@ -20,6 +20,7 @@ from src.web import (
     _match_inventory_scanner_text,
     _normalize_inventory_tooltip_name,
     _read_inventory_title_bands,
+    _read_title_above_volume_anchor,
     _top_inventory_ocr_candidate,
 )
 
@@ -437,6 +438,26 @@ def test_inventory_match_confidence_scores_catalog_names() -> None:
     ) >= 0.95
 
 
+def test_inventory_title_normalization_recovers_medpen_hemozal_ocr() -> None:
+    normalized = _normalize_inventory_tooltip_name("Med Pen CHemozaly")
+
+    assert normalized == "MedPen Hemozal"
+    assert _inventory_match_confidence(normalized, "MedPen (Hemozal)") >= 0.88
+
+
+def test_inventory_match_ignores_optional_class_prefix_for_any_item_title() -> None:
+    examples = (
+        ("Mil/1/B Polar", "Polar"),
+        ("Civ/2/C Frost-Star EX", "Frost-Star EX"),
+        ("Cmp/3/A Venture Core", "Venture Core"),
+        ("Ind/1/B Pyro RYT Multi-Tool", "Pyro RYT Multi-Tool"),
+    )
+
+    for scanned_title, catalog_title in examples:
+        assert _normalize_inventory_tooltip_name(scanned_title) == catalog_title
+        assert _inventory_match_confidence(scanned_title, catalog_title) == 1
+
+
 def test_inventory_title_bands_keep_titles_and_reject_metadata(monkeypatch) -> None:
     calls = 0
 
@@ -461,6 +482,10 @@ def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
     assert _inventory_catalog_item_type("Navoi Boot and Pants Striker", "Clothing") == "Footwear"
     assert _inventory_catalog_item_type("ThermoWave Gloves ASD Edition", "Clothing") == "Gloves"
     assert _inventory_catalog_item_type("Pyro RYT microTech Multi-Tool", "Utility") == "Multitool"
+    assert _inventory_catalog_item_type("Odyssey Flight Blade", "Components") == "Flight Blade"
+    assert _inventory_catalog_item_type("Wei-Tek L86 Radar", "Components") == "Radar"
+    assert _inventory_catalog_item_type("Sakura Sun Life Support Generator", "Components") == "Life Support Generator"
+    assert _inventory_catalog_item_type("Medium Quantum Fuel Tank", "Components") == "Quantum Fuel Tank"
     assert _inventory_catalog_item_type("Unknown Item", "Clothing") is None
 
 
@@ -470,6 +495,8 @@ def test_inventory_title_ocr_uses_top_line_and_rejects_metadata_calibration() ->
 
     assert _top_inventory_ocr_candidate([metadata, title]) == title
     assert _top_inventory_ocr_candidate([metadata]) is None
+    compact_header = ([[0, 4], [100, 4], [100, 14], [0, 14]], "LOOTINGVIEW", 0.98)
+    assert _top_inventory_ocr_candidate([compact_header]) is None
 
 
 def test_inventory_title_ocr_uses_volume_anchor_instead_of_unrelated_top_text() -> None:
@@ -478,6 +505,16 @@ def test_inventory_title_ocr_uses_volume_anchor_instead_of_unrelated_top_text() 
     metadata = ([[400, 202], [520, 202], [520, 218], [400, 218]], "Volume: 18000 uSCU", 0.99)
 
     assert _top_inventory_ocr_candidate([unrelated, metadata, title]) == title
+
+
+def test_inventory_title_anchor_keeps_detected_title_immediately_above_volume() -> None:
+    title = ([[400, 180], [560, 180], [560, 198], [400, 198]], "SnowBlind", 0.99)
+    volume = ([[400, 202], [540, 202], [540, 218], [400, 218]], "Volume: 84000 uSCU", 0.99)
+
+    recovered = _read_title_above_volume_anchor(b"", [title, volume], title)
+
+    assert recovered is not None
+    assert recovered[0] == "SnowBlind"
 
 
 def test_inventory_title_ocr_prefers_upper_hover_tooltip_over_equipped_item() -> None:

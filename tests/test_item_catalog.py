@@ -5,7 +5,12 @@ from src.cache import SQLiteCache
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 
 
-def catalog_row(item_uuid: str, name: str, category: str = "Utility") -> dict:
+def catalog_row(
+    item_uuid: str,
+    name: str,
+    category: str = "Utility",
+    class_name: str | None = None,
+) -> dict:
     normalized = " ".join(name.lower().replace("-", " ").split())
     return {
         "item_uuid": item_uuid,
@@ -20,6 +25,7 @@ def catalog_row(item_uuid: str, name: str, category: str = "Utility") -> dict:
         "source_name": "Test Catalog",
         "game_version": "4.9.0-LIVE",
         "source_updated_at": "2026-07-23T00:00:00Z",
+        "class_name": class_name,
     }
 
 
@@ -45,6 +51,35 @@ def test_catalog_replacement_and_local_fuzzy_search(tmp_path: Path) -> None:
 
         assert exact[0].name == "ParaMed Medical Device"
         assert fuzzy[0].name == "ParaMed Medical Device"
+        await cache.close()
+
+    asyncio.run(run())
+
+
+def test_local_catalog_resolves_ocr_localization_keys_to_display_names(tmp_path: Path) -> None:
+    async def run() -> None:
+        cache = await SQLiteCache.create(str(tmp_path / "catalog.sqlite3"))
+        await cache.replace_item_catalog(
+            [
+                catalog_row(
+                    "goldsmith",
+                    'CQ7 "Goldsmith" Rifle',
+                    "Weapons",
+                    "behr_rifle_ballistic_03_store01",
+                ),
+            ],
+            {"status": "ready", "item_count": 1},
+        )
+        source = StarCitizenWikiSource(None, cache, None)
+
+        matches = await source.lookup_inventory_items(
+            "item_Namebehr_rife_ballstic_03_storeo1",
+            5,
+            "Weapons",
+        )
+
+        assert matches[0].name == 'CQ7 "Goldsmith" Rifle'
+        assert "item_namebehr_rifle_ballistic_03_store01" in matches[0].catalog_aliases
         await cache.close()
 
     asyncio.run(run())

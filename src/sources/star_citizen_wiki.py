@@ -15,7 +15,7 @@ class StarCitizenWikiSource:
     name = "Star Citizen Wiki"
     base_url = "https://api.star-citizen.wiki"
     item_catalog_page_delay_seconds = 3.1
-    item_catalog_schema_version = 3
+    item_catalog_schema_version = 4
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -161,6 +161,7 @@ class StarCitizenWikiSource:
                     "source_name": parsed.source_name,
                     "game_version": version,
                     "source_updated_at": self._string_or_none(source_row.get("updated_at")),
+                    "class_name": self._string_or_none(source_row.get("class_name")),
                 }
             if page < last_page:
                 await asyncio.sleep(self.item_catalog_page_delay_seconds)
@@ -240,16 +241,23 @@ class StarCitizenWikiSource:
                 source_url=str(row["source_url"]),
                 source_name=str(row.get("source_name") or self.name),
                 purchases=[],
+                catalog_aliases=self._inventory_item_catalog_aliases(row.get("class_name")),
             )
             index = len(items)
             items.append(item)
             normalized = str(row["normalized_name"])
             exact.setdefault(normalized, []).append(index)
+            aliases = tuple(self._normalize_name(alias) for alias in item.catalog_aliases if alias)
+            for alias in aliases:
+                exact.setdefault(alias, []).append(index)
             category = self._normalize_name(row.get("category"))
             if category:
                 categories.setdefault(category, set()).add(index)
             for trigram in self._item_name_trigrams(normalized):
                 trigrams.setdefault(trigram, set()).add(index)
+            for alias in aliases:
+                for trigram in self._item_name_trigrams(alias):
+                    trigrams.setdefault(trigram, set()).add(index)
         self._local_items = items
         self._local_item_exact = exact
         self._local_item_trigrams = trigrams
@@ -275,7 +283,13 @@ class StarCitizenWikiSource:
             candidate_indices.intersection_update(allowed_indices)
         ranked = sorted(
             candidate_indices,
-            key=lambda index: self._local_item_rank(normalized, query_trigrams, self._local_items[index].name),
+            key=lambda index: min(
+                self._local_item_rank(normalized, query_trigrams, candidate)
+                for candidate in (
+                    self._local_items[index].name,
+                    *self._local_items[index].catalog_aliases,
+                )
+            ),
         )
         return [self._local_items[index] for index in ranked[:limit]]
 
@@ -297,6 +311,13 @@ class StarCitizenWikiSource:
     def _item_name_trigrams(value: str) -> set[str]:
         compact = f"  {value}  "
         return {compact[index:index + 3] for index in range(max(1, len(compact) - 2))}
+
+    @staticmethod
+    def _inventory_item_catalog_aliases(class_name: object) -> tuple[str, ...]:
+        value = str(class_name or "").strip()
+        if not value:
+            return ()
+        return (value, f"item_name{value}")
 
     async def lookup(self, query: str) -> LookupResult | None:
         normalized_query = " ".join(query.strip().split())
@@ -1146,8 +1167,10 @@ class StarCitizenWikiSource:
         if any(
             term in haystack
             for term in (
-                "power plant", "cooler", "shield generator", "quantum drive",
-                "jump drive", "vehicle component",
+                "power plant", "powerplant", "cooler", "shield generator", "quantum drive",
+                "jump drive", "jump module", "life support", "radar", "computer",
+                "flight blade", "battery", "fuel intake", "fuel tank", "thruster",
+                "vehicle component",
             )
         ):
             return "Components", sub_type_label or item_type_value or None

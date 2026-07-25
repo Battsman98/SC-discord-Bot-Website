@@ -187,6 +187,7 @@ class ItemLocatorResult:
     source_url: str
     source_name: str
     purchases: list[ItemPurchaseLocation]
+    catalog_aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
