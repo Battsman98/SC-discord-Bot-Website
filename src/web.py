@@ -1389,7 +1389,7 @@ async def import_inventory_from_images(
         ocr_text, ocr_error = await _ocr_blueprint_images(files)
     ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
     if scanner_mode:
-        effective_min_score = max(min_score, 0.92) if live_scan else min_score
+        effective_min_score = max(min_score, 0.88) if live_scan else min_score
         match_started_at = time.perf_counter()
         scanner_lookups = await _inventory_scanner_lookups(
             ocr_text,
@@ -1638,13 +1638,11 @@ def _normalized_ocr_box(image_data: bytes, points: object) -> str | None:
         image = Image.open(BytesIO(image_data))
         width, height = image.size
         coordinates = list(points)
-        xs = [float(point[0]) for point in coordinates]
         ys = [float(point[1]) for point in coordinates]
-        padding_x = max(2, (max(xs) - min(xs)) * 0.02)
         padding_y = max(2, (max(ys) - min(ys)) * 0.12)
-        left = max(0, min(xs) - padding_x)
+        left = 0
         top = max(0, min(ys) - padding_y)
-        right = min(width, max(xs) + padding_x)
+        right = width
         bottom = min(height, max(ys) + padding_y)
         values = (left / width, top / height, (right - left) / width, (bottom - top) / height)
         return ",".join(f"{value:.6f}" for value in values)
@@ -1899,10 +1897,15 @@ async def _match_inventory_scanner_text(
 
 
 def _inventory_scanner_accepted_matches(scored_matches: list[tuple[Any, float]], min_score: float) -> list[tuple[Any, float]]:
-    accepted = [(result, confidence) for result, confidence in scored_matches if confidence >= min_score]
+    accepted = sorted(
+        [(result, confidence) for result, confidence in scored_matches if confidence >= min_score],
+        key=lambda item: (-item[1], -len(item[0].name), item[0].name.lower()),
+    )
     if not accepted:
         return []
-    return [max(accepted, key=lambda item: (item[1], -len(item[0].name)))]
+    if len(accepted) > 1 and accepted[0][1] - accepted[1][1] < 0.04:
+        return []
+    return [accepted[0]]
 
 
 def _inventory_tooltip_match_agrees_with_result(item: dict[str, Any], result_name: str) -> bool:
@@ -2179,20 +2182,25 @@ def _inventory_match_confidence(candidate: str, item_name: str) -> float:
     if candidate_norm == item_norm:
         return 1
     if item_norm in candidate_norm:
-        return min(0.96, len(item_norm) / max(len(candidate_norm), 1) + 0.25)
+        extra_words = set(candidate_norm.split()) - set(item_norm.split())
+        ceiling = 0.88 if extra_words else 0.96
+        return min(ceiling, len(item_norm) / max(len(candidate_norm), 1) + 0.25)
     if candidate_norm in item_norm:
         return min(0.9, len(candidate_norm) / max(len(item_norm), 1) + 0.2)
     candidate_words = set(candidate_norm.split())
     item_words = set(item_norm.split())
     overlap = len(candidate_words & item_words)
-    word_score = overlap / max(len(item_words), 1) if overlap else 0
+    word_score = (
+        (2 * overlap) / max(len(candidate_words) + len(item_words), 1)
+        if overlap else 0
+    )
     typo_score = difflib.SequenceMatcher(None, candidate_norm, item_norm).ratio()
     compact_typo_score = difflib.SequenceMatcher(
         None,
         candidate_norm.replace(" ", ""),
         item_norm.replace(" ", ""),
     ).ratio()
-    score = max(word_score, typo_score * 0.95, compact_typo_score * 0.92)
+    score = max(word_score, typo_score * 0.95, compact_typo_score * 0.99)
     candidate_family = _inventory_name_family(candidate_norm)
     item_family = _inventory_name_family(item_norm)
     if candidate_family and item_family and candidate_family != item_family:

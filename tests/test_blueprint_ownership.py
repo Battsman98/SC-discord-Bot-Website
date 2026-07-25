@@ -719,7 +719,17 @@ def test_inventory_match_confidence_scores_catalog_names() -> None:
     assert _inventory_match_confidence("Effective Range", "FS-9 LMG") == 0
 
 
-def test_inventory_scanner_accepts_only_best_match_per_hover_candidate() -> None:
+def test_inventory_match_prefers_named_multitool_variant_over_generic_item() -> None:
+    candidate = 'Pyro RYT "micro tech" Multi-Tool'
+    variant = _inventory_match_confidence(candidate, 'Pyro RYT "microTech" Multi-Tool')
+    generic = _inventory_match_confidence(candidate, "Pyro RYT Multi-Tool")
+
+    assert variant >= 0.98
+    assert generic <= 0.88
+    assert variant - generic >= 0.04
+
+
+def test_inventory_scanner_rejects_ambiguous_variant_matches_for_review() -> None:
     matches = [
         (SimpleNamespace(name='A03 "Canuto" Sniper Rifle'), 0.9),
         (SimpleNamespace(name='A03 "HighSec" Sniper Rifle'), 0.9),
@@ -728,8 +738,7 @@ def test_inventory_scanner_accepts_only_best_match_per_hover_candidate() -> None
 
     accepted = _inventory_scanner_accepted_matches(matches, 0.72)
 
-    assert len(accepted) == 1
-    assert accepted[0][0].name == 'A03 "Canuto" Sniper Rifle'
+    assert accepted == []
 
 
 def test_inventory_scanner_reuses_catalog_lookups_for_results_and_diagnostics(monkeypatch) -> None:

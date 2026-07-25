@@ -210,7 +210,7 @@ const inventoryScannerMaxInFlight = 1;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
-const inventoryScannerQueueLimit = 8;
+const inventoryScannerQueueLimit = 24;
 let inventoryScannerGeneration = 0;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
@@ -1723,12 +1723,12 @@ async function scanInventoryHover() {
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const captureToken = `${capture.hash}:${capture.contextHash}`;
     if ((inventoryScannerLastHash
-        && imageHashDistance(inventoryScannerLastHash, capture.hash) === 0
-        && imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) === 0)
+        && imageHashDistance(inventoryScannerLastHash, capture.hash) <= 2
+        && imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) <= 4)
       || inventoryScannerPendingHashes.has(captureToken)
       || inventoryScannerQueue.some((queued) =>
-        imageHashDistance(queued.hash, capture.hash) === 0
-        && imageHashDistance(queued.contextHash, capture.contextHash) === 0)) {
+        imageHashDistance(queued.hash, capture.hash) <= 2
+        && imageHashDistance(queued.contextHash, capture.contextHash) <= 4)) {
       return;
     }
     inventoryScannerQueue.push({

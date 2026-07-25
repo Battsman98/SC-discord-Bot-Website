@@ -273,12 +273,13 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     assert 'params.set("title_box", inventoryScannerTitleBox)' in javascript
 
 
-def test_live_inventory_scanner_retries_missed_reads_and_only_skips_exact_frames() -> None:
+def test_live_inventory_scanner_retries_missed_reads_and_collapses_near_duplicate_frames() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
     assert 'frameRate: { ideal: 5, max: 8 }' in javascript
-    assert 'imageHashDistance(inventoryScannerLastHash, capture.hash) === 0' in javascript
+    assert 'imageHashDistance(inventoryScannerLastHash, capture.hash) <= 2' in javascript
+    assert 'imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) <= 4' in javascript
     assert 'if (payload?.items?.length)' in javascript
     assert 'inventoryScannerLastHash = ""' in javascript
     assert 'Math.max(250' in javascript
@@ -303,7 +304,7 @@ def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> 
     assert "await asyncio.to_thread(_initialize_rapid_ocr_pool)" in python
     assert "await asyncio.to_thread(_read_image_text, data)" in python
     assert "candidate_limit=1 if live_scan else None" in python
-    assert "effective_min_score = max(min_score, 0.92) if live_scan else min_score" in python
+    assert "effective_min_score = max(min_score, 0.88) if live_scan else min_score" in python
 
 
 def test_live_scanner_avoids_ocr_cpu_contention_and_reports_stage_timings() -> None:
@@ -322,7 +323,7 @@ def test_live_scanner_avoids_ocr_cpu_contention_and_reports_stage_timings() -> N
 def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "inventoryScannerQueueLimit = 8" in javascript
+    assert "inventoryScannerQueueLimit = 24" in javascript
     assert "inventoryScannerCaptureBusy" in javascript
     assert "drainInventoryScannerQueue()" in javascript
     assert "processInventoryScannerCapture(capture)" in javascript
