@@ -247,6 +247,7 @@ class InventoryTextImportRequest(BaseModel):
     text: str = Field(min_length=1)
     default_location: str | None = None
     default_category: str | None = None
+    default_item_type: str | None = None
     scanner_mode: bool = False
     min_score: float = Field(default=0.72, ge=0, le=1)
     exclude_words: str | None = None
@@ -1325,7 +1326,10 @@ async def import_inventory_from_text(
                 detail="Select the matching in-game inventory category before scanning.",
             )
         scanner_lookups = await _inventory_scanner_lookups(
-            request.text, request.exclude_words, category=request.default_category
+            request.text,
+            request.exclude_words,
+            category=request.default_category,
+            item_type=request.default_item_type,
         )
         return {
             "ocr_available": True,
@@ -1364,6 +1368,7 @@ async def import_inventory_from_images(
     files: list[UploadFile] = File(...),
     default_location: str | None = None,
     default_category: str | None = None,
+    default_item_type: str | None = None,
     scanner_mode: bool = False,
     live_scan: bool = False,
     title_box: str | None = None,
@@ -1396,6 +1401,7 @@ async def import_inventory_from_images(
             exclude_words,
             candidate_limit=1 if live_scan else None,
             category=default_category,
+            item_type=default_item_type,
         ) if ocr_text.strip() else {}
         items = await _match_inventory_scanner_text(
             ocr_text,
@@ -2113,6 +2119,7 @@ async def _inventory_scanner_lookups(
     exclude_words: str | None,
     candidate_limit: int | None = None,
     category: str | None = None,
+    item_type: str | None = None,
 ) -> dict[str, list[tuple[Any, float]]]:
     """Resolve each OCR candidate once for both matching and diagnostics.
 
@@ -2132,6 +2139,22 @@ async def _inventory_scanner_lookups(
                 if category
                 else await _inventory_lookup_scored_matches(candidate, 5)
             )
+            selected_type = _normalize_text(item_type or "")
+            if selected_type:
+                matches = [
+                    (result, score)
+                    for result, score in matches
+                    if selected_type in {
+                        _normalize_text(getattr(result, "section", "") or ""),
+                        _normalize_text(
+                            _inventory_catalog_item_type(
+                                getattr(result, "name", ""),
+                                getattr(result, "category", None) or category,
+                            )
+                            or ""
+                        ),
+                    }
+                ]
             return candidate, matches
 
     return dict(await asyncio.gather(*(lookup(candidate) for candidate in candidates)))

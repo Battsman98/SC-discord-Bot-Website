@@ -2029,6 +2029,7 @@ async function importInventoryText() {
         text,
         default_location: document.querySelector("#inventoryImportLocation").value,
         default_category: document.querySelector("#inventoryImportCategory").value,
+        default_item_type: document.querySelector("#inventoryImportType")?.value || null,
         scanner_mode: true,
         min_score: Number(document.querySelector("#inventoryScannerMinScore")?.value || 0.72),
         exclude_words: document.querySelector("#inventoryScannerExcludeWords")?.value || null,
@@ -2084,8 +2085,10 @@ async function submitInventoryImages(files, options = {}) {
   const params = new URLSearchParams();
   const location = document.querySelector("#inventoryImportLocation").value.trim();
   const category = document.querySelector("#inventoryImportCategory").value.trim();
+  const itemType = document.querySelector("#inventoryImportType")?.value.trim();
   if (location) params.set("default_location", location);
   if (category) params.set("default_category", category);
+  if (itemType) params.set("default_item_type", itemType);
   if (options.scannerMode) {
     params.set("scanner_mode", "true");
     if (options.liveScan) {

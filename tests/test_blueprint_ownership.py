@@ -814,3 +814,26 @@ def test_inventory_scanner_reuses_catalog_lookups_for_results_and_diagnostics(mo
         await _inventory_scanner_diagnostics(text, 0.72, None, lookups)
 
     asyncio.run(run())
+
+
+def test_inventory_scanner_optional_type_filter_restricts_catalog_matches(monkeypatch) -> None:
+    async def fake_lookup(candidate: str, limit: int = 5, category: str | None = None):
+        del candidate, limit, category
+        return [
+            (SimpleNamespace(name="FS-9 LMG", category="Weapons", section="Light machine gun"), 1.0),
+            (SimpleNamespace(name="Coda Pistol", category="Weapons", section="Pistol"), 0.9),
+        ]
+
+    async def run() -> None:
+        monkeypatch.setattr(web_module, "_inventory_lookup_scored_matches", fake_lookup)
+        primary = await _inventory_scanner_lookups(
+            "FS-9 LMG", None, candidate_limit=1, category="Weapons", item_type="Primary"
+        )
+        sidearm = await _inventory_scanner_lookups(
+            "Coda Pistol", None, candidate_limit=1, category="Weapons", item_type="Sidearm"
+        )
+
+        assert [result.name for result, _score in next(iter(primary.values()))] == ["FS-9 LMG"]
+        assert [result.name for result, _score in next(iter(sidearm.values()))] == ["Coda Pistol"]
+
+    asyncio.run(run())
