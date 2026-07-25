@@ -765,6 +765,25 @@ def test_inventory_title_ocr_uses_top_line_and_rejects_metadata_calibration() ->
     assert _top_inventory_ocr_candidate([metadata]) is None
 
 
+def test_inventory_title_ocr_uses_volume_anchor_instead_of_unrelated_top_text() -> None:
+    unrelated = ([[900, 10], [1000, 10], [1000, 25], [900, 25]], "LOOTING VIEW", 0.99)
+    title = ([[400, 180], [560, 180], [560, 198], [400, 198]], 'Demeco "Red Alert" LMG', 0.99)
+    metadata = ([[400, 202], [520, 202], [520, 218], [400, 218]], "Volume: 18000 uSCU", 0.99)
+
+    assert _top_inventory_ocr_candidate([unrelated, metadata, title]) == title
+
+
+def test_inventory_title_ocr_prefers_upper_hover_tooltip_over_equipped_item() -> None:
+    hover_title = ([[400, 180], [620, 180], [620, 198], [400, 198]], 'Ravager-212 "Red Alert" Twin Shotgun', 0.99)
+    hover_volume = ([[400, 202], [540, 202], [540, 218], [400, 218]], "Volume: 16000 uSCU", 0.99)
+    equipped_title = ([[400, 450], [500, 450], [500, 468], [400, 468]], "FS-9 LMG", 0.99)
+    equipped_volume = ([[400, 472], [540, 472], [540, 488], [400, 488]], "Volume: 18000 uSCU", 0.99)
+
+    assert _top_inventory_ocr_candidate(
+        [equipped_volume, hover_volume, equipped_title, hover_title]
+    ) == hover_title
+
+
 def test_inventory_match_prefers_named_multitool_variant_over_generic_item() -> None:
     candidate = 'Pyro RYT "micro tech" Multi-Tool'
     variant = _inventory_match_confidence(candidate, 'Pyro RYT "microTech" Multi-Tool')
@@ -773,6 +792,13 @@ def test_inventory_match_prefers_named_multitool_variant_over_generic_item() -> 
     assert variant >= 0.98
     assert generic <= 0.88
     assert variant - generic >= 0.04
+
+
+def test_inventory_match_recovers_structured_item_codes_from_clear_suffixes() -> None:
+    assert _inventory_match_confidence("MiBPolar", "Mil/1/B Polar") >= 0.9
+    assert _inventory_match_confidence("MiCBracer", "Mil/1/C Bracer") >= 0.9
+    assert _inventory_match_confidence("Sth/VA Snoweind", "Sth/1/A SnowBlind") >= 0.9
+    assert _inventory_match_confidence("ind/ivc Thermax", "Ind/1/C Thermax") >= 0.9
 
 
 def test_inventory_scanner_rejects_ambiguous_variant_matches_for_review() -> None:

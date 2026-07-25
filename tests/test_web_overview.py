@@ -119,7 +119,7 @@ def test_mission_and_blueprint_results_do_not_display_game_file_source() -> None
 
     assert '["Source"' not in blueprint_renderer
     assert '["Source"' not in mission_renderer
-    assert "20260724-scanner-calibration-v4" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "20260724-tooltip-anchor-v5" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
 
 def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:
@@ -271,13 +271,13 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     assert 'canvas.toBlob(resolve, "image/webp", 0.9)' in javascript
     assert 'params.set("live_scan", "true")' in javascript
     assert 'params.set("title_box", inventoryScannerTitleBox)' in javascript
-    assert 'id="inventoryScannerTextHeight" type="number" min="30" max="100" step="5" value="50"' in (
+    assert 'id="inventoryScannerTextHeight" type="number" min="30" max="100" step="5" value="65"' in (
         WEB_DIR / "index.html"
     ).read_text(encoding="utf-8")
     assert 'id="inventoryImportType"' in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert 'params.set("default_item_type", itemType)' in javascript
     assert 'default_item_type: document.querySelector("#inventoryImportType")?.value || null' in javascript
-    assert "scanner-calibration-v4" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "tooltip-anchor-v5" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert "inventoryTypeOptions(category, validCurrent" in javascript
 
 
@@ -331,12 +331,13 @@ def test_live_scanner_avoids_ocr_cpu_contention_and_reports_stage_timings() -> N
 def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "inventoryScannerQueueLimit = 24" in javascript
+    assert "inventoryScannerQueueLimit = 1" in javascript
     assert "inventoryScannerCaptureBusy" in javascript
     assert "drainInventoryScannerQueue()" in javascript
     assert "processInventoryScannerCapture(capture)" in javascript
     assert "inventoryScannerPendingMatchCount >= requiredConfirmations" not in javascript
-    assert "deferRender: true" not in javascript
+    assert "deferRender: true" in javascript
+    assert "Recognized: ${names.join" in javascript
     assert "inventoryScannerQueue.shift()" in javascript
 
 

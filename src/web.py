@@ -1641,6 +1641,10 @@ def _read_inventory_title(
     candidate = _top_inventory_ocr_candidate(result)
     if candidate is None:
         return "", None, False
+    recovered_title = _read_title_above_volume_anchor(image_data, result, candidate)
+    if recovered_title is not None:
+        title, points = recovered_title
+        return title, _normalized_ocr_box(image_data, points), False
     title = str(candidate[1]).strip()
     return title, _normalized_ocr_box(image_data, candidate[0]), False
 
@@ -1696,17 +1700,114 @@ def _top_inventory_ocr_candidate(result: object) -> Any | None:
     if not candidates:
         return None
 
-    def top_edge(item: Any) -> float:
+    def bounds(item: Any) -> tuple[float, float, float, float]:
         try:
-            return min(float(point[1]) for point in item[0])
+            xs = [float(point[0]) for point in item[0]]
+            ys = [float(point[1]) for point in item[0]]
+            return min(xs), min(ys), max(xs), max(ys)
         except Exception:
-            return float("inf")
+            return float("inf"), float("inf"), float("inf"), float("inf")
 
-    candidate = min(candidates, key=top_edge)
+    volume_anchors = [
+        item for item in candidates
+        if re.search(r"\bvol(?:ume)?\s*[:;]?", _normalize_text(str(item[1])), re.IGNORECASE)
+    ]
+    anchored_titles: list[tuple[float, float, Any]] = []
+    for anchor in volume_anchors:
+        anchor_left, anchor_top, anchor_right, anchor_bottom = bounds(anchor)
+        anchor_height = max(1.0, anchor_bottom - anchor_top)
+        for item in candidates:
+            if item is anchor or _inventory_scanner_line_is_metadata(str(item[1])):
+                continue
+            left, top, right, bottom = bounds(item)
+            vertical_gap = anchor_top - bottom
+            if vertical_gap < -anchor_height or vertical_gap > max(70.0, anchor_height * 5.0):
+                continue
+            horizontal_overlap = max(0.0, min(right, anchor_right) - max(left, anchor_left))
+            left_delta = abs(left - anchor_left)
+            if horizontal_overlap <= 0 and left_delta > max(80.0, (anchor_right - anchor_left) * 1.5):
+                continue
+            anchored_titles.append((
+                anchor_top,
+                max(0.0, vertical_gap) + (left_delta * 0.12),
+                item,
+            ))
+    if anchored_titles:
+        return min(anchored_titles, key=lambda entry: (entry[0], entry[1]))[2]
+
+    candidate = min(candidates, key=lambda item: bounds(item)[1])
     text = str(candidate[1]).strip()
     if _inventory_scanner_line_is_metadata(text):
         return None
     return candidate
+
+
+def _read_title_above_volume_anchor(
+    image_data: bytes,
+    result: object,
+    selected_candidate: Any,
+) -> tuple[str, list[list[float]]] | None:
+    anchors: list[tuple[float, Any]] = []
+    for item in result or []:
+        if len(item) <= 1:
+            continue
+        if not re.search(r"\bvol(?:ume)?\s*[:;]?", _normalize_text(str(item[1])), re.IGNORECASE):
+            continue
+        try:
+            anchor_top = min(float(point[1]) for point in item[0])
+        except Exception:
+            continue
+        anchors.append((anchor_top, item))
+    if not anchors:
+        return None
+
+    _, anchor = min(anchors, key=lambda entry: entry[0])
+    try:
+        anchor_xs = [float(point[0]) for point in anchor[0]]
+        anchor_ys = [float(point[1]) for point in anchor[0]]
+        candidate_bottom = max(float(point[1]) for point in selected_candidate[0])
+        anchor_left = min(anchor_xs)
+        anchor_top = min(anchor_ys)
+        anchor_height = max(1.0, max(anchor_ys) - anchor_top)
+    except Exception:
+        return None
+
+    # When detection found a line immediately above Volume, it is already the
+    # strongest title read. Recognition-only recovery is for faint/missed titles.
+    if -anchor_height <= anchor_top - candidate_bottom <= anchor_height * 1.5:
+        return None
+
+    try:
+        from PIL import Image
+
+        image = Image.open(BytesIO(image_data)).convert("RGB")
+        width, height = image.size
+        left = max(0, round(anchor_left - 6))
+        top = max(0, round(anchor_top - (anchor_height * 1.45)))
+        right = min(width, round(left + max(300.0, width * 0.24)))
+        bottom = min(height, round(anchor_top))
+        if right <= left or bottom <= top:
+            return None
+        crop = image.crop((left, top, right, bottom))
+        output = BytesIO()
+        crop.save(output, format="PNG")
+        recovered, _ = _initialize_rapid_title_ocr()(output.getvalue())
+        text = " ".join(
+            str(item[1]).strip()
+            for item in recovered or []
+            if len(item) > 1 and str(item[1]).strip()
+        ).strip()
+        if not text or _inventory_scanner_line_is_metadata(text):
+            return None
+        points = [
+            [float(left), float(top)],
+            [float(right), float(top)],
+            [float(right), float(bottom)],
+            [float(left), float(bottom)],
+        ]
+        return text, points
+    except Exception:
+        return None
 
 
 def _normalized_ocr_box(image_data: bytes, points: object) -> str | None:
@@ -2360,17 +2461,37 @@ def _inventory_match_confidence(candidate: str, item_name: str) -> float:
         item_norm.replace(" ", ""),
     ).ratio()
     score = max(word_score, typo_score * 0.95, compact_typo_score * 0.99)
+    suffix_score = _inventory_distinctive_suffix_score(candidate_norm, item_norm)
+    if suffix_score >= 0.82:
+        score = max(score, min(0.99, 0.9 + ((suffix_score - 0.82) * 0.5)))
     candidate_family = _inventory_name_family(candidate_norm)
     item_family = _inventory_name_family(item_norm)
     if candidate_family and item_family and candidate_family != item_family:
         family_similarity = difflib.SequenceMatcher(None, candidate_family, item_family).ratio()
-        if family_similarity < 0.72 and compact_typo_score < 0.85:
+        if family_similarity < 0.72 and compact_typo_score < 0.85 and suffix_score < 0.82:
             score = min(score, 0.65)
     candidate_numbers = set(re.findall(r"\d+", candidate_norm))
     item_numbers = set(re.findall(r"\d+", item_norm))
     if candidate_numbers and item_numbers and not (candidate_numbers & item_numbers):
         score = min(score, 0.65)
     return score
+
+
+def _inventory_distinctive_suffix_score(candidate_norm: str, item_norm: str) -> float:
+    item_words = item_norm.split()
+    if not item_words:
+        return 0
+    suffix = item_words[-1]
+    if len(suffix) < 5 or not suffix.isalpha():
+        return 0
+    candidate_words = candidate_norm.split()
+    candidate_tail = candidate_words[-1] if candidate_words else candidate_norm
+    compact_candidate = candidate_norm.replace(" ", "")
+    trailing_candidate = compact_candidate[-max(len(suffix) + 2, len(suffix)):]
+    return max(
+        difflib.SequenceMatcher(None, candidate_tail, suffix).ratio(),
+        difflib.SequenceMatcher(None, trailing_candidate, suffix).ratio(),
+    )
 
 
 def _inventory_name_family(normalized_name: str) -> str | None:

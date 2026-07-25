@@ -210,7 +210,7 @@ const inventoryScannerMaxInFlight = 1;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
-const inventoryScannerQueueLimit = 24;
+const inventoryScannerQueueLimit = 1;
 let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
 let inventoryScannerLastTiming = null;
@@ -224,7 +224,7 @@ let inventoryScannerReadyToCount = true;
 const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
 if (inventoryScannerSpacingInput?.value === "3500") inventoryScannerSpacingInput.value = "350";
 if (inventoryScannerSpacingInput) inventoryScannerSpacingInput.min = "250";
-const inventoryScannerCropKey = "gameAssist.inventoryScannerCrop.titleOnly.v4";
+const inventoryScannerCropKey = "gameAssist.inventoryScannerCrop.tooltipAnchor.v5";
 const inventoryCategoryTypes = {
   Armor: ["Helmet", "Torso Armor", "Arm Armor", "Leg Armor", "Backpack", "Undersuit"],
   Clothing: ["Hat", "Jacket", "Shirt", "Pants", "Footwear", "Gloves"],
@@ -1325,7 +1325,8 @@ function renderInventoryImportItems(payload, options = {}) {
       const shouldCount = !options.scannerMode
         || inventoryScannerReadyToCount
         || inventoryScannerLastCountedKey !== key
-        || (options.captureToken && inventoryScannerLastCountedCaptureToken !== options.captureToken);
+        || (options.captureToken
+          && inventoryScannerCaptureChanged(inventoryScannerLastCountedCaptureToken, options.captureToken));
       if (!existing) {
         inventoryImportItems.push(item);
         countedScannerItems.push(item);
@@ -1749,7 +1750,7 @@ async function scanInventoryHover() {
   try {
     const capture = await captureInventoryScannerCrop();
     const captureMs = Math.round(performance.now() - captureStartedAt);
-    const captureToken = `${capture.hash}:${capture.contextHash}`;
+    const captureToken = `${capture.hash}:${capture.tileToken || capture.contextHash}`;
     if ((inventoryScannerLastHash
         && imageHashDistance(inventoryScannerLastHash, capture.hash) <= 2
         && imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) <= 4)
@@ -1802,23 +1803,32 @@ async function processInventoryScannerCapture(capture) {
     captureMs: capture.captureMs,
     captureToken: capture.captureToken,
     scannerGeneration: capture.generation,
+    deferRender: true,
   });
   if (capture.generation !== inventoryScannerGeneration) return;
   if (payload?.items?.length) {
     inventoryScannerLastHash = capture.hash;
     inventoryScannerLastContextHash = capture.contextHash;
     inventoryScannerEmptyReadStreak = 0;
+    const names = payload.items.map((item) => item.name).filter(Boolean);
+    inventoryScannerStatus = names.length
+      ? `Recognized: ${names.join(", ")}. Move to the next item.`
+      : "Item recognized. Move to the next item.";
   } else {
     if (payload?.calibration?.fast_title) {
       inventoryScannerTitleBox = "";
     }
     inventoryScannerEmptyReadStreak += 1;
-    if (inventoryScannerEmptyReadStreak >= 1) {
-      inventoryScannerReadyToCount = true;
-      inventoryScannerLastHash = "";
-      inventoryScannerLastContextHash = "";
-    }
     inventoryScannerStatus = "No confident read yet. Processing the next captured tooltip.";
+  }
+  if (payload) {
+    payload.scan_status = inventoryScannerStatus;
+    renderInventoryImportItems(payload, {
+      append: true,
+      scannerMode: true,
+      liveScan: true,
+      captureToken: capture.tileToken || capture.contextHash,
+    });
   }
 }
 
@@ -1845,7 +1855,7 @@ function beginInventoryAutoScan() {
 }
 
 function defaultInventoryTooltipCrop() {
-  return { x: 0.42, y: 0.20, width: 0.33, height: 0.36 };
+  return { x: 0, y: 0, width: 1, height: 1 };
 }
 
 function loadInventoryScannerCrop() {
@@ -1925,7 +1935,7 @@ async function captureInventoryScannerCrop() {
   const sw = Math.round(crop.width * sourceWidth);
   const fullCropHeight = Math.round(crop.height * sourceHeight);
   const sh = Math.max(1, Math.round(fullCropHeight * inventoryScannerTextHeightRatio()));
-  const maxWidth = 720;
+  const maxWidth = 1280;
   const scale = Math.min(1, maxWidth / Math.max(1, sw));
   const targetWidth = Math.max(1, Math.round(sw * scale));
   const targetHeight = Math.max(1, Math.round(sh * scale));
@@ -1950,13 +1960,56 @@ async function captureInventoryScannerCrop() {
     contextCanvas.height,
   );
   const contextHash = imageAverageHash(contextCanvas, 24);
+  const tileToken = detectInventoryScannerTileToken(contextCanvas);
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
   if (!blob) throw new Error("Could not encode the inventory capture.");
   return {
     file: new File([blob], "inventory-tooltip.webp", { type: "image/webp" }),
     hash,
     contextHash,
+    tileToken,
   };
+}
+
+function detectInventoryScannerTileToken(canvas) {
+  const context = canvas.getContext("2d");
+  const { width, height } = canvas;
+  const pixels = context.getImageData(0, 0, width, height).data;
+  const columns = 4;
+  const rows = 6;
+  const startX = Math.round(width * 0.095);
+  const startY = Math.round(height * 0.177);
+  const columnStep = width * 0.198;
+  const rowStep = height * 0.121;
+  const cellWidth = Math.round(width * 0.19);
+  const cellHeight = Math.round(height * 0.116);
+  const border = 6;
+  let best = { score: 0, row: -1, column: -1 };
+  const isBrightBorder = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return false;
+    const index = ((y * width) + x) * 4;
+    const red = pixels[index];
+    const green = pixels[index + 1];
+    const blue = pixels[index + 2];
+    const luminance = (red * 0.299) + (green * 0.587) + (blue * 0.114);
+    return luminance > 120 && Math.max(red, green, blue) - Math.min(red, green, blue) < 180;
+  };
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const left = Math.round(startX + (column * columnStep));
+      const top = Math.round(startY + (row * rowStep));
+      let score = 0;
+      for (let y = top; y < top + cellHeight; y += 1) {
+        for (let x = left; x < left + cellWidth; x += 1) {
+          const edgeX = x - left < border || (left + cellWidth) - x <= border;
+          const edgeY = y - top < border || (top + cellHeight) - y <= border;
+          if ((edgeX || edgeY) && isBrightBorder(x, y)) score += 1;
+        }
+      }
+      if (score > best.score) best = { score, row, column };
+    }
+  }
+  return best.score >= 50 ? `tile:${best.row + 1}:${best.column + 1}` : "";
 }
 
 function inventoryScannerTextHeightRatio() {
@@ -1986,6 +2039,14 @@ function imageHashDistance(left, right) {
     if (left[index] !== right[index]) distance += 1;
   }
   return distance;
+}
+
+function inventoryScannerCaptureChanged(left, right) {
+  if (!left || !right) return true;
+  const leftIsTile = left.startsWith("tile:");
+  const rightIsTile = right.startsWith("tile:");
+  if (leftIsTile || rightIsTile) return left !== right;
+  return imageHashDistance(left, right) > 4;
 }
 
 async function importInventoryText() {

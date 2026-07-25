@@ -401,10 +401,10 @@
           <button type="button" data-action-button="stopInventoryScanner">Stop</button>
         </div>
         <p class="scanner-timing-guide">
-          <strong>Scanning timing:</strong> The first readable tooltip locates the title line and warms recognition.
-          Keep that first item steady until it appears. Following items reuse the verified title line and should
-          process much faster. If a fast read fails, the scanner automatically recalibrates instead of guessing.
-          For another copy of the same item, move to the next inventory tile so its highlight changes.
+          <strong>Scanning timing:</strong> Keep the first item steady while the scanner finds its tooltip and the
+          <em>Volume</em> line beneath the title. After the first confirmation, hover each item until its recognized
+          name appears, then move to the next tile. The scanner keeps only the newest waiting frame so old captures
+          cannot build up behind your current item.
         </p>
         <div class="scanner-preview">
           <video id="inventoryScannerVideo" muted playsinline></video>
@@ -424,7 +424,7 @@
             </label>
             <label>
               Title band height
-              <input id="inventoryScannerTextHeight" type="number" min="30" max="100" step="5" value="50">
+              <input id="inventoryScannerTextHeight" type="number" min="30" max="100" step="5" value="65">
             </label>
             <input id="inventoryScannerExcludeWords" placeholder="Ignore words">
           </div>
@@ -642,6 +642,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260723-inline-wheel" defer></script>
-  <script src="/assets/app.js?v=20260724-scanner-calibration-v4" defer></script>
+  <script src="/assets/app.js?v=20260724-tooltip-anchor-v5" defer></script>
 </body>
 </html>
