@@ -291,7 +291,15 @@ function initToolMenus() {
       button.type = "button";
       button.dataset.toolTarget = id;
       button.textContent = title;
-      button.addEventListener("click", () => {
+      button.addEventListener("click", async () => {
+        const scannerName = tool.classList.contains("blueprint-import")
+          ? "Blueprint Scanner"
+          : tool.classList.contains("inventory-import")
+            ? "Inventory Scanner"
+            : "";
+        if (scannerName && !tool.classList.contains("active")) {
+          await showScannerWorkInProgressNotice(scannerName);
+        }
         toggleToolPanel(tab, id);
         if (tool.classList.contains("warbond-tracker")) void loadWarbonds();
       });
@@ -1076,6 +1084,34 @@ function syncInventoryTypeSelectForCategory(categorySelect) {
   const validCurrent = current && (allowed.includes(current) || !allowed.length) ? current : "";
   typeSelect.innerHTML = inventoryTypeOptions(category, validCurrent, typeSelect.dataset.placeholder || "Item type");
   typeSelect.value = validCurrent;
+}
+
+function showScannerWorkInProgressNotice(scannerName) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "scanner-notice-backdrop";
+    backdrop.innerHTML = `<section class="scanner-notice-dialog" role="dialog" aria-modal="true" aria-labelledby="scannerNoticeTitle" aria-describedby="scannerNoticeMessage">
+      <p class="scanner-notice-kicker">WORK IN PROGRESS</p>
+      <h2 id="scannerNoticeTitle">${escapeHtml(scannerName)}</h2>
+      <p id="scannerNoticeMessage">This scanner is a work in progress and may not currently be fully functional. Results can be incomplete or inaccurate, so please review all matches before saving them.</p>
+      <button type="button" data-scanner-notice-accept>I Understand</button>
+    </section>`;
+    const finish = () => {
+      document.removeEventListener("keydown", onKeyDown);
+      backdrop.remove();
+      resolve();
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" || event.key === "Enter") finish();
+    };
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop) finish();
+    });
+    backdrop.querySelector("[data-scanner-notice-accept]").addEventListener("click", finish);
+    document.addEventListener("keydown", onKeyDown);
+    document.body.append(backdrop);
+    backdrop.querySelector("[data-scanner-notice-accept]").focus();
+  });
 }
 
 function bindInventoryCategoryMenus(target) {

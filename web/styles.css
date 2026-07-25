@@ -1390,6 +1390,50 @@ body.hangar-modal-open {
   gap: 12px;
 }
 
+.scanner-notice-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(7px);
+}
+
+.scanner-notice-dialog {
+  width: min(500px, 100%);
+  padding: 26px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: linear-gradient(145deg, var(--panel-tint), transparent 58%), var(--surface);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--accent) 22%, transparent), 0 24px 70px rgba(0, 0, 0, 0.74);
+  text-align: center;
+}
+
+.scanner-notice-dialog .scanner-notice-kicker {
+  margin: 0 0 8px;
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.scanner-notice-dialog h2 {
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+.scanner-notice-dialog p:not(.scanner-notice-kicker) {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.scanner-notice-dialog button {
+  margin-top: 22px;
+}
+
 .active-visitor-stat {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

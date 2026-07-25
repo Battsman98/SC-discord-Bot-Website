@@ -388,6 +388,19 @@ def test_live_scanner_avoids_ocr_cpu_contention_and_reports_stage_timings() -> N
     assert "result_groups = await asyncio.gather" in python
 
 
+def test_scanner_tool_panels_show_work_in_progress_notice() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    stylesheet = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert 'tool.classList.contains("blueprint-import")' in javascript
+    assert 'tool.classList.contains("inventory-import")' in javascript
+    assert "This scanner is a work in progress" in javascript
+    assert "may not currently be fully functional" in javascript
+    assert "showScannerWorkInProgressNotice(scannerName)" in javascript
+    assert ".scanner-notice-backdrop" in stylesheet
+    assert 'role="dialog"' in javascript
+
+
 def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
