@@ -19,6 +19,7 @@ from src.web import (
     _match_inventory_scanner_text,
     _normalize_inventory_tooltip_name,
     _inventory_scanner_text_candidates,
+    _top_inventory_ocr_candidate,
     _rsi_import_lookup_candidates,
     _rsi_import_protected_names,
     _ship_display_name,
@@ -725,6 +726,14 @@ def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
     assert _inventory_catalog_item_type("ThermoWave Gloves ASD Edition", "Clothing") == "Gloves"
     assert _inventory_catalog_item_type("Pyro RYT microTech Multi-Tool", "Utility") == "Multitool"
     assert _inventory_catalog_item_type("Unknown Item", "Clothing") is None
+
+
+def test_inventory_title_ocr_uses_top_line_and_rejects_metadata_calibration() -> None:
+    title = ([[0, 4], [100, 4], [100, 14], [0, 14]], "FS-9 LMG", 0.98)
+    metadata = ([[0, 30], [100, 30], [100, 40], [0, 40]], "Volume: 8000 µSCU", 0.99)
+
+    assert _top_inventory_ocr_candidate([metadata, title]) == title
+    assert _top_inventory_ocr_candidate([metadata]) is None
 
 
 def test_inventory_match_prefers_named_multitool_variant_over_generic_item() -> None:

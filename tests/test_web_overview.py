@@ -382,6 +382,8 @@ def test_missed_scans_can_be_opened_for_manual_review() -> None:
 
     assert '"diagnostics": await _inventory_scanner_diagnostics(' in python
     assert "data-scanner-review-text" in javascript
+    assert "name: ocrText" in javascript
+    assert "name: button.dataset.scannerReviewName || ocrText" not in javascript
     assert "Needs review from scanner OCR" in javascript
     assert "stopInventoryScanner(false)" in javascript
 

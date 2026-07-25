@@ -1518,10 +1518,10 @@ document.addEventListener("click", (event) => {
   stopInventoryScanner(false);
   const ocrText = button.dataset.scannerReviewText || "Unidentified item";
   const item = {
-    name: button.dataset.scannerReviewName || ocrText,
-    category: button.dataset.scannerReviewCategory || document.querySelector("#inventoryImportCategory")?.value || null,
-    item_type: button.dataset.scannerReviewType || null,
-    item_size: button.dataset.scannerReviewSize || null,
+    name: ocrText,
+    category: document.querySelector("#inventoryImportCategory")?.value || null,
+    item_type: null,
+    item_size: null,
     location: document.querySelector("#inventoryImportLocation")?.value.trim() || "Unknown location",
     quantity: 1,
     quality: null,

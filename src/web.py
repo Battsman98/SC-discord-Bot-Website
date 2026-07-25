@@ -1620,16 +1620,32 @@ def _read_inventory_title(
         result, _ = engine(image_data)
     finally:
         _RAPID_OCR_POOL.put(engine)
+    candidate = _top_inventory_ocr_candidate(result)
+    if candidate is None:
+        return "", None, False
+    title = str(candidate[1]).strip()
+    return title, _normalized_ocr_box(image_data, candidate[0]), False
+
+
+def _top_inventory_ocr_candidate(result: object) -> Any | None:
     candidates = [
         item for item in result or []
-        if len(item) > 1
-        and str(item[1]).strip()
-        and not _inventory_scanner_line_is_metadata(str(item[1]))
+        if len(item) > 1 and str(item[1]).strip()
     ]
     if not candidates:
-        return "", None, False
-    title = str(candidates[0][1]).strip()
-    return title, _normalized_ocr_box(image_data, candidates[0][0]), False
+        return None
+
+    def top_edge(item: Any) -> float:
+        try:
+            return min(float(point[1]) for point in item[0])
+        except Exception:
+            return float("inf")
+
+    candidate = min(candidates, key=top_edge)
+    text = str(candidate[1]).strip()
+    if _inventory_scanner_line_is_metadata(text):
+        return None
+    return candidate
 
 
 def _normalized_ocr_box(image_data: bytes, points: object) -> str | None:
