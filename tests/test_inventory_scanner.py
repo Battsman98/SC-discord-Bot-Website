@@ -514,6 +514,22 @@ def test_inventory_title_recalibrates_when_previous_title_position_misses(monkey
     assert used_fast is True
 
 
+def test_inventory_title_does_not_calibrate_to_scanner_chrome(monkeypatch) -> None:
+    attempted_boxes: list[str] = []
+
+    def fake_read(_image_data: bytes, title_box: str) -> str:
+        attempted_boxes.append(title_box)
+        return "TOSTAR" if len(attempted_boxes) == 1 else "Regulus"
+
+    monkeypatch.setattr(web_module, "_read_calibrated_inventory_title", fake_read)
+
+    text, calibrated_box, used_fast = web_module._read_inventory_title(b"image", None)
+
+    assert text == "Regulus"
+    assert calibrated_box == attempted_boxes[1]
+    assert used_fast is True
+
+
 def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
     assert _inventory_catalog_item_type("Navoi Boot and Pants Striker", "Clothing") == "Footwear"
     assert _inventory_catalog_item_type("ThermoWave Gloves ASD Edition", "Clothing") == "Gloves"

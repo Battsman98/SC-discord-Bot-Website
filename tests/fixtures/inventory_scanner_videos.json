@@ -1,0 +1,33 @@
+[
+  {
+    "name": "weapons",
+    "url": "https://medal.tv/games/star-citizen/clips/nbqzzCKiE_OcMcDIo?invite=cr-MSxBR1IsMjY4Nzc3NTUz",
+    "samples": [
+      {"second": 32, "expected": "Parallax \"Piconalia\" Energy Assault Rifle"},
+      {"second": 37, "expected": "Quartz \"GCD-Army\" SMG"},
+      {"second": 41, "expected": "Quartz \"Piconalia\" Energy SMG"},
+      {"second": 47, "expected": "Arrowhead \"Executive\" Sniper Rifle"},
+      {"second": 52, "expected": "Parallax \"GCD-Army\" Rifle"},
+      {
+        "second": 55,
+        "expected": "CQ7 \"Goldsmith\" Rifle",
+        "aliases": ["item_Namebehr_rifle_ballistic_03_store01"]
+      }
+    ]
+  },
+  {
+    "name": "mixed-items",
+    "url": "https://medal.tv/games/star-citizen/clips/naIVmfq9NQYRWGR1m?invite=cr-MSxTSUIsMjY4Nzc3NTUz",
+    "samples": [
+      {"second": 19, "expected": "Cambio SRT"},
+      {"second": 26, "expected": "XDL Mark I Monocular Rangefinder"},
+      {"second": 34, "expected": "Pyro RYT \"Bloodline\" Multi-Tool"},
+      {"second": 39, "expected": "MedPen (Hemozal)"},
+      {"second": 43, "expected": "Arclight Pistol"},
+      {"second": 47, "expected": "Pyro RYT \"Bloodline\" Multi-Tool"},
+      {"second": 52, "expected": "MaxLift AA Support Tractor Beam"},
+      {"second": 59, "expected": "Pyro RYT Multi-Tool"},
+      {"second": 81, "expected": "Pyro RYT Multi-Tool"}
+    ]
+  }
+]

@@ -301,13 +301,13 @@ _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_
 _RAPID_OCR_POOL_READY = False
 _RAPID_TITLE_OCR = None
 _RAPID_TITLE_OCR_RUN_LOCK = threading.Lock()
-_DEFAULT_INVENTORY_TITLE_BOX = "0.525000,0.381500,0.275000,0.037000"
+_DEFAULT_INVENTORY_TITLE_BOX = "0.300000,0.500000,0.380000,0.055000"
 _INVENTORY_TITLE_FALLBACK_BOXES = (
-    "0.300000,0.230000,0.380000,0.055000",
-    "0.300000,0.320000,0.380000,0.055000",
     "0.300000,0.410000,0.380000,0.055000",
-    "0.300000,0.500000,0.380000,0.055000",
     "0.300000,0.590000,0.380000,0.055000",
+    "0.300000,0.320000,0.380000,0.055000",
+    "0.300000,0.230000,0.380000,0.055000",
+    "0.525000,0.381500,0.275000,0.037000",
 )
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
@@ -1636,20 +1636,43 @@ def _read_inventory_title(
     image_data: bytes,
     title_box: str | None,
 ) -> tuple[str, str | None, bool]:
-    active_box = title_box or _DEFAULT_INVENTORY_TITLE_BOX
-    fast_text = _read_calibrated_inventory_title(image_data, active_box)
-    if fast_text:
-        return fast_text, active_box, True
-    for fallback_box in _INVENTORY_TITLE_FALLBACK_BOXES:
-        if fallback_box == active_box:
+    # Tooltip placement can change from one inventory slot to the next. Always
+    # check the normal title row first instead of trusting the previous frame's
+    # calibration, which may now point at unrelated game UI.
+    candidate_boxes = (
+        _DEFAULT_INVENTORY_TITLE_BOX,
+        title_box,
+        *_INVENTORY_TITLE_FALLBACK_BOXES,
+    )
+    attempted: set[str] = set()
+    for candidate_box in candidate_boxes:
+        if not candidate_box or candidate_box in attempted:
             continue
-        fast_text = _read_calibrated_inventory_title(image_data, fallback_box)
-        if fast_text:
-            return fast_text, fallback_box, True
+        attempted.add(candidate_box)
+        fast_text = _read_calibrated_inventory_title(image_data, candidate_box)
+        if _inventory_title_candidate_is_plausible(fast_text):
+            return fast_text, candidate_box, True
     # Keep live requests bounded to the title-only recognition path. Falling
     # back to full-frame detection takes several seconds and skips items that
     # users hover for the required one-second interval.
     return "", title_box, False
+
+
+def _inventory_title_candidate_is_plausible(text: str) -> bool:
+    normalized = _normalize_text(text)
+    compact = normalized.replace(" ", "")
+    if len(compact) < 5 or sum(character.isalpha() for character in compact) < 2:
+        return False
+    scanner_chrome = {
+        "star",
+        "start",
+        "tostar",
+        "totostar",
+        "focotostat",
+    }
+    if compact in scanner_chrome:
+        return False
+    return not _inventory_scanner_line_is_metadata(text)
 
 
 def _read_inventory_title_bands(image_data: bytes) -> str:
@@ -1861,6 +1884,10 @@ def _read_calibrated_inventory_title(image_data: bytes, title_box: str) -> str:
             for item in result or []
             if len(item) > 1 and str(item[1]).strip()
         ).strip()
+        # A tight crop can include the beginning of the Volume line. Remove
+        # only the characteristic OCR form of its µSCU unit from the end of
+        # the title; legitimate model numbers and variant suffixes remain.
+        text = re.sub(r"(?i)\s*[o0uµ]*\s*s[c(]u\s*$", "", text).strip()
         return "" if _inventory_scanner_line_is_metadata(text) else text
     except Exception:
         return ""
