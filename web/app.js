@@ -2999,6 +2999,53 @@ function cssEscape(value) {
   return String(value).replace(/["\\]/g, "\\$&");
 }
 
+function persistentFieldLabel(control) {
+  const explicit = control.dataset.fieldLabel || control.getAttribute("aria-label");
+  if (explicit?.trim()) return explicit.trim();
+  const source = control.getAttribute("name") || control.id;
+  if (source) {
+    return source
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase())
+      .trim();
+  }
+  const placeholder = control.getAttribute("data-placeholder") || control.getAttribute("placeholder");
+  return placeholder?.trim() || "";
+}
+
+function applyPersistentFieldLabels(root = document) {
+  const selector = "input, select, textarea";
+  const controls = [];
+  if (root instanceof Element && root.matches(selector)) controls.push(root);
+  root.querySelectorAll?.(selector).forEach((control) => controls.push(control));
+  controls.forEach((control) => {
+    const type = String(control.getAttribute("type") || "").toLowerCase();
+    if (control.hidden
+      || ["hidden", "file", "checkbox", "radio", "button", "submit", "reset", "range", "color"].includes(type)
+      || control.closest("label")
+      || control.dataset.persistentLabel === "off") return;
+    const text = persistentFieldLabel(control);
+    if (!text) return;
+    const wrapper = document.createElement("label");
+    wrapper.className = "form-field persistent-form-field";
+    const caption = document.createElement("span");
+    caption.textContent = text;
+    control.parentNode.insertBefore(wrapper, control);
+    wrapper.append(caption, control);
+  });
+}
+
+applyPersistentFieldLabels();
+const persistentFieldObserver = new MutationObserver((records) => {
+  records.forEach((record) => {
+    record.addedNodes.forEach((node) => {
+      if (node instanceof Element) applyPersistentFieldLabels(node);
+    });
+  });
+});
+persistentFieldObserver.observe(document.body, { childList: true, subtree: true });
+
 loadMe();
 sendActivityHeartbeat();
 setInterval(sendActivityHeartbeat, 60_000);

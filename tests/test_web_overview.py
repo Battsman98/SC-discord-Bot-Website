@@ -274,6 +274,20 @@ def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     assert 'id="inventoryScannerTextHeight" type="number" min="30" max="100" step="5" value="65"' in (
         WEB_DIR / "index.html"
     ).read_text(encoding="utf-8")
+
+
+def test_form_controls_receive_persistent_labels_above_their_blocks() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    stylesheet = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert "function applyPersistentFieldLabels(root = document)" in javascript
+    assert 'wrapper.className = "form-field persistent-form-field"' in javascript
+    assert "persistentFieldObserver.observe(document.body" in javascript
+    assert 'data-field-label="Station / Location"' in html
+    assert 'data-field-label="Category"' in html
+    assert 'data-field-label="Type"' in html
+    assert ".persistent-form-field > input" in stylesheet
     assert 'id="inventoryImportType"' in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert 'params.set("default_item_type", itemType)' in javascript
     assert 'default_item_type: document.querySelector("#inventoryImportType")?.value || null' in javascript

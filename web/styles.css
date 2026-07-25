@@ -764,6 +764,17 @@ article.tool-panel.active {
   text-transform: uppercase;
 }
 
+.persistent-form-field {
+  align-content: start;
+}
+
+.persistent-form-field > input,
+.persistent-form-field > select,
+.persistent-form-field > textarea {
+  width: 100%;
+  min-width: 0;
+}
+
 .trade-route-form {
   gap: 10px 12px;
   padding: 16px 18px;
