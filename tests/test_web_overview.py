@@ -339,6 +339,15 @@ def test_scanner_review_queue_has_individual_and_bulk_remove_actions() -> None:
     assert "Scanning timing:" in html
 
 
+def test_stopping_scanner_drains_queued_captures_before_review() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "inventoryScannerStopping = true" in javascript
+    assert "Processing ${remaining} remaining capture" in javascript
+    assert "finishInventoryScannerReview()" in javascript
+    assert "inventoryScannerStopping && inventoryScannerInFlight === 0" in javascript
+
+
 def test_scanner_uses_inventory_tile_context_to_count_duplicate_titles() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 

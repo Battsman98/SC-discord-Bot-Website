@@ -212,6 +212,7 @@ let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
 const inventoryScannerQueueLimit = 24;
 let inventoryScannerGeneration = 0;
+let inventoryScannerStopping = false;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
@@ -1650,6 +1651,7 @@ async function startInventoryScanner() {
   inventoryScannerPendingHashes.clear();
   inventoryScannerCaptureBusy = false;
   inventoryScannerQueue = [];
+  inventoryScannerStopping = false;
   inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
   inventoryScannerLastContextHash = "";
@@ -1685,13 +1687,10 @@ async function startInventoryScanner() {
 }
 
 function stopInventoryScanner(clearOutput = true) {
-  inventoryScannerGeneration += 1;
   if (inventoryScannerTimer) {
     clearInterval(inventoryScannerTimer);
     inventoryScannerTimer = null;
   }
-  inventoryScannerQueue = [];
-  inventoryScannerPendingHashes.clear();
   inventoryScannerStream?.getTracks().forEach((track) => {
     if (track.readyState !== "ended") track.stop();
   });
@@ -1704,13 +1703,34 @@ function stopInventoryScanner(clearOutput = true) {
   document.querySelector(".scanner-preview")?.classList.remove("active");
   const empty = document.querySelector(".scanner-empty");
   if (empty) empty.textContent = "Scanner stopped. Share the Star Citizen window to scan again.";
-  if (clearOutput) {
-    inventoryScannerStatus = "Scanner stopped.";
-    renderInventoryImportItems(
-      { items: inventoryImportItems, scan_status: "Scanner stopped." },
-      { scannerMode: true, recordHistory: false, reviewMode: true },
-    );
+  if (!clearOutput) {
+    inventoryScannerGeneration += 1;
+    inventoryScannerStopping = false;
+    inventoryScannerQueue = [];
+    inventoryScannerPendingHashes.clear();
+    return;
   }
+  inventoryScannerStopping = true;
+  const remaining = inventoryScannerQueue.length + inventoryScannerInFlight;
+  if (!remaining) {
+    finishInventoryScannerReview();
+    return;
+  }
+  inventoryScannerStatus = `Scanner stopped. Processing ${remaining} remaining capture${remaining === 1 ? "" : "s"}...`;
+  renderInventoryImportItems(
+    { items: inventoryImportItems, scan_status: inventoryScannerStatus },
+    { scannerMode: true, recordHistory: false, reviewMode: true },
+  );
+  drainInventoryScannerQueue();
+}
+
+function finishInventoryScannerReview() {
+  inventoryScannerStopping = false;
+  inventoryScannerStatus = "Scanner stopped.";
+  renderInventoryImportItems(
+    { items: inventoryImportItems, scan_status: inventoryScannerStatus },
+    { scannerMode: true, recordHistory: false, reviewMode: true },
+  );
 }
 
 async function scanInventoryHover() {
@@ -1766,6 +1786,9 @@ function drainInventoryScannerQueue() {
         inventoryScannerPendingHashes.delete(capture.captureToken);
         inventoryScannerInFlight = Math.max(0, inventoryScannerInFlight - 1);
         drainInventoryScannerQueue();
+        if (inventoryScannerStopping && inventoryScannerInFlight === 0 && inventoryScannerQueue.length === 0) {
+          finishInventoryScannerReview();
+        }
       });
   }
 }
