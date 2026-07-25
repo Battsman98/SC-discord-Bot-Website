@@ -302,6 +302,13 @@ _RAPID_OCR_POOL_READY = False
 _RAPID_TITLE_OCR = None
 _RAPID_TITLE_OCR_RUN_LOCK = threading.Lock()
 _DEFAULT_INVENTORY_TITLE_BOX = "0.525000,0.381500,0.275000,0.037000"
+_INVENTORY_TITLE_FALLBACK_BOXES = (
+    "0.300000,0.230000,0.380000,0.055000",
+    "0.300000,0.320000,0.380000,0.055000",
+    "0.300000,0.410000,0.380000,0.055000",
+    "0.300000,0.500000,0.380000,0.055000",
+    "0.300000,0.590000,0.380000,0.055000",
+)
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
 
@@ -1633,6 +1640,11 @@ def _read_inventory_title(
     fast_text = _read_calibrated_inventory_title(image_data, active_box)
     if fast_text:
         return fast_text, active_box, True
+    if not title_box:
+        for fallback_box in _INVENTORY_TITLE_FALLBACK_BOXES:
+            fast_text = _read_calibrated_inventory_title(image_data, fallback_box)
+            if fast_text:
+                return fast_text, fallback_box, True
     # Keep live requests bounded to the title-only recognition path. Falling
     # back to full-frame detection takes several seconds and skips items that
     # users hover for the required one-second interval.
@@ -2435,6 +2447,8 @@ def _inventory_scanner_line_is_metadata(line: str) -> bool:
         "empty",
     }
     if normalized in blocked_exact or compact in blocked_compact:
+        return True
+    if compact.startswith("move") and len(compact) <= 8:
         return True
     blocked_prefixes = (
         "volume",
