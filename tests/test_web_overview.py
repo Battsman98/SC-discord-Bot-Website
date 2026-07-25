@@ -319,13 +319,16 @@ def test_form_controls_receive_persistent_labels_above_their_blocks() -> None:
     assert "inventoryTypeOptions(category, validCurrent" in javascript
 
 
-def test_live_inventory_scanner_retries_missed_reads_and_collapses_near_duplicate_frames() -> None:
+def test_live_inventory_scanner_retries_missed_reads_without_collapsing_adjacent_items() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
     assert 'frameRate: { ideal: 5, max: 8 }' in javascript
-    assert 'imageHashDistance(inventoryScannerLastHash, capture.hash) <= 2' in javascript
-    assert 'imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) <= 4' in javascript
+    assert "const sameCountedTile = capture.tileToken" in javascript
+    assert "const samePendingTile = capture.tileToken" in javascript
+    assert "const sameQueuedTile = capture.tileToken" in javascript
+    assert "if (sameCountedTile || samePendingTile || sameQueuedTile)" in javascript
+    assert "&& (!capture.tileToken" not in javascript
     assert 'if (payload?.items?.length)' in javascript
     assert 'inventoryScannerLastHash = ""' in javascript
     assert 'Math.max(250' in javascript

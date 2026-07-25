@@ -1774,16 +1774,13 @@ async function scanInventoryHover() {
     const capture = await captureInventoryScannerCrop();
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const captureToken = `${capture.hash}:${capture.tileToken || capture.contextHash}`;
-    if ((inventoryScannerLastHash
-        && imageHashDistance(inventoryScannerLastHash, capture.hash) <= 2
-        && imageHashDistance(inventoryScannerLastContextHash, capture.contextHash) <= 4
-        && (!capture.tileToken
-          || capture.tileToken === inventoryScannerLastCountedCaptureToken))
-      || inventoryScannerPendingHashes.has(captureToken)
-      || inventoryScannerQueue.some((queued) =>
-        imageHashDistance(queued.hash, capture.hash) <= 2
-        && imageHashDistance(queued.contextHash, capture.contextHash) <= 4
-        && queued.tileToken === capture.tileToken)) {
+    const sameCountedTile = capture.tileToken
+      && capture.tileToken === inventoryScannerLastCountedCaptureToken;
+    const samePendingTile = capture.tileToken
+      && [...inventoryScannerPendingHashes].some((token) => token.endsWith(`:${capture.tileToken}`));
+    const sameQueuedTile = capture.tileToken
+      && inventoryScannerQueue.some((queued) => queued.tileToken === capture.tileToken);
+    if (sameCountedTile || samePendingTile || sameQueuedTile) {
       return;
     }
     inventoryScannerQueue.push({
