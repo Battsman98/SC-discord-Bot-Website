@@ -300,6 +300,7 @@ _RAPID_OCR_POOL_SIZE = 1
 _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_SIZE)
 _RAPID_OCR_POOL_READY = False
 _RAPID_TITLE_OCR = None
+_RAPID_TITLE_OCR_RUN_LOCK = threading.Lock()
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
 
 
@@ -1671,7 +1672,7 @@ def _read_inventory_title_bands(image_data: bytes) -> str:
             band = band.resize((width * 2, (bottom - top) * 2))
             output = BytesIO()
             band.save(output, format="PNG")
-            result, _ = engine(output.getvalue())
+            result, _ = _run_rapid_title_ocr(output.getvalue(), engine)
             text = " ".join(
                 str(item[1]).strip()
                 for item in result or []
@@ -1791,7 +1792,7 @@ def _read_title_above_volume_anchor(
         crop = image.crop((left, top, right, bottom))
         output = BytesIO()
         crop.save(output, format="PNG")
-        recovered, _ = _initialize_rapid_title_ocr()(output.getvalue())
+        recovered, _ = _run_rapid_title_ocr(output.getvalue())
         text = " ".join(
             str(item[1]).strip()
             for item in recovered or []
@@ -1845,7 +1846,7 @@ def _read_calibrated_inventory_title(image_data: bytes, title_box: str) -> str:
         crop = image.crop((left, top, right, bottom))
         output = BytesIO()
         crop.save(output, format="PNG")
-        result, _ = _initialize_rapid_title_ocr()(output.getvalue())
+        result, _ = _run_rapid_title_ocr(output.getvalue())
         text = " ".join(
             str(item[1]).strip()
             for item in result or []
@@ -1907,6 +1908,17 @@ def _initialize_rapid_title_ocr():
         if _RAPID_TITLE_OCR is None:
             _RAPID_TITLE_OCR = RapidOCR(use_text_det=False, use_angle_cls=False)
     return _RAPID_TITLE_OCR
+
+
+def _run_rapid_title_ocr(image_data: bytes, engine: Any | None = None) -> tuple[Any, Any]:
+    """Run the shared recognition-only OCR engine one request at a time.
+
+    RapidOCR's ONNX session is reused to keep live scans fast, but the session
+    is not safe to invoke concurrently from separate asyncio worker threads.
+    """
+    title_engine = engine or _initialize_rapid_title_ocr()
+    with _RAPID_TITLE_OCR_RUN_LOCK:
+        return title_engine(image_data)
 
 
 def _rapid_ocr_engine():
