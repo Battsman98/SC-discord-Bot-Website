@@ -1840,7 +1840,11 @@ async def _enrich_inventory_items(items: list[dict[str, Any]]) -> list[dict[str,
         if match:
             enriched_item["name"] = match.name
             enriched_item["category"] = match.category or enriched_item.get("category")
-            enriched_item["item_type"] = match.section or enriched_item.get("item_type")
+            enriched_item["item_type"] = (
+                match.section
+                or _inventory_catalog_item_type(match.name, enriched_item.get("category"))
+                or enriched_item.get("item_type")
+            )
             enriched_item["item_size"] = match.size or enriched_item.get("item_size")
             enriched_item["source_name"] = match.source_name
             enriched_item["source_url"] = match.source_url
@@ -1882,7 +1886,11 @@ async def _match_inventory_scanner_text(
                 {
                     "name": result.name,
                     "category": result.category or item.get("category"),
-                    "item_type": result.section or item.get("item_type"),
+                    "item_type": (
+                        result.section
+                        or _inventory_catalog_item_type(result.name, result.category or item.get("category"))
+                        or item.get("item_type")
+                    ),
                     "item_size": result.size or item.get("item_size"),
                     "source_name": result.source_name,
                     "source_url": result.source_url,
@@ -1894,6 +1902,61 @@ async def _match_inventory_scanner_text(
             matches[result.name] = item
 
     return sorted(matches.values(), key=lambda item: (-float(item["confidence"]), item["name"].lower()))[:5]
+
+
+def _inventory_catalog_item_type(name: str, category: str | None) -> str | None:
+    normalized = _normalize_text(name)
+    word_groups = {
+        "Armor": (
+            ("Helmet", ("helmet",)),
+            ("Torso Armor", ("torso", "chest", "core armor")),
+            ("Arm Armor", ("arm armor", "arms")),
+            ("Leg Armor", ("leg armor", "legs")),
+            ("Backpack", ("backpack",)),
+            ("Undersuit", ("undersuit",)),
+        ),
+        "Clothing": (
+            ("Footwear", ("boot", "boots", "shoe", "shoes", "footwear")),
+            ("Gloves", ("glove", "gloves")),
+            ("Pants", ("pants", "trouser", "trousers")),
+            ("Jacket", ("jacket", "coat")),
+            ("Shirt", ("shirt", "sweater")),
+            ("Hat", ("hat", "cap", "head gear", "headgear")),
+        ),
+        "Weapons": (
+            ("Attachments", ("scope", "optic", "suppressor", "compensator", "attachment")),
+            ("Sidearm", ("pistol", "sidearm")),
+            ("Melee", ("knife", "melee")),
+            ("Primary", ("rifle", "shotgun", "smg", "lmg", "sniper", "launcher", "railgun")),
+        ),
+        "Utility": (
+            ("Medical", ("medical", "medpen", "med pen", "paramed")),
+            ("Multitool", ("multi tool", "multitool")),
+            ("Mining", ("mining",)),
+            ("Salvage", ("salvage",)),
+            ("Container", ("container",)),
+            ("Tool", ("tool", "tractor beam")),
+        ),
+        "Ammunition": (
+            ("Magazine", ("magazine",)),
+            ("Battery", ("battery",)),
+            ("Ammunition", ("ammunition", "ammo")),
+        ),
+        "Sustenance": (
+            ("Drink", ("drink", "water", "soda")),
+            ("Food", ("food",)),
+        ),
+        "Other": (
+            ("Paint", ("paint",)),
+            ("Flair", ("flair",)),
+            ("Collectible", ("collectible",)),
+            ("Container", ("container",)),
+        ),
+    }
+    for item_type, terms in word_groups.get(category or "", ()):
+        if any(term in normalized for term in terms):
+            return item_type
+    return None
 
 
 def _inventory_scanner_accepted_matches(scored_matches: list[tuple[Any, float]], min_score: float) -> list[tuple[Any, float]]:

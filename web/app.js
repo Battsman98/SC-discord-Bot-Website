@@ -1329,6 +1329,11 @@ function renderInventoryImportItems(payload, options = {}) {
         countedScannerItems.push(item);
       } else if (shouldCount) {
         existing.quantity = Number(existing.quantity || 1) + Number(item.quantity || 1);
+        existing.category = item.category || existing.category;
+        existing.item_type = item.item_type || existing.item_type;
+        existing.item_size = item.item_size || existing.item_size;
+        existing.source_name = item.source_name || existing.source_name;
+        existing.source_url = item.source_url || existing.source_url;
         countedScannerItems.push(existing);
       }
       if (options.scannerMode && shouldCount) {
@@ -1371,7 +1376,7 @@ function renderInventoryImportItems(payload, options = {}) {
   }
   outputs.inventoryImport.innerHTML = `${ocrWarning}<div class="import-review">
     <div class="import-review-heading">
-      <h3>${totalQuantity} scanned across ${items.length} unique item${items.length === 1 ? "" : "s"}</h3>
+      <h3>Scanned Items (${totalQuantity} total / ${items.length} unique)</h3>
       <button type="button" data-inventory-save-all>Save All</button>
     </div>
     <div class="import-review-list" tabindex="0" aria-label="Scanned items to review">

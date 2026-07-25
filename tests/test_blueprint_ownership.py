@@ -10,6 +10,7 @@ from src.web import (
     _blueprint_text_candidates,
     _extract_rsi_pledge_ship_names,
     _inventory_items_from_text,
+    _inventory_catalog_item_type,
     _inventory_item_from_tooltip_text,
     _inventory_match_confidence,
     _inventory_scanner_accepted_matches,
@@ -717,6 +718,13 @@ def test_inventory_match_confidence_scores_catalog_names() -> None:
     assert _inventory_match_confidence("FS-9 LMG", "FS-9 LMG") == 1
     assert _inventory_match_confidence("FS-9", "FS-9 LMG") >= 0.58
     assert _inventory_match_confidence("Effective Range", "FS-9 LMG") == 0
+
+
+def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
+    assert _inventory_catalog_item_type("Navoi Boot and Pants Striker", "Clothing") == "Footwear"
+    assert _inventory_catalog_item_type("ThermoWave Gloves ASD Edition", "Clothing") == "Gloves"
+    assert _inventory_catalog_item_type("Pyro RYT microTech Multi-Tool", "Utility") == "Multitool"
+    assert _inventory_catalog_item_type("Unknown Item", "Clothing") is None
 
 
 def test_inventory_match_prefers_named_multitool_variant_over_generic_item() -> None:

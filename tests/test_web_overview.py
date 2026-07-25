@@ -358,6 +358,8 @@ def test_scanner_review_rows_use_compact_inventory_density() -> None:
     assert 'class="import-scu-field"><span>SCU</span>' in javascript
     assert 'class="import-notes-field"><span>Scanner notes</span>' in javascript
     assert 'class="import-review-list"' in javascript
+    assert "Scanned Items (${totalQuantity} total / ${items.length} unique)" in javascript
+    assert "existing.item_type = item.item_type || existing.item_type" in javascript
     assert ".inventory-import-row {" in css
     assert ".import-review-list {" in css
     assert "overflow-y: auto" in css
