@@ -401,10 +401,9 @@
           <button type="button" data-action-button="stopInventoryScanner">Stop</button>
         </div>
         <p class="scanner-timing-guide">
-          <strong>Scanning timing:</strong> Each capture now searches the tooltip for its title instead of reusing
-          a fixed position. An item is added after the same catalog title is read twice. Hold each item steady until
-          the confirmation message clears, normally about 1.5–2.5 seconds after warm-up. The first item can take
-          about 3–5 seconds while recognition warms.
+          <strong>Scanning timing:</strong> The first readable tooltip locates the title line and warms recognition.
+          Keep that first item steady until it appears. Following items reuse the verified title line and should
+          process much faster. If a fast read fails, the scanner automatically recalibrates instead of guessing.
           For another copy of the same item, move to the next inventory tile so its highlight changes.
         </p>
         <div class="scanner-preview">
@@ -643,6 +642,6 @@
   </template>
 
   <script src="/assets/hotfix-overlay.js?v=20260723-inline-wheel" defer></script>
-  <script src="/assets/app.js?v=20260724-scanner-title-bands-v3" defer></script>
+  <script src="/assets/app.js?v=20260724-scanner-calibration-v4" defer></script>
 </body>
 </html>

@@ -1627,10 +1627,10 @@ def _read_inventory_title(
     image_data: bytes,
     title_box: str | None,
 ) -> tuple[str, str | None, bool]:
-    del title_box
-    fast_text = _read_inventory_title_bands(image_data)
-    if fast_text:
-        return fast_text, None, True
+    if title_box:
+        fast_text = _read_calibrated_inventory_title(image_data, title_box)
+        if fast_text:
+            return fast_text, title_box, True
 
     _initialize_rapid_ocr_pool()
     engine = _RAPID_OCR_POOL.get(timeout=30)
@@ -1642,7 +1642,7 @@ def _read_inventory_title(
     if candidate is None:
         return "", None, False
     title = str(candidate[1]).strip()
-    return title, None, False
+    return title, _normalized_ocr_box(image_data, candidate[0]), False
 
 
 def _read_inventory_title_bands(image_data: bytes) -> str:
@@ -2364,7 +2364,7 @@ def _inventory_match_confidence(candidate: str, item_name: str) -> float:
     item_family = _inventory_name_family(item_norm)
     if candidate_family and item_family and candidate_family != item_family:
         family_similarity = difflib.SequenceMatcher(None, candidate_family, item_family).ratio()
-        if family_similarity < 0.72:
+        if family_similarity < 0.72 and compact_typo_score < 0.85:
             score = min(score, 0.65)
     candidate_numbers = set(re.findall(r"\d+", candidate_norm))
     item_numbers = set(re.findall(r"\d+", item_norm))

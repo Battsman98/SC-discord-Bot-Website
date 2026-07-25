@@ -723,6 +723,11 @@ def test_inventory_match_confidence_scores_catalog_names() -> None:
     assert _inventory_match_confidence("FS-9 LMG", "FS-9 LMG") == 1
     assert _inventory_match_confidence("FS-9", "FS-9 LMG") >= 0.58
     assert _inventory_match_confidence("Effective Range", "FS-9 LMG") == 0
+    assert _inventory_match_confidence("QuartzGCD-ArmySMG", "Quartz GCD-Army SMG") >= 0.95
+    assert _inventory_match_confidence(
+        'Arrowhead"ExecutiveSniperRifle',
+        'Arrowhead "Executive" Sniper Rifle',
+    ) >= 0.95
 
 
 def test_inventory_title_bands_keep_titles_and_reject_metadata(monkeypatch) -> None:
