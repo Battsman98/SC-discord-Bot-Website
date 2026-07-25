@@ -1376,7 +1376,7 @@ function renderInventoryImportItems(payload, options = {}) {
   }
   outputs.inventoryImport.innerHTML = `${ocrWarning}<div class="import-review">
     <div class="import-review-heading">
-      <h3>Scanned Items (${totalQuantity} total / ${items.length} unique)</h3>
+      <h3>Scanned Items</h3>
       <button type="button" data-inventory-save-all>Save All</button>
     </div>
     <div class="import-review-list" tabindex="0" aria-label="Scanned items to review">
