@@ -482,10 +482,10 @@ def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
     assert _inventory_catalog_item_type("Navoi Boot and Pants Striker", "Clothing") == "Footwear"
     assert _inventory_catalog_item_type("ThermoWave Gloves ASD Edition", "Clothing") == "Gloves"
     assert _inventory_catalog_item_type("Pyro RYT microTech Multi-Tool", "Utility") == "Multitool"
-    assert _inventory_catalog_item_type("Odyssey Flight Blade", "Components") == "Flight Blade"
+    assert _inventory_catalog_item_type("Thunderbolt III Missile", "Components") == "Ordnance"
     assert _inventory_catalog_item_type("Wei-Tek L86 Radar", "Components") == "Radar"
-    assert _inventory_catalog_item_type("Sakura Sun Life Support Generator", "Components") == "Life Support Generator"
-    assert _inventory_catalog_item_type("Medium Quantum Fuel Tank", "Components") == "Quantum Fuel Tank"
+    assert _inventory_catalog_item_type("Polar Paint", "Components") == "Liveries"
+    assert _inventory_catalog_item_type("Atlas Quantum Drive", "Components") == "Quantum Drives"
     assert _inventory_catalog_item_type("Unknown Item", "Clothing") is None
 
 

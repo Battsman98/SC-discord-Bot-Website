@@ -281,21 +281,20 @@ def test_component_type_filter_includes_current_ship_component_groups() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
     component_types = (
-        "Power Plant",
-        "Cooler",
-        "Shield Generator",
-        "Quantum Drive",
-        "Jump Module",
-        "Life Support Generator",
+        "Ordnance",
+        "Coolers",
+        "EMP",
+        "Mining",
+        "Missile Racks",
+        "Power Plants",
+        "Quantum Drives",
+        "Shields",
+        "Turrets",
+        "Weapons",
+        "CM Launchers",
+        "Liveries",
+        "Jump Modules",
         "Radar",
-        "Computer",
-        "Flight Blade",
-        "Battery",
-        "Fuel Intake",
-        "Fuel Tank",
-        "Quantum Fuel Tank",
-        "Main Thruster",
-        "Maneuvering Thruster",
     )
     for item_type in component_types:
         assert f'"{item_type}"' in javascript
