@@ -119,7 +119,7 @@ def test_mission_and_blueprint_results_do_not_display_game_file_source() -> None
 
     assert '["Source"' not in blueprint_renderer
     assert '["Source"' not in mission_renderer
-    assert "20260724-tooltip-anchor-v5" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "20260724-persistent-labels-v6" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
 
 def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:
@@ -201,7 +201,7 @@ def test_trade_route_form_has_six_fields_and_discord_style_results() -> None:
     assert '<option value="false">Flexible</option>' in html
     assert 'class="trade-route-fields"' in html
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
-    assert "20260723-active-users" in html
+    assert "20260724-persistent-labels-v6" in html
     assert "Estimated Loop Profit" in javascript
     assert "Estimated Ending Cash" in javascript
     assert "Starting Point" in javascript
@@ -464,7 +464,7 @@ def test_station_inventory_is_compact_at_partial_desktop_widths() -> None:
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "20260723-active-users" in html
+    assert "20260724-persistent-labels-v6" in html
     assert "@media (min-width: 761px) and (max-width: 1200px)" in css
     assert "grid-template-columns: repeat(12, minmax(0, 1fr))" in css
     assert "grid-template-columns: minmax(180px, 4fr)" in css
