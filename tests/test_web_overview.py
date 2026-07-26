@@ -122,6 +122,19 @@ def test_mission_and_blueprint_results_do_not_display_game_file_source() -> None
     assert "20260724-persistent-labels-v6" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
 
+def test_blueprint_missions_link_to_mission_search() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    blueprint_renderer = javascript.split("function renderBlueprint(item)", 1)[1].split(
+        "function renderBlueprintImportMatches", 1
+    )[0]
+
+    assert 'href="#missions"' in blueprint_renderer
+    assert 'data-mission-link=' in blueprint_renderer
+    assert 'openMissionFromBlueprint(missionLink.dataset.missionLink)' in javascript
+    assert 'form.querySelector(\'[name="query"]\').value = missionName' in javascript
+    assert 'form.requestSubmit()' in javascript
+
+
 def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")

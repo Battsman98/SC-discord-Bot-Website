@@ -75,6 +75,22 @@ document.querySelectorAll("[data-overview-tab]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.overviewTab));
 });
 
+document.addEventListener("click", (event) => {
+  const missionLink = event.target.closest("[data-mission-link]");
+  if (!missionLink) return;
+  event.preventDefault();
+  openMissionFromBlueprint(missionLink.dataset.missionLink);
+});
+
+function openMissionFromBlueprint(missionName) {
+  const form = document.querySelector('form[data-action="missions"]');
+  if (!form || !missionName) return;
+  activateTab("missions");
+  form.querySelector('[name="query"]').value = missionName;
+  form.requestSubmit();
+  outputs.missions.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 const homeBackgrounds = [
   "25", "29", "30", "32", "34", "36",
   "user-01", "user-04", "user-05", "user-06", "user-07", "user-08", "user-09",
@@ -616,7 +632,10 @@ function renderBlueprint(item) {
     ["Craft time", item.craft_time_seconds ? `${Math.round(item.craft_time_seconds / 60)} min` : null],
     ["Tiers", item.tiers],
     ["Ingredients", item.ingredients?.map((ing) => escapeHtml(`${ing.quantity || ""} ${ing.unit || ""} ${ing.name}`.trim())).join("<br>")],
-    ["Missions", item.missions?.slice(0, 8).map((mission) => `${escapeHtml(mission.contractor || "Unknown")}: ${escapeHtml(mission.name)}`).join("<br>")],
+    ["Missions", item.missions?.slice(0, 8).map((mission) => {
+      const missionName = escapeHtml(mission.name);
+      return `${escapeHtml(mission.contractor || "Unknown")}: <a href="#missions" data-mission-link="${escapeAttribute(mission.name)}">${missionName}</a>`;
+    }).join("<br>")],
   ], `<div class="card-actions">${action}</div>`);
 }
 
