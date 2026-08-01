@@ -1153,7 +1153,6 @@ const feedbackPreviews = document.querySelector("[data-feedback-previews]");
 const feedbackStatus = document.querySelector("[data-feedback-status]");
 const feedbackSubmit = document.querySelector("[data-feedback-submit]");
 const feedbackSuccessModal = document.querySelector("[data-feedback-success-modal]");
-const feedbackPostLink = document.querySelector("[data-feedback-post-link]");
 let feedbackPreviewUrls = [];
 
 function closeFeedbackModal() {
@@ -1178,12 +1177,11 @@ function closeFeedbackSuccess() {
   document.querySelector("[data-feedback-open]")?.focus();
 }
 
-function openFeedbackSuccess(forumUrl) {
-  if (!feedbackSuccessModal || !feedbackPostLink) return;
-  feedbackPostLink.href = forumUrl;
+function openFeedbackSuccess() {
+  if (!feedbackSuccessModal) return;
   feedbackSuccessModal.hidden = false;
   document.body.classList.add("feedback-modal-open");
-  feedbackPostLink.focus();
+  feedbackSuccessModal.querySelector("[data-feedback-success-close]")?.focus();
 }
 
 function clearFeedbackPreviews() {
@@ -1253,7 +1251,7 @@ feedbackForm?.addEventListener("submit", async (event) => {
     feedbackForm.reset();
     clearFeedbackPreviews();
     closeFeedbackModal();
-    openFeedbackSuccess(payload.forum_url);
+    openFeedbackSuccess();
   } catch (error) {
     setFeedbackStatus(error.message);
   } finally {

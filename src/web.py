@@ -795,10 +795,9 @@ async def submit_feedback(
         raise HTTPException(status_code=502, detail="The feedback post could not reach Discord.") from error
 
     thread_id = str(response_payload.get("id") or "")
-    guild_id = str(response_payload.get("guild_id") or settings.discord_guild_id or "")
-    if not thread_id or not guild_id:
-        raise HTTPException(status_code=502, detail="Discord created the post but did not return its link.")
-    return {"status": "submitted", "forum_url": f"https://discord.com/channels/{guild_id}/{thread_id}"}
+    if not thread_id:
+        raise HTTPException(status_code=502, detail="Discord created the post but did not confirm the ticket.")
+    return {"status": "submitted"}
 
 
 @app.post("/api/activity", status_code=204)
