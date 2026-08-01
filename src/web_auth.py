@@ -20,6 +20,7 @@ SESSION_COOKIE_NAME = "game_assist_session"
 OAUTH_STATE_COOKIE_NAME = "game_assist_oauth_state"
 SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
 VISITOR_ROLE_NAME = "Visitor"
+BOT_MANAGER_ROLE_NAME = "Bot Manager"
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,9 @@ async def fetch_web_user(settings: Settings, access_token: str) -> WebUser:
         member_payload = await _fetch_or_join_guild_member(session, settings, user_id, access_token)
         role_ids = tuple(int(role_id) for role_id in member_payload.get("roles", []))
         permissions = await _resolve_member_permissions(session, settings, role_ids)
+        is_bot_manager = await _member_has_named_role(
+            session, settings, role_ids, BOT_MANAGER_ROLE_NAME
+        )
 
     username = str(user_payload.get("username") or "")
     global_name = user_payload.get("global_name")
@@ -108,8 +112,8 @@ async def fetch_web_user(settings: Settings, access_token: str) -> WebUser:
         avatar_url=_avatar_url(user_payload),
         roles=role_ids,
         guild_permissions=permissions,
-        can_manage_changes=can_manage_change_commands(settings, role_ids, permissions),
-        can_manage_admin=can_manage_admin_commands(settings, user_id, role_ids, permissions),
+        can_manage_changes=is_bot_manager or can_manage_change_commands(settings, role_ids, permissions),
+        can_manage_admin=is_bot_manager or can_manage_admin_commands(settings, user_id, role_ids, permissions),
     )
 
 
@@ -190,6 +194,29 @@ async def _resolve_member_permissions(
         if role_id in role_set:
             permissions |= int(role.get("permissions", "0"))
     return permissions
+
+
+async def _member_has_named_role(
+    session: aiohttp.ClientSession,
+    settings: Settings,
+    role_ids: tuple[int, ...],
+    role_name: str,
+) -> bool:
+    if not role_ids:
+        return False
+    async with session.get(
+        f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/roles",
+        headers={"Authorization": f"Bot {settings.discord_token}"},
+    ) as response:
+        roles = await response.json()
+        if response.status >= 400:
+            raise HTTPException(status_code=403, detail="Could not read Discord role access.")
+    member_role_ids = set(role_ids)
+    return any(
+        int(role.get("id", 0)) in member_role_ids
+        and str(role.get("name") or "").casefold() == role_name.casefold()
+        for role in roles
+    )
 
 
 def can_manage_change_commands(settings: Settings, role_ids: tuple[int, ...], permissions: int) -> bool:

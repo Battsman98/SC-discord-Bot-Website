@@ -50,6 +50,7 @@ CZ_TIMER_DEFINITIONS = {
 INVENTORY_CHANNEL_ID = 1528623944947597383
 FEEDBACK_TEMPLATE_CACHE_PREFIX = "discord:feedback-template-thread"
 VISITOR_ROLE_NAME = "Visitor"
+BOT_MANAGER_ROLE_NAME = "Bot Manager"
 VISITOR_CATEGORY_NAME = "Visitor Bot Hub"
 VISITOR_CHANNEL_SPECS = {
     "bot-start-here": "text",
@@ -271,6 +272,7 @@ class GameAssistBot(commands.Bot):
 
         self._commands_reference_synced = True
         await self.ensure_visitor_access()
+        await self.ensure_bot_manager_role()
         await self.ensure_feedback_forum()
         await self.ensure_inventory_search_channel()
         await self.sync_commands_reference_message()
@@ -410,6 +412,65 @@ class GameAssistBot(commands.Bot):
         else:
             message = await channel.send(embed=embed)
             await self.cache.set(cache_key, message.id, 315360000)
+
+    async def ensure_bot_manager_role(self) -> None:
+        guild = self.get_guild(self.settings.discord_guild_id or 0)
+        if guild is None or guild.me is None:
+            logging.error("Could not resolve the configured guild for Bot Manager provisioning")
+            return
+        me = guild.me
+        if not me.guild_permissions.manage_roles or not me.guild_permissions.manage_channels:
+            logging.error("Bot requires Manage Roles and Manage Channels to provision Bot Manager")
+            return
+
+        role = discord.utils.find(lambda item: item.name.casefold() == BOT_MANAGER_ROLE_NAME.casefold(), guild.roles)
+        if role is None:
+            permissions = discord.Permissions.none()
+            for name in (
+                "view_channel", "send_messages", "send_messages_in_threads", "read_message_history",
+                "embed_links", "attach_files", "add_reactions", "use_application_commands",
+            ):
+                setattr(permissions, name, True)
+            role = await guild.create_role(
+                name=BOT_MANAGER_ROLE_NAME,
+                permissions=permissions,
+                reason="Create website and Discord bot management role",
+            )
+
+        bot_channel_ids = {
+            INVENTORY_CHANNEL_ID,
+            *self.settings.command_channel_ids.values(),
+            *self.visitor_channels.values(),
+        }
+        for channel_id in (
+            self.settings.commands_channel_id,
+            self.settings.exec_status_channel_id,
+            self.settings.cz_timers_channel_id,
+            self.settings.audit_log_channel_id,
+            self.settings.feedback_forum_channel_id,
+        ):
+            if channel_id:
+                bot_channel_ids.add(channel_id)
+
+        visitor_category = discord.utils.find(
+            lambda item: item.name.casefold() == VISITOR_CATEGORY_NAME.casefold(), guild.categories
+        )
+        if visitor_category:
+            bot_channel_ids.add(visitor_category.id)
+        for channel_id in bot_channel_ids:
+            channel = guild.get_channel(channel_id)
+            if channel is None:
+                continue
+            overwrite = channel.overwrites_for(role)
+            overwrite.view_channel = True
+            overwrite.send_messages = True
+            overwrite.send_messages_in_threads = True
+            overwrite.read_message_history = True
+            overwrite.embed_links = True
+            overwrite.attach_files = True
+            overwrite.use_application_commands = True
+            await channel.set_permissions(role, overwrite=overwrite, reason="Grant Bot Manager access")
+        logging.info("Bot Manager role %s is ready", role.id)
 
     async def ensure_feedback_forum(self) -> None:
         channel_id = self.settings.feedback_forum_channel_id
@@ -2456,6 +2517,9 @@ def _can_manage_change_commands(interaction: discord.Interaction, settings: Sett
     if not isinstance(user, discord.Member):
         return False
 
+    if any(role.name.casefold() == BOT_MANAGER_ROLE_NAME.casefold() for role in user.roles):
+        return True
+
     if settings.exec_admin_role_ids:
         user_role_ids = {role.id for role in user.roles}
         return bool(user_role_ids.intersection(settings.exec_admin_role_ids))
@@ -2469,6 +2533,9 @@ def _can_manage_admin_commands(interaction: discord.Interaction, settings: Setti
         return True
     if not isinstance(user, discord.Member):
         return False
+
+    if any(role.name.casefold() == BOT_MANAGER_ROLE_NAME.casefold() for role in user.roles):
+        return True
 
     if settings.bot_admin_role_ids:
         user_role_ids = {role.id for role in user.roles}
