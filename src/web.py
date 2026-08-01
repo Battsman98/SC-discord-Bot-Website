@@ -37,6 +37,7 @@ from src.bot import (
 )
 from src.cache import AUDIT_ACTION_TYPES, SQLiteCache
 from src.config import Settings
+from src.security import SlidingWindowLimiter, install_secret_redaction
 from src.sources.registry import SourceRegistry, build_default_registry
 from src.sources.citizen_updates import CitizenUpdatesSource
 from src.sources.warbonds import WarbondTrackerSource
@@ -172,6 +173,7 @@ class AppState:
     warbonds: WarbondTrackerSource
     item_catalog_task: asyncio.Task | None
     scanner_gate: "InventoryScannerGate"
+    request_limiter: SlidingWindowLimiter
 
 
 class InventoryScannerGate:
@@ -216,6 +218,22 @@ class MiningCommunityRequest(BaseModel):
     location_type: str = Field(min_length=1)
     location: str = Field(min_length=1)
     reported_by: str = "Website"
+
+
+class RefineryOrderRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=120)
+    material: str | None = Field(default=None, max_length=120)
+    quantity: float | None = Field(default=None, ge=0)
+    refinery: str | None = Field(default=None, max_length=120)
+    method: str | None = Field(default=None, max_length=120)
+    location: str | None = Field(default=None, max_length=120)
+    crew: str | None = Field(default=None, max_length=500)
+    notes: str | None = Field(default=None, max_length=2000)
+    completes_at: int = Field(gt=0)
+
+
+class RefineryOrderStatusRequest(BaseModel):
+    status: str
 
 
 class ExecOverrideRequest(BaseModel):
@@ -295,6 +313,7 @@ class InventoryTextImportRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = Settings.from_env(require_discord_token=False)
+    install_secret_redaction()
     cache = await SQLiteCache.create(settings.database_path)
     sources = await build_default_registry(settings, cache)
     updates = CitizenUpdatesSource(settings, cache)
@@ -308,6 +327,9 @@ async def lifespan(app: FastAPI):
     app.state.game_assist.scanner_gate = InventoryScannerGate(
         worker_count=int(os.getenv("INVENTORY_SCANNER_WORKERS", "2")),
         capacity=int(os.getenv("INVENTORY_SCANNER_CAPACITY", "4")),
+    )
+    app.state.game_assist.request_limiter = SlidingWindowLimiter(
+        settings.web_rate_limit_per_minute, 60
     )
     app.state.game_assist.item_catalog_task = asyncio.create_task(
         _item_catalog_maintenance_loop(sources),
@@ -359,6 +381,51 @@ _INVENTORY_TITLE_FALLBACK_BOXES = (
     "0.300000,0.610000,0.380000,0.027500",
 )
 VISITOR_COOKIE_NAME = "sc_companion_visitor"
+_STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def security_controls(request: Request, call_next):
+    """Apply browser, request-size, origin, and abuse protections in one place."""
+    if hasattr(app.state, "game_assist"):
+        settings = state().settings
+        # Uvicorn resolves trusted proxy headers into request.client. Reading a raw
+        # X-Forwarded-For value here would let clients rotate a spoofed rate-limit key.
+        client_ip = request.client.host if request.client else "unknown"
+        allowed, retry_after = state().request_limiter.allow(client_ip)
+        if not allowed:
+            return Response(status_code=429, headers={"Retry-After": str(retry_after)})
+
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > settings.max_upload_bytes:
+                    return Response(status_code=413)
+            except ValueError:
+                return Response(status_code=400)
+
+        if request.method in _STATE_CHANGING_METHODS:
+            origin = request.headers.get("origin", "").rstrip("/")
+            fetch_site = request.headers.get("sec-fetch-site", "").lower()
+            request_origin = f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+            trusted = {request_origin, *settings.trusted_origins}
+            if fetch_site == "cross-site" or (origin and origin not in trusted):
+                return Response(status_code=403)
+
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; "
+        "img-src 'self' data: https://cdn.discordapp.com https:; "
+        "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https:"
+    )
+    if request.url.path.startswith(("/api/me", "/api/audit", "/auth/")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def state() -> AppState:
@@ -553,21 +620,12 @@ async def health() -> dict[str, Any]:
     catalog = await state().sources.item_catalog_status()
     return {
         "status": "online",
-        "database_path": settings.database_path,
         "discord_auth_enabled": discord_auth_configured(settings),
-        "legacy_admin_token_enabled": bool(settings.web_admin_token),
         "inventory_scanner": {
             "workers": state().scanner_gate.worker_count,
             "capacity": state().scanner_gate.capacity,
         },
         "item_catalog": catalog,
-        "configured_channels": {
-            "commands": settings.commands_channel_id,
-            "exec_status": settings.exec_status_channel_id,
-            "cz_timers": settings.cz_timers_channel_id,
-            "audit_log": settings.audit_log_channel_id,
-        },
-        "command_channel_ids": settings.command_channel_ids,
     }
 
 
@@ -1235,6 +1293,7 @@ async def mining(material: str, system: str | None = None, planet: str | None = 
 async def multi_mining_signature_payload(query: str, terms: list[str]) -> dict[str, Any]:
     results = []
     missing = []
+    location_materials: dict[tuple[str, str], set[str]] = {}
     for term in terms:
         result = await state().sources.lookup_mining_material(term)
         if result is None:
@@ -1247,8 +1306,25 @@ async def multi_mining_signature_payload(query: str, terms: list[str]) -> dict[s
                 "signatures": _mining_term_signatures(result, term),
             }
         )
+        groups = result.location_groups or []
+        if groups:
+            for group in groups:
+                locations = [*group.lagrange_points, *group.planets, *group.moons, *group.points_of_interest]
+                for location in locations:
+                    location_materials.setdefault((group.system, location), set()).add(result.material_name)
+        else:
+            locations = [*result.lagrange_points, *result.planets, *result.moons, *result.points_of_interest]
+            for location in locations:
+                location_materials.setdefault(("", location), set()).add(result.material_name)
 
     shared_signatures = _shared_mining_signatures([result["signatures"] for result in results])
+    ranked_locations = sorted(
+        (
+            {"system": system or None, "location": location, "materials": sorted(materials), "match_count": len(materials)}
+            for (system, location), materials in location_materials.items()
+        ),
+        key=lambda item: (-item["match_count"], str(item["system"] or ""), item["location"]),
+    )[:30]
     return {
         "result_type": "multi_mining_signatures",
         "material_name": "Mining Signature Match",
@@ -1256,6 +1332,7 @@ async def multi_mining_signature_payload(query: str, terms: list[str]) -> dict[s
         "materials": _unique_preserve_order([result["material"] for result in results]),
         "missing": missing,
         "rock_signatures": shared_signatures,
+        "ranked_locations": ranked_locations,
         "source_name": "Star-Head mining signatures",
     }
 
@@ -1276,6 +1353,42 @@ async def mining_community(payload: MiningCommunityRequest, request: Request) ->
         "mining",
     )
     return {"status": "saved"}
+
+
+@app.get("/api/me/refinery-orders")
+async def my_refinery_orders(user=Depends(require_user)) -> list[dict[str, Any]]:
+    return await state().cache.user_refinery_orders(user.id)
+
+
+@app.post("/api/me/refinery-orders")
+async def save_my_refinery_order(
+    payload: RefineryOrderRequest,
+    user=Depends(require_user),
+) -> dict[str, Any]:
+    values = payload.model_dump()
+    order_id = await state().cache.save_user_refinery_order(user.id, values)
+    return {"status": "saved", "id": order_id}
+
+
+@app.put("/api/me/refinery-orders/{order_id}/status")
+async def update_my_refinery_order_status(
+    order_id: int,
+    payload: RefineryOrderStatusRequest,
+    user=Depends(require_user),
+) -> dict[str, str]:
+    status = payload.status.strip().lower()
+    if status not in {"refining", "ready", "collected", "sold", "archived"}:
+        raise HTTPException(status_code=422, detail="Unsupported refinery order status.")
+    if not await state().cache.update_user_refinery_order_status(user.id, order_id, status):
+        not_found("Refinery order not found.")
+    return {"status": "updated"}
+
+
+@app.delete("/api/me/refinery-orders/{order_id}")
+async def delete_my_refinery_order(order_id: int, user=Depends(require_user)) -> dict[str, str]:
+    if not await state().cache.delete_user_refinery_order(user.id, order_id):
+        not_found("Refinery order not found.")
+    return {"status": "deleted"}
 
 
 @app.get("/api/autocomplete/mining-materials")
@@ -1729,7 +1842,9 @@ async def _ocr_blueprint_images(files: list[UploadFile]) -> tuple[str, str | Non
 
     texts: list[str] = []
     for file in files[:8]:
-        data = await file.read()
+        data = await file.read(state().settings.max_upload_bytes + 1)
+        if len(data) > state().settings.max_upload_bytes:
+            raise HTTPException(status_code=413, detail="Uploaded image is too large.")
         if not data:
             continue
         try:
@@ -1745,7 +1860,9 @@ async def _ocr_inventory_title_images(
     title_box: str | None,
 ) -> tuple[str, str | None, str | None, bool]:
     for file in files[:1]:
-        data = await file.read()
+        data = await file.read(state().settings.max_upload_bytes + 1)
+        if len(data) > state().settings.max_upload_bytes:
+            raise HTTPException(status_code=413, detail="Uploaded image is too large.")
         if not data:
             continue
         try:
@@ -1765,7 +1882,9 @@ async def _ocr_inventory_title_candidates(
     title_box: str | None,
 ) -> tuple[list[tuple[str, str]], str | None]:
     for file in files[:1]:
-        data = await file.read()
+        data = await file.read(state().settings.max_upload_bytes + 1)
+        if len(data) > state().settings.max_upload_bytes:
+            raise HTTPException(status_code=413, detail="Uploaded image is too large.")
         if not data:
             continue
         try:
@@ -1784,7 +1903,9 @@ async def _read_inventory_scanner_image(
     files: list[UploadFile],
 ) -> tuple[bytes, str | None]:
     for file in files[:1]:
-        data = await file.read()
+        data = await file.read(state().settings.max_upload_bytes + 1)
+        if len(data) > state().settings.max_upload_bytes:
+            raise HTTPException(status_code=413, detail="Uploaded image is too large.")
         if not data:
             continue
         return data, None

@@ -157,6 +157,29 @@ class SQLiteCache:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS user_refinery_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                label TEXT NOT NULL,
+                material TEXT,
+                quantity REAL,
+                refinery TEXT,
+                method TEXT,
+                location TEXT,
+                crew TEXT,
+                notes TEXT,
+                completes_at INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'refining',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_refinery_orders_user_status ON user_refinery_orders(user_id, status, completes_at)"
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS item_catalog (
                 item_uuid TEXT PRIMARY KEY,
                 stable_id INTEGER NOT NULL,
@@ -856,6 +879,7 @@ class SQLiteCache:
             )
             for row in rows
         ]
+
         with self._connection:
             self._connection.execute("DELETE FROM item_catalog")
             self._connection.executemany(
@@ -876,6 +900,67 @@ class SQLiteCache:
                 """,
                 [(str(key), json.dumps(value)) for key, value in metadata.items()],
             )
+
+    async def user_refinery_orders(self, user_id: int) -> list[dict[str, Any]]:
+        self._connection.execute(
+            "UPDATE user_refinery_orders SET status = 'ready', updated_at = ? WHERE user_id = ? AND status = 'refining' AND completes_at <= ?",
+            (int(time.time()), user_id, int(time.time())),
+        )
+        self._connection.commit()
+        rows = self._connection.execute(
+            """
+            SELECT id, label, material, quantity, refinery, method, location, crew, notes,
+                   completes_at, status, created_at, updated_at
+            FROM user_refinery_orders
+            WHERE user_id = ?
+            ORDER BY CASE status WHEN 'refining' THEN 0 WHEN 'ready' THEN 1 ELSE 2 END,
+                     completes_at ASC, id DESC
+            """,
+            (user_id,),
+        ).fetchall()
+        return [
+            {
+                "id": row[0], "label": row[1], "material": row[2], "quantity": row[3],
+                "refinery": row[4], "method": row[5], "location": row[6], "crew": row[7],
+                "notes": row[8], "completes_at": row[9], "status": row[10],
+                "created_at": row[11], "updated_at": row[12],
+            }
+            for row in rows
+        ]
+
+    async def save_user_refinery_order(self, user_id: int, values: dict[str, Any]) -> int:
+        now = int(time.time())
+        cursor = self._connection.execute(
+            """
+            INSERT INTO user_refinery_orders (
+                user_id, label, material, quantity, refinery, method, location, crew, notes,
+                completes_at, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'refining', ?, ?)
+            """,
+            (
+                user_id, values["label"], values.get("material"), values.get("quantity"),
+                values.get("refinery"), values.get("method"), values.get("location"),
+                values.get("crew"), values.get("notes"), values["completes_at"], now, now,
+            ),
+        )
+        self._connection.commit()
+        return int(cursor.lastrowid)
+
+    async def update_user_refinery_order_status(self, user_id: int, order_id: int, status: str) -> bool:
+        cursor = self._connection.execute(
+            "UPDATE user_refinery_orders SET status = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+            (status, int(time.time()), user_id, order_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
+    async def delete_user_refinery_order(self, user_id: int, order_id: int) -> bool:
+        cursor = self._connection.execute(
+            "DELETE FROM user_refinery_orders WHERE user_id = ? AND id = ?",
+            (user_id, order_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
 
     async def close(self) -> None:
         self._connection.close()

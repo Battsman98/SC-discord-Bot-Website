@@ -9,6 +9,7 @@ from discord.ext import commands
 
 from src.cache import SQLiteCache
 from src.config import Settings
+from src.security import SlidingWindowLimiter, install_secret_redaction
 from src.sources.base import (
     BlueprintIngredient,
     BlueprintMission,
@@ -57,6 +58,17 @@ class GameAssistCommandTree(app_commands.CommandTree):
 
         if interaction.type == discord.InteractionType.autocomplete:
             return True
+
+        if bot.settings.discord_guild_id and interaction.guild_id != bot.settings.discord_guild_id:
+            await interaction.response.send_message("This bot is not available in this server.", ephemeral=True)
+            return False
+
+        allowed, retry_after = bot.command_limiter.allow(str(interaction.user.id))
+        if not allowed:
+            await interaction.response.send_message(
+                f"You're using commands too quickly. Try again in {retry_after}s.", ephemeral=True
+            )
+            return False
 
         command_name = _interaction_command_name(interaction)
         allowed_channel_id = _allowed_command_channel_id(bot, command_name)
@@ -144,6 +156,9 @@ class GameAssistBot(commands.Bot):
         self.inventory_channel_id: int = INVENTORY_CHANNEL_ID
         self._exec_status_task: asyncio.Task | None = None
         self._cz_timers_task: asyncio.Task | None = None
+        self.command_limiter = SlidingWindowLimiter(
+            settings.discord_rate_limit_per_10_seconds, 10
+        )
 
     async def setup_hook(self) -> None:
         self.add_view(CZTimerDashboardView())
@@ -3534,6 +3549,7 @@ def configure_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    install_secret_redaction()
 
 
 async def main() -> None:

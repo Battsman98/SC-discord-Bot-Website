@@ -2303,6 +2303,39 @@ body.hangar-modal-open {
   grid-column: 1 / -1;
 }
 
+.refinery-ledger .saved-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.refinery-order {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.18));
+  background: rgba(5, 12, 18, 0.72);
+}
+
+.refinery-order > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.refinery-order p,
+.refinery-order small {
+  margin: 0;
+}
+
+.refinery-status {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid currentColor;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+}
+
 .mini-output {
   min-height: 0;
   margin-top: 12px;

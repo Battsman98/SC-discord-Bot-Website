@@ -231,11 +231,15 @@
             <div id="industrySplitOutput" class="mini-output" aria-live="polite"></div>
           </form>
           <form class="resource-card form" data-action="refineryTimer">
-            <div class="resource-card-heading"><h3>Refinery Completion</h3><span>Timer</span></div>
-            <p>Turn an in-game duration into a local completion time and Discord timestamp.</p>
+            <div class="resource-card-heading"><h3>Refinery Work Order</h3><span>Saved timer</span></div>
+            <p>Save a refinery job, track its completion, and carry its details into crew operations.</p>
             <input name="job" placeholder="Job label or refinery" aria-label="Refinery job label" required>
+            <div class="field-row"><input name="material" placeholder="Material or ore mix" aria-label="Material or ore mix"><input name="quantity" type="number" min="0" step="0.01" placeholder="Quantity" aria-label="Material quantity"></div>
+            <div class="field-row"><input name="refinery" placeholder="Refinery" aria-label="Refinery"><input name="method" placeholder="Method" aria-label="Refining method"></div>
+            <div class="field-row"><input name="location" placeholder="Mining location" aria-label="Mining location"><input name="crew" placeholder="Crew" aria-label="Crew"></div>
             <div class="field-row"><input name="hours" type="number" min="0" max="999" value="0" placeholder="Hours" aria-label="Hours remaining"><input name="minutes" type="number" min="0" max="59" value="30" placeholder="Minutes" aria-label="Minutes remaining"></div>
-            <button type="submit">Set Completion</button>
+            <textarea name="notes" rows="2" placeholder="Notes"></textarea>
+            <button type="submit">Save Work Order</button>
             <div id="refineryTimerOutput" class="mini-output" aria-live="polite"></div>
           </form>
           <form class="resource-card form resource-card-wide" data-action="operationBrief">
@@ -248,6 +252,11 @@
             <div id="operationBriefOutput" class="mini-output" aria-live="polite"></div>
           </form>
         </div>
+      </article>
+      <article class="panel refinery-ledger">
+        <div class="panel-heading"><h2>Refinery Ledger</h2><button type="button" data-action-button="refreshRefineryOrders">Refresh</button></div>
+        <p class="form-note">Active orders become ready automatically. Completed orders remain available until you archive or remove them.</p>
+        <div id="refineryOrdersOutput" class="saved-list" aria-live="polite"></div>
       </article>
     </section>
 

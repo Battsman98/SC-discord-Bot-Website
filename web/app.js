@@ -8,6 +8,7 @@ const outputs = {
   mining: document.querySelector("#miningOutput"),
   industrySplit: document.querySelector("#industrySplitOutput"),
   refineryTimer: document.querySelector("#refineryTimerOutput"),
+  refineryOrders: document.querySelector("#refineryOrdersOutput"),
   operationBrief: document.querySelector("#operationBriefOutput"),
   crafting: document.querySelector("#craftingOutput"),
   missions: document.querySelector("#missionsOutput"),
@@ -194,6 +195,7 @@ document.querySelector("#auditActionType")?.addEventListener("change", loadAudit
 document.querySelector("#auditSort")?.addEventListener("change", loadAudit);
 document.querySelector("#auditLimit")?.addEventListener("change", loadAudit);
 document.querySelector("[data-action-button='refreshBlueprints']").addEventListener("click", loadSavedBlueprints);
+document.querySelector("[data-action-button='refreshRefineryOrders']")?.addEventListener("click", loadRefineryOrders);
 document.querySelector("[data-action-button='refreshShips']").addEventListener("click", loadSavedShips);
 document.querySelector("[data-action-button='backToOverview']").addEventListener("click", () => activateTab("overview"));
 document.querySelector("[data-action-button='refreshInventory']").addEventListener("click", loadInventory);
@@ -213,6 +215,7 @@ window.addEventListener("pagehide", () => stopInventoryScanner(false));
 
 let currentUser = { authenticated: false };
 let savedBlueprintNames = new Set();
+let inventoryMaterialTotals = new Map();
 let savedShipTypes = new Map();
 let inventoryScannerStream = null;
 let inventoryScannerCrop = null;
@@ -387,7 +390,7 @@ async function handleForm(action, form) {
       renderCrewSplit(data);
     }
     if (action === "refineryTimer") {
-      renderRefineryCompletion(data);
+      await renderRefineryCompletion(data);
     }
     if (action === "operationBrief") {
       renderOperationBrief(data);
@@ -602,6 +605,7 @@ function renderMiningSignatureMatch(item) {
   return card(item.material_name, [
     ["Search", item.query],
     ["Materials", item.materials?.join(", ")],
+    ["Best location matches", item.ranked_locations?.slice(0, 12).map((entry) => `${escapeHtml([entry.system, entry.location].filter(Boolean).join(" / "))}: ${escapeHtml(entry.materials.join(", "))}`).join("<br>")],
     ["Rock signatures", rockSignatureClusters(item.rock_signatures)],
     ["Not found", item.missing?.join(", ")],
     ["Source", item.source_name],
@@ -618,6 +622,7 @@ function rockSignatureClusters(signatures) {
 
 function renderBlueprint(item) {
   const isOwned = savedBlueprintNames.has(item.name);
+  const craftability = blueprintCraftability(item);
   const action = currentUser.authenticated
     ? `<button type="button" data-blueprint-toggle="${escapeAttribute(item.name)}" data-blueprint='${escapeAttribute(JSON.stringify({
       name: item.name,
@@ -627,6 +632,7 @@ function renderBlueprint(item) {
     }))}'>${isOwned ? "Remove from Mine" : "Save to Mine"}</button>`
     : `<span class="state">Log in with Discord to save this blueprint.</span>`;
   return card(item.name, [
+    ["Inventory", craftability],
     ["Category", item.category],
     ["Size", item.component_size],
     ["Craft time", item.craft_time_seconds ? `${Math.round(item.craft_time_seconds / 60)} min` : null],
@@ -751,6 +757,7 @@ async function loadMe() {
       outputs.savedShips.innerHTML = stateMessage("Log in with Discord to save ships to your account.");
       outputs.savedBlueprints.innerHTML = stateMessage("Log in with Discord to save blueprints to your account.");
       outputs.inventory.innerHTML = stateMessage("Log in with Discord to track station inventory.");
+      outputs.refineryOrders.innerHTML = stateMessage("Log in with Discord to save refinery work orders.");
       return;
     }
     const badges = [
@@ -765,6 +772,7 @@ async function loadMe() {
     await loadSavedShips();
     await loadSavedBlueprints();
     await loadInventory();
+    await loadRefineryOrders();
     if (currentUser.can_manage_admin) await loadAudit();
   } catch (error) {
     setAdminVisibility(false);
@@ -1024,6 +1032,7 @@ async function loadSavedBlueprints(options = {}) {
 
 async function loadInventory() {
   if (!currentUser.authenticated) {
+    inventoryMaterialTotals = new Map();
     outputs.inventory.innerHTML = stateMessage("Log in with Discord to track station inventory.");
     return;
   }
@@ -1032,7 +1041,11 @@ async function loadInventory() {
     await api("/api/me/inventory/merge-duplicates", { method: "POST" });
     await loadInventoryFacets();
     const params = inventoryFilterParams();
-    const items = await api(`/api/me/inventory?${params}`);
+    const [items, allItems] = await Promise.all([
+      api(`/api/me/inventory?${params}`),
+      params ? api("/api/me/inventory?sort_by=name") : api(`/api/me/inventory?${params}`),
+    ]);
+    inventoryMaterialTotals = inventoryTotals(allItems);
     if (!items.length) {
       outputs.inventory.innerHTML = stateMessage("No inventory items found.");
       return;
@@ -1103,6 +1116,29 @@ function syncInventoryTypeSelectForCategory(categorySelect) {
   const validCurrent = current && (allowed.includes(current) || !allowed.length) ? current : "";
   typeSelect.innerHTML = inventoryTypeOptions(category, validCurrent, typeSelect.dataset.placeholder || "Item type");
   typeSelect.value = validCurrent;
+}
+
+function inventoryTotals(items) {
+  const totals = new Map();
+  items.forEach((item) => {
+    const key = normalizeInventoryMergeKey(item.name);
+    totals.set(key, (totals.get(key) || 0) + Number(item.quantity || 0));
+  });
+  return totals;
+}
+
+function blueprintCraftability(item) {
+  if (!currentUser.authenticated) return "Log in to compare materials";
+  if (!item.ingredients?.length) return "No ingredient data";
+  const missing = item.ingredients.filter((ingredient) => {
+    const required = Number(ingredient.quantity || 0);
+    return required > (inventoryMaterialTotals.get(normalizeInventoryMergeKey(ingredient.name)) || 0);
+  });
+  if (!missing.length) return "Ready with saved inventory";
+  return `Missing ${missing.slice(0, 3).map((ingredient) => {
+    const owned = inventoryMaterialTotals.get(normalizeInventoryMergeKey(ingredient.name)) || 0;
+    return `${Math.max(0, Number(ingredient.quantity || 0) - owned)} ${ingredient.name}`;
+  }).join(", ")}${missing.length > 3 ? ` +${missing.length - 3} more` : ""}`;
 }
 
 function showScannerWorkInProgressNotice(scannerName) {
@@ -2932,7 +2968,7 @@ function renderCrewSplit(data) {
   outputs.industrySplit.innerHTML = `<div class="metric-grid">${metric("Net payout", money(net))}${metric("Crew", crew.length)}</div><p>${lines.join("<br>")}</p>`;
 }
 
-function renderRefineryCompletion(data) {
+async function renderRefineryCompletion(data) {
   const hours = Number(data.hours || 0);
   const minutes = Number(data.minutes || 0);
   if (!Number.isInteger(hours) || hours < 0 || !Number.isInteger(minutes) || minutes < 0 || minutes > 59) {
@@ -2941,7 +2977,51 @@ function renderRefineryCompletion(data) {
   if (hours === 0 && minutes === 0) throw new Error("The refinery duration must be longer than zero.");
   const completionUnix = Math.floor(Date.now() / 1000) + ((hours * 60 + minutes) * 60);
   const discordTime = `<t:${completionUnix}:F> (<t:${completionUnix}:R>)`;
-  outputs.refineryTimer.innerHTML = `<div class="metric-grid">${metric("Job", data.job)}${metric("Completes", new Date(completionUnix * 1000).toLocaleString())}</div><p><code>${escapeHtml(discordTime)}</code></p><button type="button" data-copy-text="${escapeAttribute(discordTime)}">Copy Discord Time</button>`;
+  if (!currentUser.authenticated) throw new Error("Log in with Discord to save refinery work orders.");
+  await api("/api/me/refinery-orders", { method: "POST", body: {
+    label: data.job,
+    material: data.material || null,
+    quantity: data.quantity ? Number(data.quantity) : null,
+    refinery: data.refinery || null,
+    method: data.method || null,
+    location: data.location || null,
+    crew: data.crew || null,
+    notes: data.notes || null,
+    completes_at: completionUnix,
+  } });
+  outputs.refineryTimer.innerHTML = `<div class="metric-grid">${metric("Saved", data.job)}${metric("Completes", new Date(completionUnix * 1000).toLocaleString())}</div><p><code>${escapeHtml(discordTime)}</code></p><button type="button" data-copy-text="${escapeAttribute(discordTime)}">Copy Discord Time</button>`;
+  await loadRefineryOrders();
+}
+
+async function loadRefineryOrders() {
+  if (!currentUser.authenticated) {
+    outputs.refineryOrders.innerHTML = stateMessage("Log in with Discord to save refinery work orders.");
+    return;
+  }
+  outputs.refineryOrders.innerHTML = stateMessage("Loading refinery orders...");
+  try {
+    const orders = await api("/api/me/refinery-orders");
+    if (!orders.length) {
+      outputs.refineryOrders.innerHTML = stateMessage("No refinery work orders yet.");
+      return;
+    }
+    outputs.refineryOrders.innerHTML = orders.map(renderRefineryOrder).join("");
+  } catch (error) {
+    outputs.refineryOrders.innerHTML = errorMessage(error.message);
+  }
+}
+
+function renderRefineryOrder(order) {
+  const completion = new Date(Number(order.completes_at) * 1000);
+  const details = [order.material, order.quantity != null && `${number(order.quantity)} units`, order.refinery, order.method, order.location].filter(Boolean).join(" · ");
+  const nextStatus = order.status === "refining" ? "ready" : order.status === "ready" ? "collected" : order.status === "collected" ? "sold" : "archived";
+  return `<article class="refinery-order" data-refinery-order="${order.id}">
+    <div><strong>${escapeHtml(order.label)}</strong><span class="refinery-status">${escapeHtml(order.status)}</span></div>
+    ${details ? `<p>${escapeHtml(details)}</p>` : ""}
+    <p>Completes ${escapeHtml(completion.toLocaleString())}${order.crew ? ` · Crew: ${escapeHtml(order.crew)}` : ""}</p>
+    ${order.notes ? `<small>${escapeHtml(order.notes)}</small>` : ""}
+    <div class="card-actions"><button type="button" data-refinery-status="${nextStatus}" data-refinery-id="${order.id}">Mark ${escapeHtml(nextStatus)}</button><button type="button" data-refinery-delete="${order.id}">Remove</button></div>
+  </article>`;
 }
 
 function renderOperationBrief(data) {
@@ -3130,6 +3210,30 @@ const persistentFieldObserver = new MutationObserver((records) => {
       if (node instanceof Element) applyPersistentFieldLabels(node);
     });
   });
+});
+
+document.addEventListener("click", async (event) => {
+  const statusButton = event.target.closest("[data-refinery-status]");
+  const deleteButton = event.target.closest("[data-refinery-delete]");
+  if (!statusButton && !deleteButton) return;
+  try {
+    if (statusButton) {
+      await api(`/api/me/refinery-orders/${statusButton.dataset.refineryId}/status`, { method: "PUT", body: { status: statusButton.dataset.refineryStatus } });
+    } else if (deleteButton) {
+      const accepted = await confirmInventoryClear({
+        title: "Remove refinery work order?",
+        message: "This removes the saved order and cannot be undone.",
+        confirmLabel: "Remove order",
+      });
+      if (!accepted) return;
+      await api(`/api/me/refinery-orders/${deleteButton.dataset.refineryDelete}`, { method: "DELETE" });
+    } else {
+      return;
+    }
+    await loadRefineryOrders();
+  } catch (error) {
+    outputs.refineryOrders.innerHTML = errorMessage(error.message);
+  }
 });
 persistentFieldObserver.observe(document.body, { childList: true, subtree: true });
 

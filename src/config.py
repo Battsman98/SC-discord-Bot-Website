@@ -25,6 +25,10 @@ class Settings:
     cache_ttl_seconds: int
     web_admin_token: str = ""
     web_session_secret: str = ""
+    trusted_origins: tuple[str, ...] = ()
+    max_upload_bytes: int = 10 * 1024 * 1024
+    web_rate_limit_per_minute: int = 120
+    discord_rate_limit_per_10_seconds: int = 8
 
     @classmethod
     def from_env(cls, load_env_file: bool = True, require_discord_token: bool = True) -> "Settings":
@@ -84,6 +88,14 @@ class Settings:
             cache_ttl_seconds=int(os.getenv("CACHE_TTL_SECONDS", "300")),
             web_admin_token=os.getenv("WEB_ADMIN_TOKEN", "").strip(),
             web_session_secret=os.getenv("WEB_SESSION_SECRET", "").strip(),
+            trusted_origins=tuple(
+                origin.strip().rstrip("/")
+                for origin in os.getenv("TRUSTED_ORIGINS", "").split(",")
+                if origin.strip()
+            ),
+            max_upload_bytes=int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024))),
+            web_rate_limit_per_minute=int(os.getenv("WEB_RATE_LIMIT_PER_MINUTE", "120")),
+            discord_rate_limit_per_10_seconds=int(os.getenv("DISCORD_RATE_LIMIT_PER_10_SECONDS", "8")),
         )
 
 
