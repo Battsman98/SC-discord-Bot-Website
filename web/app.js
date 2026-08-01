@@ -293,6 +293,26 @@ const shipDisplayPrefixes = [
 
 setupInventoryScannerOverlay();
 setupStaticInventorySelects();
+setupCrewPayoutMode();
+
+function setupCrewPayoutMode() {
+  const form = document.querySelector('form[data-action="industrySplit"]');
+  const mode = form?.querySelector('[name="crew_mode"]');
+  const names = form?.querySelector("[data-crew-names]");
+  const count = form?.querySelector("[data-crew-count]");
+  if (!mode || !names || !count) return;
+  const sync = () => {
+    const useCount = mode.value === "count";
+    names.hidden = useCount;
+    names.disabled = useCount;
+    names.required = !useCount;
+    count.hidden = !useCount;
+    count.disabled = !useCount;
+    count.required = useCount;
+  };
+  mode.addEventListener("change", sync);
+  sync();
+}
 
 function initToolMenus() {
   document.querySelectorAll(".tab-panel").forEach((tab) => {
@@ -2951,11 +2971,15 @@ function sendActivityHeartbeat() {
 function renderCrewSplit(data) {
   const gross = Number(data.gross);
   const expenses = Number(data.expenses || 0);
-  const crew = String(data.crew || "").split(",").map((name) => name.trim()).filter(Boolean);
+  const useCount = data.crew_mode === "count";
+  const memberCount = Number(data.member_count || 0);
+  const crew = useCount
+    ? (Number.isInteger(memberCount) && memberCount > 0 ? Array.from({ length: memberCount }, (_, index) => `Member ${index + 1}`) : [])
+    : String(data.crew || "").split(",").map((name) => name.trim()).filter(Boolean);
   if (!Number.isFinite(gross) || gross < 0 || !Number.isFinite(expenses) || expenses < 0) {
     throw new Error("Gross payout and expenses must be positive numbers.");
   }
-  if (!crew.length) throw new Error("Add at least one crew member.");
+  if (!crew.length) throw new Error(useCount ? "Enter a whole-number member count of at least 1." : "Add at least one crew member.");
   if (expenses > gross) throw new Error("Expenses cannot exceed the gross payout.");
   const net = gross - expenses;
   const baseShare = Math.floor(net / crew.length);
@@ -2965,7 +2989,10 @@ function renderCrewSplit(data) {
     remainder = Math.max(0, remainder - 1);
     return `${escapeHtml(name)}: <strong>${number(share)} aUEC</strong>`;
   });
-  outputs.industrySplit.innerHTML = `<div class="metric-grid">${metric("Net payout", money(net))}${metric("Crew", crew.length)}</div><p>${lines.join("<br>")}</p>`;
+  const payoutLines = useCount
+    ? `${crew.length} member${crew.length === 1 ? "" : "s"}: <strong>${number(baseShare)} aUEC each</strong>${Math.round(net - (baseShare * crew.length)) ? `<br>${Math.round(net - (baseShare * crew.length))} member(s) receive 1 extra aUEC to account for rounding.` : ""}`
+    : lines.join("<br>");
+  outputs.industrySplit.innerHTML = `<div class="metric-grid">${metric("Net payout", money(net))}${metric("Crew", crew.length)}</div><p>${payoutLines}</p>`;
 }
 
 async function renderRefineryCompletion(data) {

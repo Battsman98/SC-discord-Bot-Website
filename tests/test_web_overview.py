@@ -145,6 +145,29 @@ def test_mining_page_includes_original_industry_operation_tools_without_external
     assert "renderCrewSplit" in javascript
     assert "renderRefineryCompletion" in javascript
     assert "renderOperationBrief" in javascript
+
+
+def test_industry_tools_support_crew_count_and_all_refining_methods() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'name="crew_mode"' in html
+    assert 'value="count"' in html
+    assert 'name="member_count"' in html
+    assert "setupCrewPayoutMode" in javascript
+    assert 'data.crew_mode === "count"' in javascript
+    for method in (
+        "Cormack Method",
+        "Dinyx Solventation",
+        "Electrostarolysis",
+        "Ferron Exchange",
+        "Gaskin Process",
+        "Kazen Winnowing",
+        "Pyrometric Chromalysis",
+        "Thermonatic Deposition",
+        "XCR Reaction",
+    ):
+        assert f"<option>{method}</option>" in html
     assert "cryon.rocks" not in html
     assert "regolith.rocks" not in html
 

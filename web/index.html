@@ -226,7 +226,12 @@
             <div class="resource-card-heading"><h3>Crew Payout</h3><span>Calculator</span></div>
             <p>Subtract shared costs and divide the remaining payout evenly.</p>
             <div class="field-row"><input name="gross" type="number" min="0" step="1" placeholder="Gross payout (aUEC)" aria-label="Gross payout in aUEC" required><input name="expenses" type="number" min="0" step="1" value="0" placeholder="Shared expenses" aria-label="Shared expenses in aUEC"></div>
-            <input name="crew" placeholder="Crew names, separated by commas" aria-label="Crew names separated by commas" required>
+            <select name="crew_mode" aria-label="Crew payout entry mode">
+              <option value="names">Enter crew names</option>
+              <option value="count">Enter member count</option>
+            </select>
+            <input name="crew" data-crew-names placeholder="Crew names, separated by commas" aria-label="Crew names separated by commas" required>
+            <input name="member_count" data-crew-count type="number" min="1" max="999" step="1" placeholder="Number of crew members" aria-label="Number of crew members" hidden disabled>
             <button type="submit">Calculate Split</button>
             <div id="industrySplitOutput" class="mini-output" aria-live="polite"></div>
           </form>
@@ -235,7 +240,7 @@
             <p>Save a refinery job, track its completion, and carry its details into crew operations.</p>
             <input name="job" placeholder="Job label or refinery" aria-label="Refinery job label" required>
             <div class="field-row"><input name="material" placeholder="Material or ore mix" aria-label="Material or ore mix"><input name="quantity" type="number" min="0" step="0.01" placeholder="Quantity" aria-label="Material quantity"></div>
-            <div class="field-row"><input name="refinery" placeholder="Refinery" aria-label="Refinery"><input name="method" placeholder="Method" aria-label="Refining method"></div>
+            <div class="field-row"><input name="refinery" placeholder="Refinery" aria-label="Refinery"><select name="method" aria-label="Refining method"><option value="">Select method</option><option>Cormack Method</option><option>Dinyx Solventation</option><option>Electrostarolysis</option><option>Ferron Exchange</option><option>Gaskin Process</option><option>Kazen Winnowing</option><option>Pyrometric Chromalysis</option><option>Thermonatic Deposition</option><option>XCR Reaction</option></select></div>
             <div class="field-row"><input name="location" placeholder="Mining location" aria-label="Mining location"><input name="crew" placeholder="Crew" aria-label="Crew"></div>
             <div class="field-row"><input name="hours" type="number" min="0" max="999" value="0" placeholder="Hours" aria-label="Hours remaining"><input name="minutes" type="number" min="0" max="59" value="30" placeholder="Minutes" aria-label="Minutes remaining"></div>
             <textarea name="notes" rows="2" placeholder="Notes"></textarea>
