@@ -54,6 +54,7 @@ BOT_MANAGER_ROLE_NAME = "Bot Manager"
 VISITOR_CATEGORY_NAME = "Visitor Bot Hub"
 VISITOR_CHANNEL_SPECS = {
     "bot-start-here": "text",
+    "bot-commands": "text",
     "bot-status": "text",
     "ship-search": "text",
     "trade-tools": "text",
@@ -593,21 +594,28 @@ class GameAssistBot(commands.Bot):
             await self.sync_cz_timers_message()
 
     async def sync_commands_reference_message(self) -> None:
-        if not self.settings.commands_channel_id:
-            return
+        channel_ids = []
+        if self.settings.commands_channel_id:
+            channel_ids.append(self.settings.commands_channel_id)
+        visitor_channel_id = self.visitor_channels.get("bot-commands")
+        if visitor_channel_id and visitor_channel_id not in channel_ids:
+            channel_ids.append(visitor_channel_id)
+        for channel_id in channel_ids:
+            await self._sync_commands_reference_channel(channel_id)
 
+    async def _sync_commands_reference_channel(self, channel_id: int) -> None:
         try:
-            channel = await self.fetch_channel(self.settings.commands_channel_id)
+            channel = await self.fetch_channel(channel_id)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            logging.warning("Could not access COMMANDS_CHANNEL_ID %s", self.settings.commands_channel_id)
+            logging.warning("Could not access commands reference channel %s", channel_id)
             return
 
         if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
-            logging.warning("COMMANDS_CHANNEL_ID does not point to a messageable channel")
+            logging.warning("Commands reference channel %s is not messageable", channel_id)
             return
 
         embeds = build_commands_reference_embeds(self.settings)
-        cache_key = f"discord:commands-reference-message:{self.settings.commands_channel_id}"
+        cache_key = f"discord:commands-reference-message:{channel_id}"
         cached_message_ids = await self.cache.get(cache_key)
         message_ids: list[int] = []
         if isinstance(cached_message_ids, int):
@@ -648,7 +656,7 @@ class GameAssistBot(commands.Bot):
                     await self.delete_recent_duplicate_embed_messages(channel, embed.title, message.id, limit=250)
                 continue
 
-            message = await channel.send(embed=embed)
+            message = await channel.send(embed=embed, silent=True)
             await asyncio.sleep(1)
             updated_message_ids.append(message.id)
             if embed.title:
@@ -663,7 +671,7 @@ class GameAssistBot(commands.Bot):
                 logging.info("Could not delete stale commands reference message %s", stale_message_id)
 
         await self.cache.set(cache_key, updated_message_ids, 315360000)
-        logging.info("Synced %s commands reference message(s)", len(updated_message_ids))
+        logging.info("Synced %s commands reference message(s) in channel %s", len(updated_message_ids), channel_id)
 
     async def sync_exec_status_message(self) -> None:
         if not self.settings.exec_status_channel_id:

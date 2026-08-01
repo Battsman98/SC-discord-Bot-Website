@@ -46,6 +46,7 @@ def test_bot_feedback_template_gives_users_a_complete_example() -> None:
 
 
 def test_visitor_hub_includes_public_bot_and_social_channels() -> None:
+    assert VISITOR_CHANNEL_SPECS["bot-commands"] == "text"
     assert VISITOR_CHANNEL_SPECS["general-chat"] == "text"
     assert VISITOR_CHANNEL_SPECS["visitor-lounge"] == "voice"
     assert VISITOR_COMMAND_CHANNELS["ship"] == "ship-search"
