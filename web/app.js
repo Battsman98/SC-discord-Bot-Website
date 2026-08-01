@@ -1241,17 +1241,18 @@ feedbackForm?.addEventListener("submit", async (event) => {
   }
   setFeedbackStatus("Creating your Discord forum post...");
   try {
+    const formData = new FormData(feedbackForm);
+    if (!feedbackImages?.files?.length) formData.delete("images");
     const response = await fetch("/api/me/feedback", {
       method: "POST",
       credentials: "same-origin",
-      body: new FormData(feedbackForm),
+      body: formData,
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.detail || "The report could not be submitted.");
     feedbackForm.reset();
     clearFeedbackPreviews();
     closeFeedbackModal();
-    openFeedbackSuccess();
   } catch (error) {
     setFeedbackStatus(error.message);
   } finally {

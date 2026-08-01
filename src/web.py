@@ -711,6 +711,11 @@ def _feedback_embed(
     return embed
 
 
+def _provided_feedback_images(images: list[UploadFile]) -> list[UploadFile]:
+    """Discard the empty multipart placeholder emitted for an unselected file input."""
+    return [upload for upload in images if (upload.filename or "").strip()]
+
+
 @app.post("/api/me/feedback")
 async def submit_feedback(
     report_type: str = Form(...),
@@ -734,6 +739,9 @@ async def submit_feedback(
         raise HTTPException(status_code=400, detail="A title and report details are required.")
     if len(title) > 100 or len(details) > 3000:
         raise HTTPException(status_code=400, detail="The report title or details are too long.")
+    # Multipart forms may represent an unselected optional file input as an
+    # UploadFile with an empty filename and application/octet-stream type.
+    images = _provided_feedback_images(images)
     if len(images) > 4:
         raise HTTPException(status_code=400, detail="Attach no more than 4 images.")
 
