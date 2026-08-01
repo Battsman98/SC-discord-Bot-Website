@@ -115,6 +115,16 @@ def test_mission_command_uses_blueprint_channel_by_default() -> None:
     assert _allowed_command_channel_id(bot, "mission") == 2468
 
 
+def test_visitor_hub_channel_replaces_legacy_command_channel() -> None:
+    bot = SimpleNamespace(
+        settings=SimpleNamespace(command_channel_ids={"ship": 2468}),
+        inventory_channel_id=INVENTORY_CHANNEL_ID,
+        visitor_channels={"ship-search": 1357},
+    )
+
+    assert GameAssistBot.allowed_command_channel_ids(bot, "ship") == {1357}
+
+
 def test_industry_planning_commands_are_registered() -> None:
     assert industry_group.get_command("split") is not None
     assert industry_group.get_command("refinery") is not None

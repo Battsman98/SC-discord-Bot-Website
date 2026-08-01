@@ -67,6 +67,8 @@ On startup, the bot also creates private `website-changelog` and `discord-change
 
 Every command-focused channel in the Discord Bot Hub also receives a durable example embed showing the command syntax and representative response data. These examples are refreshed on startup without duplicating posts. In the Executive Hangar and Contested Zone channels, the example appears first and the live auto-updating dashboard is posted directly below it. The bot automatically removes a duplicate legacy `Visitor Bot Hub`, preserving unique channels by moving them into `Discord Bot Hub` and deleting only duplicate managed channels.
 
+The Discord Bot Hub is the sole public command area. On startup, known bot-managed text channels under the `Star Citizen` category are removed, while unrelated discussion channels are preserved. Each public command is accepted only in its associated Hub channel; for example, `/ship` is limited to `ship-search`, trade commands to `trade-tools`, and `/mining` plus `/miningadd` to `mining-tools`.
+
 Set `UEX_API_TOKEN` to the bearer token from your registered UEX API application. The token is used only by the Python backend for documented `api.uexcorp.uk` requests and must not be exposed to browser JavaScript or committed to source control. Mining locations and signatures use the public Star Citizen Wiki API, which does not require a token.
 
 Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive Hangar status message updated every 60 seconds.

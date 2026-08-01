@@ -81,6 +81,7 @@ VISITOR_COMMAND_CHANNELS = {
     "commodity": "trade-tools",
     "trade routing": "trade-tools",
     "mining": "mining-tools",
+    "miningadd": "mining-tools",
     "industry split": "industry-operations",
     "industry refinery": "industry-operations",
     "industry brief": "industry-operations",
@@ -440,15 +441,12 @@ class GameAssistBot(commands.Bot):
             await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role updated", "Role settings were changed.\n\n" + "\n".join(changes))
 
     def allowed_command_channel_ids(self, command_name: str) -> set[int]:
-        ids: set[int] = set()
-        configured = _allowed_command_channel_id(self, command_name)
-        if configured:
-            ids.add(configured)
         visitor_name = VISITOR_COMMAND_CHANNELS.get(command_name)
         visitor_id = self.visitor_channels.get(visitor_name or "")
         if visitor_id:
-            ids.add(visitor_id)
-        return ids
+            return {visitor_id}
+        configured = _allowed_command_channel_id(self, command_name)
+        return {configured} if configured else set()
 
     async def ensure_visitor_access(self) -> None:
         guild = self.get_guild(self.settings.discord_guild_id or 0)
@@ -531,6 +529,8 @@ class GameAssistBot(commands.Bot):
                 reason="Move feedback forum into Visitor hub",
             )
 
+        await self.remove_legacy_star_citizen_bot_channels(guild)
+
         allowed_ids = {category.id, *self.visitor_channels.values()}
         if isinstance(feedback, discord.ForumChannel):
             allowed_ids.add(feedback.id)
@@ -545,6 +545,34 @@ class GameAssistBot(commands.Bot):
         welcome = self.get_channel(self.visitor_channels.get("bot-start-here", 0))
         if isinstance(welcome, discord.TextChannel):
             await self.sync_visitor_welcome(welcome, role)
+
+    async def remove_legacy_star_citizen_bot_channels(
+        self,
+        guild: discord.Guild,
+    ) -> None:
+        star_citizen = discord.utils.find(
+            lambda item: item.name.casefold() == "star citizen",
+            guild.categories,
+        )
+        if star_citizen is None:
+            return
+        managed_ids = {
+            INVENTORY_CHANNEL_ID,
+            *self.settings.command_channel_ids.values(),
+        }
+        for channel_id in (
+            self.settings.commands_channel_id,
+            self.settings.exec_status_channel_id,
+            self.settings.cz_timers_channel_id,
+        ):
+            if channel_id:
+                managed_ids.add(channel_id)
+        visitor_ids = set(self.visitor_channels.values())
+        for channel in list(star_citizen.text_channels):
+            if channel.id not in managed_ids or channel.id in visitor_ids:
+                continue
+            await channel.delete(reason="Consolidate bot commands into Discord Bot Hub")
+            logging.info("Deleted legacy Star Citizen bot channel %s (%s)", channel.name, channel.id)
 
     async def _remove_legacy_visitor_categories(
         self,
@@ -778,9 +806,9 @@ class GameAssistBot(commands.Bot):
 
     async def sync_commands_reference_message(self) -> None:
         channel_ids = []
-        if self.settings.commands_channel_id:
-            channel_ids.append(self.settings.commands_channel_id)
         visitor_channel_id = self.visitor_channels.get("bot-commands")
+        if self.settings.commands_channel_id and not visitor_channel_id:
+            channel_ids.append(self.settings.commands_channel_id)
         if visitor_channel_id and visitor_channel_id not in channel_ids:
             channel_ids.append(visitor_channel_id)
         for channel_id in channel_ids:
@@ -857,14 +885,9 @@ class GameAssistBot(commands.Bot):
         logging.info("Synced %s commands reference message(s) in channel %s", len(updated_message_ids), channel_id)
 
     async def sync_exec_status_message(self) -> None:
-        channel_ids = {
-            channel_id
-            for channel_id in (
-                self.settings.exec_status_channel_id,
-                self.visitor_channels.get("executive-hangar-status"),
-            )
-            if channel_id
-        }
+        visitor_channel_id = self.visitor_channels.get("executive-hangar-status")
+        channel_ids = {visitor_channel_id} if visitor_channel_id else {self.settings.exec_status_channel_id}
+        channel_ids.discard(None)
         if not channel_ids:
             return
 
@@ -987,14 +1010,9 @@ class GameAssistBot(commands.Bot):
             logging.info("Could not scan for duplicate %s messages", title)
 
     async def sync_cz_timers_message(self) -> None:
-        channel_ids = {
-            channel_id
-            for channel_id in (
-                self.settings.cz_timers_channel_id,
-                self.visitor_channels.get("contested-zone-timers"),
-            )
-            if channel_id
-        }
+        visitor_channel_id = self.visitor_channels.get("contested-zone-timers")
+        channel_ids = {visitor_channel_id} if visitor_channel_id else {self.settings.cz_timers_channel_id}
+        channel_ids.discard(None)
         if not channel_ids:
             return
 

@@ -59,6 +59,7 @@ def test_visitor_hub_includes_public_bot_and_social_channels() -> None:
     assert VISITOR_CHANNEL_SPECS["visitor-lounge"] == "voice"
     assert VISITOR_COMMAND_CHANNELS["ship"] == "ship-search"
     assert VISITOR_COMMAND_CHANNELS["trade routing"] == "trade-tools"
+    assert VISITOR_COMMAND_CHANNELS["miningadd"] == "mining-tools"
     assert not any(name.startswith("admin") or name.startswith("audit") for name in VISITOR_COMMAND_CHANNELS)
 
 
