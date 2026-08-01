@@ -119,7 +119,7 @@ def test_mission_and_blueprint_results_do_not_display_game_file_source() -> None
 
     assert '["Source"' not in blueprint_renderer
     assert '["Source"' not in mission_renderer
-    assert "20260724-persistent-labels-v6" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "20260801-crew-payout-v1" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
 
 def test_blueprint_missions_link_to_mission_search() -> None:
@@ -237,7 +237,7 @@ def test_trade_route_form_has_six_fields_and_discord_style_results() -> None:
     assert '<option value="false">Flexible</option>' in html
     assert 'class="trade-route-fields"' in html
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in css
-    assert "20260724-persistent-labels-v6" in html
+    assert "20260801-crew-payout-v1" in html
     assert "Estimated Loop Profit" in javascript
     assert "Estimated Ending Cash" in javascript
     assert "Starting Point" in javascript
@@ -351,7 +351,7 @@ def test_form_controls_receive_persistent_labels_above_their_blocks() -> None:
     assert 'id="inventoryImportType"' in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert 'params.set("default_item_type", itemType)' in javascript
     assert 'default_item_type: document.querySelector("#inventoryImportType")?.value || null' in javascript
-    assert "persistent-labels-v6" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "crew-payout-v1" in (WEB_DIR / "index.html").read_text(encoding="utf-8")
     assert "inventoryTypeOptions(category, validCurrent" in javascript
 
 
@@ -547,7 +547,7 @@ def test_station_inventory_is_compact_at_partial_desktop_widths() -> None:
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "20260724-persistent-labels-v6" in html
+    assert "20260801-crew-payout-v1" in html
     assert "@media (min-width: 761px) and (max-width: 1200px)" in css
     assert "grid-template-columns: repeat(12, minmax(0, 1fr))" in css
     assert "grid-template-columns: minmax(180px, 4fr)" in css
