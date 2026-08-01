@@ -24,6 +24,7 @@ from src.sources.base import (
 class UEXSource:
     name = "UEX"
     base_url = "https://api.uexcorp.uk/2.0"
+    wiki_api_url = "https://api.star-citizen.wiki/api"
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -134,12 +135,7 @@ class UEXSource:
         result = await self._with_mining_location_groups(result, commodity, system_code)
 
         filtered_result = self._filter_mining_result(result, planet)
-        if self._has_mining_locations(filtered_result):
-            return filtered_result
-
-        expanded_result = await self._expand_mining_result_from_associated_deposits(result, commodity, system_code)
-        filtered_expanded = self._filter_mining_result(expanded_result, planet)
-        return filtered_expanded
+        return filtered_result
 
     async def autocomplete_mining_materials(self, query: str, limit: int = 25) -> list[str]:
         materials = await self._get_mining_materials()
@@ -636,7 +632,11 @@ class UEXSource:
 
     async def _fetch_json(self, url: str) -> dict | None:
         try:
-            async with self._session.get(url, headers={"Accept": "application/json"}) as response:
+            headers = {"Accept": "application/json"}
+            token = getattr(getattr(self, "_settings", None), "uex_api_token", "")
+            if token and url.startswith(self.base_url):
+                headers["Authorization"] = f"Bearer {token}"
+            async with self._session.get(url, headers=headers) as response:
                 response.raise_for_status()
                 payload = await response.json()
                 return payload if isinstance(payload, dict) else None
@@ -701,20 +701,26 @@ class UEXSource:
         system_code: str | None,
     ) -> MiningLocationResult | None:
         slug = self._mining_material_slug(commodity)
-        url = f"https://uexcorp.space/mining/locations/commodity/{slug}/"
-        if system_code:
-            url = f"{url}system/{system_code}/"
-
-        cache_key = f"uex:mining-location:v1:{slug}:system-{system_code or 'all'}"
+        cache_key = f"star-citizen-wiki:mining-location:v1:{slug}:system-{system_code or 'all'}"
         cached = await self._cache.get(cache_key)
         if cached:
             return self._mining_result_from_cache(cached)
 
-        html = await self._fetch_text(url)
-        if not html:
+        payload = await self._fetch_json(f"{self.wiki_api_url}/commodities/{quote(slug)}")
+        row = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(row, dict):
             return None
 
-        result = self._parse_mining_location_result(commodity, html, url)
+        if not row.get("is_mineable"):
+            raw_versions = row.get("raw_versions")
+            raw = next((item for item in raw_versions or [] if isinstance(item, dict) and item.get("link")), None)
+            if raw is not None:
+                raw_payload = await self._fetch_json(str(raw["link"]))
+                candidate = raw_payload.get("data") if isinstance(raw_payload, dict) else None
+                if isinstance(candidate, dict):
+                    row = candidate
+
+        result = self._parse_wiki_mining_location_result(commodity, row, system_code)
         await self._cache.set(cache_key, self._mining_result_to_cache(result), self._settings.cache_ttl_seconds)
         return result
 
@@ -723,6 +729,8 @@ class UEXSource:
         result: MiningLocationResult,
         commodity: dict,
     ) -> MiningLocationResult:
+        if result.rock_signatures:
+            return result
         signatures = await self._get_mining_signatures(self._mining_material_base_name(commodity))
         return MiningLocationResult(
             material_name=result.material_name,
@@ -752,6 +760,8 @@ class UEXSource:
         commodity: dict,
         system_code: str | None,
     ) -> MiningLocationResult:
+        if result.location_groups:
+            return result
         if system_code:
             system = self._mining_system_name(system_code)
             groups = [self._mining_system_group_for_result(result, system)]
@@ -800,7 +810,7 @@ class UEXSource:
         if self._mining_signatures is not None:
             return self._mining_signatures
 
-        cached = await self._cache.get("star-head:mining-signatures:v1")
+        cached = await self._cache.get("star-citizen-wiki:mining-signatures:v1")
         if isinstance(cached, dict):
             self._mining_signatures = {
                 str(key): sorted(
@@ -815,33 +825,28 @@ class UEXSource:
             }
             return self._mining_signatures
 
-        html = await self._fetch_text("https://star-head.de/database/mining/locations/")
-        if not html:
-            self._mining_signatures = {}
-            return self._mining_signatures
-
-        app_match = re.search(r'href="([^"]*/entry/app\.[^"]+\.js)"', html)
-        if not app_match:
-            self._mining_signatures = {}
-            return self._mining_signatures
-
-        app_url = app_match.group(1)
-        if app_url.startswith("/"):
-            app_url = f"https://star-head.de{app_url}"
-
-        app_script = await self._fetch_text(app_url)
-        if not app_script:
-            self._mining_signatures = {}
-            return self._mining_signatures
-
-        node_match = re.search(r"_app/immutable/nodes/14\.[^\"']+\.js", app_script)
-        if not node_match:
-            self._mining_signatures = {}
-            return self._mining_signatures
-
-        node_script = await self._fetch_text(f"https://star-head.de/{node_match.group(0)}")
-        self._mining_signatures = self._parse_star_head_signatures(node_script or "")
-        await self._cache.set("star-head:mining-signatures:v1", self._mining_signatures, 24 * 60 * 60)
+        signatures: dict[str, set[int]] = {}
+        for page in (1, 2):
+            payload = await self._fetch_json(
+                f"{self.wiki_api_url}/commodities?page[number]={page}&page[size]=200"
+            )
+            rows = payload.get("data") if isinstance(payload, dict) else None
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if not isinstance(row, dict) or not row.get("is_mineable"):
+                    continue
+                signature = self._int_or_none(row.get("signature"))
+                if signature is None:
+                    continue
+                name = self._normalize(self._strip_code_suffix(str(row.get("name") or "")))
+                name = re.sub(r"\s*\((?:ore|raw)\)\s*$", "", name).strip()
+                if name:
+                    signatures.setdefault(name, set()).add(signature)
+        self._mining_signatures = {name: sorted(values) for name, values in signatures.items()}
+        await self._cache.set(
+            "star-citizen-wiki:mining-signatures:v1", self._mining_signatures, 24 * 60 * 60
+        )
         return self._mining_signatures
 
     def _parse_star_head_signatures(self, script: str) -> dict[str, list[int]]:
@@ -1007,6 +1012,90 @@ class UEXSource:
             source_name=self.name,
             rock_signatures=[],
             location_groups=[],
+        )
+
+    def _parse_wiki_mining_location_result(
+        self,
+        commodity: dict,
+        row: dict,
+        system_code: str | None,
+    ) -> MiningLocationResult:
+        requested_system = self._normalize(self._mining_system_name(system_code)) if system_code else ""
+        grouped: dict[str, dict[str, set[str]]] = {}
+        signatures: set[int] = set()
+
+        top_signature = self._int_or_none(row.get("signature"))
+        if top_signature is not None:
+            signatures.add(top_signature)
+
+        for location in row.get("locations") or []:
+            if not isinstance(location, dict):
+                continue
+            system = str(location.get("system") or "Unknown").removesuffix(" System")
+            if requested_system and self._normalize(system) != requested_system:
+                continue
+            name = str(location.get("display_name") or location.get("name") or "").strip()
+            if not name:
+                continue
+            buckets = grouped.setdefault(
+                system,
+                {"lagrange_points": set(), "planets": set(), "moons": set(), "points_of_interest": set()},
+            )
+            kind = self._normalize(location.get("type"))
+            if kind == "star":
+                continue
+            normalized_name = self._normalize(name)
+            if re.match(r"^(arc|cru|hur|mic)[ -]?l\d", normalized_name):
+                buckets["lagrange_points"].add(name)
+            elif "planet" in kind:
+                buckets["planets"].add(name)
+            elif "moon" in kind:
+                buckets["moons"].add(name)
+            else:
+                buckets["points_of_interest"].add(name)
+
+            for resource in location.get("resources") or []:
+                if not isinstance(resource, dict):
+                    continue
+                signature = self._int_or_none(resource.get("signature"))
+                if signature is not None:
+                    signatures.add(signature)
+
+        groups = [
+            MiningSystemLocations(
+                system=system,
+                lagrange_points=sorted(values["lagrange_points"], key=str.lower),
+                planets=sorted(values["planets"], key=str.lower),
+                moons=sorted(values["moons"], key=str.lower),
+                points_of_interest=sorted(values["points_of_interest"], key=str.lower),
+            )
+            for system, values in sorted(grouped.items())
+        ]
+
+        def combined(field: str) -> list[str]:
+            return sorted({name for group in groups for name in getattr(group, field)}, key=str.lower)
+
+        source_url = str(row.get("web_url") or row.get("link") or "https://api.star-citizen.wiki/commodities")
+        return MiningLocationResult(
+            material_name=self._mining_material_base_name(commodity),
+            code=self._string_or_none(commodity.get("code")),
+            kind=self._string_or_none(commodity.get("kind")),
+            refined_sell_price=None,
+            raw_sell_price=commodity.get("price_sell") or None,
+            is_harvestable=bool(commodity.get("is_harvestable")),
+            is_volatile_qt=bool(commodity.get("is_volatile_qt")),
+            is_volatile_time=bool(commodity.get("is_volatile_time")),
+            is_explosive=bool(commodity.get("is_explosive")),
+            systems=[group.system for group in groups],
+            lagrange_points=combined("lagrange_points"),
+            planets=combined("planets"),
+            moons=combined("moons"),
+            points_of_interest=combined("points_of_interest"),
+            source_url=source_url,
+            source_name="UEX + Star Citizen Wiki API",
+            location_basis="UEX commodity data plus Star Citizen Wiki mineable locations",
+            rock_signatures=sorted(signatures),
+            location_groups=groups,
         )
 
     async def _with_mining_sell_prices(
