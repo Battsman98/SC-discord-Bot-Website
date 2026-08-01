@@ -327,6 +327,15 @@ class GameAssistBot(commands.Bot):
             overwrites[manager_role] = discord.PermissionOverwrite(
                 view_channel=True, send_messages=False, read_message_history=True
             )
+        for user_id in self.settings.bot_admin_user_ids:
+            try:
+                owner = guild.get_member(user_id) or await guild.fetch_member(user_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logging.warning("Could not resolve changelog notification user %s", user_id)
+                continue
+            overwrites[owner] = discord.PermissionOverwrite(
+                view_channel=True, send_messages=False, read_message_history=True
+            )
 
         topics = {
             WEBSITE_CHANGELOG_CHANNEL_NAME: "Automatic website deployment history and manually recorded website changes.",
@@ -338,8 +347,13 @@ class GameAssistBot(commands.Bot):
                 channel = await guild.create_text_channel(
                     name, category=category, topic=topic, overwrites=overwrites, reason="Create audit changelog"
                 )
-            elif channel.category_id != category.id:
-                await channel.edit(category=category, reason="Move changelog into audit log category")
+            else:
+                await channel.edit(
+                    category=category,
+                    topic=topic,
+                    overwrites=overwrites,
+                    reason="Refresh changelog location and access",
+                )
             self.changelog_channels[name] = channel.id
 
     async def _send_changelog(self, channel_name: str, title: str, description: str) -> None:
@@ -353,7 +367,13 @@ class GameAssistBot(commands.Bot):
             color=discord.Color.dark_teal(),
             timestamp=discord.utils.utcnow(),
         )
-        await channel.send(embed=embed, silent=True)
+        notify_user_id = self.settings.bot_admin_user_ids[0] if self.settings.bot_admin_user_ids else None
+        content = f"<@{notify_user_id}>" if notify_user_id else None
+        await channel.send(
+            content=content,
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        )
 
     async def record_website_deployment(self) -> None:
         revision = next((os.getenv(name, "").strip() for name in ("RENDER_GIT_COMMIT", "COMMIT_SHA", "GITHUB_SHA") if os.getenv(name, "").strip()), "")
