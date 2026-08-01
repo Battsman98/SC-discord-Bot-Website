@@ -52,7 +52,8 @@ INVENTORY_CHANNEL_ID = 1528623944947597383
 FEEDBACK_TEMPLATE_CACHE_PREFIX = "discord:feedback-template-thread"
 VISITOR_ROLE_NAME = "Visitor"
 BOT_MANAGER_ROLE_NAME = "Bot Manager"
-VISITOR_CATEGORY_NAME = "Visitor Bot Hub"
+VISITOR_CATEGORY_NAME = "Discord Bot Hub"
+LEGACY_VISITOR_CATEGORY_NAME = "Visitor Bot Hub"
 AUDIT_LOG_CATEGORY_ID = 1516295744603164732
 AUDIT_LOG_CATEGORY_NAME = "audit log"
 WEBSITE_CHANGELOG_CHANNEL_NAME = "website-changelog"
@@ -508,6 +509,8 @@ class GameAssistBot(commands.Bot):
         else:
             await category.edit(overwrites=category_overwrites, reason="Refresh Visitor category permissions")
 
+        await self._remove_legacy_visitor_categories(guild, category)
+
         for name, channel_type in VISITOR_CHANNEL_SPECS.items():
             existing = discord.utils.find(lambda item: item.name == name, category.channels)
             if existing is None:
@@ -542,6 +545,33 @@ class GameAssistBot(commands.Bot):
         welcome = self.get_channel(self.visitor_channels.get("bot-start-here", 0))
         if isinstance(welcome, discord.TextChannel):
             await self.sync_visitor_welcome(welcome, role)
+
+    async def _remove_legacy_visitor_categories(
+        self,
+        guild: discord.Guild,
+        destination: discord.CategoryChannel,
+    ) -> None:
+        legacy_categories = [
+            category
+            for category in guild.categories
+            if category.id != destination.id
+            and category.name.casefold() == LEGACY_VISITOR_CATEGORY_NAME.casefold()
+        ]
+        for legacy in legacy_categories:
+            for channel in list(legacy.channels):
+                destination_match = discord.utils.find(
+                    lambda item: item.name == channel.name and item.type == channel.type,
+                    destination.channels,
+                )
+                if channel.name in VISITOR_CHANNEL_SPECS and destination_match is not None:
+                    await channel.delete(reason="Remove duplicate channel from legacy Visitor Bot Hub")
+                else:
+                    await channel.edit(
+                        category=destination,
+                        sync_permissions=True,
+                        reason="Move channel into renamed Discord Bot Hub",
+                    )
+            await legacy.delete(reason="Remove replaced Visitor Bot Hub category")
 
     async def sync_visitor_welcome(self, channel: discord.TextChannel, role: discord.Role) -> None:
         cache_key = f"discord:visitor-welcome:{channel.id}"
