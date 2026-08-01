@@ -2962,8 +2962,12 @@ function renderCrewSplit(data) {
   const net = gross - expenses;
   const baseShare = Math.floor(net / memberCount);
   const remainder = Math.round(net - (baseShare * memberCount));
-  const payoutLines = `${memberCount} member${memberCount === 1 ? "" : "s"}: <strong>${number(baseShare)} aUEC each</strong>${remainder ? `<br>${remainder} member(s) receive 1 extra aUEC to account for rounding.` : ""}`;
-  outputs.industrySplit.innerHTML = `<div class="metric-grid">${metric("Net payout", money(net))}${metric("Crew", memberCount)}</div><p>${payoutLines}</p>`;
+  const roundingNote = remainder ? `<p class="payout-rounding">${remainder} member(s) receive 1 extra aUEC to account for rounding.</p>` : "";
+  outputs.industrySplit.innerHTML = `<div class="payout-result">
+    <div class="payout-primary"><span>Payout per member</span><strong>${number(baseShare)} aUEC</strong></div>
+    <div class="metric-grid payout-secondary">${metric("Net payout", money(net))}${metric("Crew", memberCount)}</div>
+    ${roundingNote}
+  </div>`;
 }
 
 async function renderRefineryCompletion(data) {
