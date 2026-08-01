@@ -285,9 +285,9 @@ class GameAssistBot(commands.Bot):
         await self._run_startup_step("prepare feedback forum", self.ensure_feedback_forum)
         await self._run_startup_step("verify inventory channel", self.ensure_inventory_search_channel)
         await self._run_startup_step("sync command references", self.sync_commands_reference_message)
+        await self._run_startup_step("sync Visitor command examples", self.sync_visitor_command_examples)
         await self._run_startup_step("sync Executive Hangar status", self.sync_exec_status_message)
         await self._run_startup_step("sync contested-zone timers", self.sync_cz_timers_message)
-        await self._run_startup_step("sync Visitor command examples", self.sync_visitor_command_examples)
         self._commands_reference_synced = True
 
         if (self.settings.exec_status_channel_id or self.visitor_channels.get("executive-hangar-status")) and self._exec_status_task is None:
@@ -1034,6 +1034,38 @@ class GameAssistBot(commands.Bot):
             else:
                 message = await channel.send(embed=embed, silent=True)
             await self.cache.set(cache_key, message.id, 315360000)
+            await self._ensure_timer_dashboard_below_example(channel_name, channel)
+
+    async def _ensure_timer_dashboard_below_example(
+        self,
+        channel_name: str,
+        channel: discord.TextChannel,
+    ) -> None:
+        timer_specs = {
+            "executive-hangar-status": ("discord:exec-status-message", "Executive Hangar Clock"),
+            "contested-zone-timers": ("discord:cz-timers-message", "Contested Zone Timers"),
+        }
+        spec = timer_specs.get(channel_name)
+        if spec is None:
+            return
+        marker_key = f"discord:visitor-example-before-dashboard:v1:{channel.id}"
+        if await self.cache.get(marker_key):
+            return
+
+        cache_prefix, embed_title = spec
+        dashboard_cache_key = f"{cache_prefix}:{channel.id}"
+        dashboard_message_id = await self.cache.get(dashboard_cache_key)
+        dashboard_message = None
+        if isinstance(dashboard_message_id, int):
+            with suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                dashboard_message = await channel.fetch_message(dashboard_message_id)
+        if dashboard_message is None:
+            dashboard_message = await self.find_recent_embed_message(channel, embed_title)
+        if dashboard_message is not None:
+            with suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                await dashboard_message.delete()
+        await self.cache.set(dashboard_cache_key, None, 315360000)
+        await self.cache.set(marker_key, True, 315360000)
 
     async def resolve_exec_cycle_start(self) -> tuple[int, str]:
         override = await self.cache.get(EXEC_OVERRIDE_CACHE_KEY)
