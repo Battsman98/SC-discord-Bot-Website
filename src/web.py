@@ -665,14 +665,7 @@ async def me(request: Request) -> dict[str, Any]:
         "guild_permissions": user.guild_permissions,
         "can_manage_changes": user.can_manage_changes,
         "can_manage_admin": user.can_manage_admin,
-        "feedback_forum_url": _feedback_forum_url(state().settings),
     }
-
-
-def _feedback_forum_url(settings: Settings) -> str | None:
-    if not settings.discord_guild_id or not settings.feedback_forum_channel_id:
-        return None
-    return f"https://discord.com/channels/{settings.discord_guild_id}/{settings.feedback_forum_channel_id}"
 
 
 def _feedback_embed(

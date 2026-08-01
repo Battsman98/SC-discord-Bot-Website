@@ -796,11 +796,6 @@ async function loadMe() {
       <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>
       <button type="button" data-feedback-open>Feedback / Report Issue</button>
     </div>`;
-    const feedbackForumLink = document.querySelector("[data-feedback-forum-link]");
-    if (feedbackForumLink && currentUser.feedback_forum_url) {
-      feedbackForumLink.href = currentUser.feedback_forum_url;
-      feedbackForumLink.hidden = false;
-    }
     await loadSavedShips();
     await loadSavedBlueprints();
     await loadInventory();
@@ -1157,6 +1152,8 @@ const feedbackImages = document.querySelector("[data-feedback-images]");
 const feedbackPreviews = document.querySelector("[data-feedback-previews]");
 const feedbackStatus = document.querySelector("[data-feedback-status]");
 const feedbackSubmit = document.querySelector("[data-feedback-submit]");
+const feedbackSuccessModal = document.querySelector("[data-feedback-success-modal]");
+const feedbackPostLink = document.querySelector("[data-feedback-post-link]");
 let feedbackPreviewUrls = [];
 
 function closeFeedbackModal() {
@@ -1170,7 +1167,23 @@ function openFeedbackModal() {
   if (!feedbackModal) return;
   feedbackModal.hidden = false;
   document.body.classList.add("feedback-modal-open");
+  setFeedbackStatus("Submit here to create a new Discord forum post. You will receive a direct link to continue the conversation.");
   feedbackModal.querySelector('[name="report_type"]')?.focus();
+}
+
+function closeFeedbackSuccess() {
+  if (!feedbackSuccessModal) return;
+  feedbackSuccessModal.hidden = true;
+  document.body.classList.remove("feedback-modal-open");
+  document.querySelector("[data-feedback-open]")?.focus();
+}
+
+function openFeedbackSuccess(forumUrl) {
+  if (!feedbackSuccessModal || !feedbackPostLink) return;
+  feedbackPostLink.href = forumUrl;
+  feedbackSuccessModal.hidden = false;
+  document.body.classList.add("feedback-modal-open");
+  feedbackPostLink.focus();
 }
 
 function clearFeedbackPreviews() {
@@ -1202,26 +1215,22 @@ function renderFeedbackPreviews() {
   });
 }
 
-function setFeedbackStatus(message, forumUrl = "") {
+function setFeedbackStatus(message) {
   if (!feedbackStatus) return;
   feedbackStatus.textContent = message;
-  if (!forumUrl) return;
-  const link = document.createElement("a");
-  link.href = forumUrl;
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  link.textContent = "Open your Discord forum post";
-  feedbackStatus.append(" ", link);
 }
 
 document.addEventListener("click", (event) => {
   if (event.target.closest("[data-feedback-open]")) openFeedbackModal();
   if (event.target.closest("[data-feedback-close]")) closeFeedbackModal();
   if (event.target === feedbackModal) closeFeedbackModal();
+  if (event.target.closest("[data-feedback-success-close]")) closeFeedbackSuccess();
+  if (event.target === feedbackSuccessModal) closeFeedbackSuccess();
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && feedbackModal && !feedbackModal.hidden) closeFeedbackModal();
+  else if (event.key === "Escape" && feedbackSuccessModal && !feedbackSuccessModal.hidden) closeFeedbackSuccess();
 });
 
 feedbackImages?.addEventListener("change", renderFeedbackPreviews);
@@ -1243,7 +1252,8 @@ feedbackForm?.addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error(payload.detail || "The report could not be submitted.");
     feedbackForm.reset();
     clearFeedbackPreviews();
-    setFeedbackStatus("Report submitted successfully.", payload.forum_url);
+    closeFeedbackModal();
+    openFeedbackSuccess(payload.forum_url);
   } catch (error) {
     setFeedbackStatus(error.message);
   } finally {

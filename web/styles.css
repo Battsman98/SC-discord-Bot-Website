@@ -181,7 +181,8 @@ h2 {
   margin: 0;
 }
 
-.feedback-backdrop {
+.feedback-backdrop,
+.feedback-success-backdrop {
   position: fixed;
   z-index: 1400;
   inset: 0;
@@ -221,28 +222,10 @@ h2 {
 }
 
 .feedback-intro,
-.feedback-forum-direct,
 .feedback-images small,
 .feedback-status {
   color: var(--muted);
   line-height: 1.55;
-}
-
-.feedback-forum-direct {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.feedback-forum-direct .button-link {
-  flex: 0 0 auto;
-}
-
-.feedback-status a {
-  color: var(--accent-2);
-  font-weight: 800;
 }
 
 .feedback-form {
@@ -320,6 +303,35 @@ h2 {
 
 .feedback-actions {
   justify-content: flex-end;
+}
+
+.feedback-success-dialog {
+  width: min(520px, 100%);
+  padding: clamp(24px, 5vw, 34px);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: linear-gradient(145deg, var(--panel-tint), transparent 58%), var(--surface);
+  box-shadow: 0 0 36px color-mix(in srgb, var(--accent) 24%, transparent), 0 24px 80px rgba(0, 0, 0, 0.78);
+  text-align: center;
+}
+
+.feedback-success-dialog h2 {
+  margin-bottom: 12px;
+  color: var(--text);
+  font-size: 1.35rem;
+}
+
+.feedback-success-dialog > p:not(.guide-kicker) {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.feedback-success-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 body.feedback-modal-open {

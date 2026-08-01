@@ -1,33 +1,6 @@
-from src.config import Settings
 from src.bot import build_feedback_template_embed
-from src.web import _feedback_embed, _feedback_forum_url
+from src.web import _feedback_embed
 from src.web_auth import WebUser
-
-
-def test_feedback_forum_url_uses_configured_guild_and_channel() -> None:
-    settings = Settings(
-        discord_token="token",
-        discord_client_id="client",
-        discord_client_secret="secret",
-        discord_redirect_uri="https://example.com/callback",
-        discord_guild_id=123,
-        commands_channel_id=None,
-        exec_status_channel_id=None,
-        exec_admin_role_ids=(),
-        bot_admin_role_ids=(),
-        bot_admin_user_ids=(),
-        cz_timers_channel_id=None,
-        audit_log_channel_id=None,
-        command_channel_ids={},
-        command_prefix="!",
-        database_path=":memory:",
-        http_timeout_seconds=15,
-        cache_ttl_seconds=300,
-    )
-
-    assert _feedback_forum_url(settings) == (
-        "https://discord.com/channels/123/1533026212463775754"
-    )
 
 
 def test_feedback_embed_has_structured_report_fields() -> None:
