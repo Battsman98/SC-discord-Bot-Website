@@ -1,3 +1,7 @@
+from io import BytesIO
+
+from fastapi import UploadFile
+
 from src.bot import (
     BOT_MANAGER_ROLE_NAME,
     VISITOR_CATEGORY_NAME,
@@ -6,7 +10,7 @@ from src.bot import (
     build_feedback_template_embed,
     build_visitor_command_example_embeds,
 )
-from src.web import _feedback_embed
+from src.web import _feedback_embed, _provided_feedback_images
 from src.web_auth import WebUser
 
 
@@ -39,6 +43,16 @@ def test_feedback_embed_has_structured_report_fields() -> None:
     assert fields["Steps to reproduce"] == "Open Overview and select Trade."
     assert fields["Improvement recommendations"] == "Add a visible selected state."
     assert embed["author"]["icon_url"] == "https://cdn.example/avatar.png"
+
+
+def test_feedback_submission_ignores_empty_optional_file_placeholder() -> None:
+    empty_upload = UploadFile(filename="", file=BytesIO())
+
+    # Keep this regression focused on the browser's empty multipart placeholder:
+    # it must not count as an attachment or fail MIME validation.
+    provided = _provided_feedback_images([empty_upload])
+
+    assert provided == []
 
 
 def test_bot_feedback_template_gives_users_a_complete_example() -> None:
