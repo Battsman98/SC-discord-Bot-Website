@@ -492,20 +492,17 @@
           <p>Everything you need to use the Star Citizen Companion website. Start with the quick tour, then jump to the tool you need.</p>
         </div>
 
-        <label class="guide-picker" for="guideTopic">
-          <span>Select a guide topic</span>
-          <select id="guideTopic" data-guide-topic>
-            <option value="guide-start">Getting started</option>
-            <option value="guide-ships">Ships &amp; Hangar</option>
-            <option value="guide-trade">Trade</option>
-            <option value="guide-mining">Mining</option>
-            <option value="guide-blueprints">Blueprints</option>
-            <option value="guide-items">Items</option>
-            <option value="guide-inventory">Inventory</option>
-            <option value="guide-timers">Timers</option>
-            <option value="guide-permissions">Access, permissions &amp; safety</option>
-          </select>
-        </label>
+        <nav class="guide-toc" aria-label="Guide contents">
+          <button type="button" class="active" data-guide-topic="guide-start" aria-controls="guide-start" aria-selected="true">Getting started</button>
+          <button type="button" data-guide-topic="guide-ships" aria-controls="guide-ships" aria-selected="false">Ships</button>
+          <button type="button" data-guide-topic="guide-trade" aria-controls="guide-trade" aria-selected="false">Trade</button>
+          <button type="button" data-guide-topic="guide-mining" aria-controls="guide-mining" aria-selected="false">Mining</button>
+          <button type="button" data-guide-topic="guide-blueprints" aria-controls="guide-blueprints" aria-selected="false">Blueprints</button>
+          <button type="button" data-guide-topic="guide-items" aria-controls="guide-items" aria-selected="false">Items</button>
+          <button type="button" data-guide-topic="guide-inventory" aria-controls="guide-inventory" aria-selected="false">Inventory</button>
+          <button type="button" data-guide-topic="guide-timers" aria-controls="guide-timers" aria-selected="false">Timers</button>
+          <button type="button" data-guide-topic="guide-permissions" aria-controls="guide-permissions" aria-selected="false">Access &amp; permissions</button>
+        </nav>
 
         <div class="guide-sections">
           <section id="guide-start" class="guide-section">

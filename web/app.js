@@ -36,17 +36,24 @@ if (overviewPanel && standaloneGuide) {
   standaloneGuide.remove();
 }
 
-const guideTopic = document.querySelector("[data-guide-topic]");
+const guideTopics = Array.from(document.querySelectorAll("[data-guide-topic]"));
 const guideSections = Array.from(document.querySelectorAll(".guide-section"));
 
 function showGuideTopic(sectionId) {
   guideSections.forEach((section) => {
     section.hidden = section.id !== sectionId;
   });
+  guideTopics.forEach((button) => {
+    const active = button.dataset.guideTopic === sectionId;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
 }
 
-guideTopic?.addEventListener("change", () => showGuideTopic(guideTopic.value));
-if (guideTopic) showGuideTopic(guideTopic.value);
+guideTopics.forEach((button) => {
+  button.addEventListener("click", () => showGuideTopic(button.dataset.guideTopic));
+});
+if (guideTopics.length) showGuideTopic(guideTopics[0].dataset.guideTopic);
 
 const mfdThemes = {
   overview: { theme: "overview", label: "RSI HOME SYSTEM" },
