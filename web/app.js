@@ -310,6 +310,10 @@ function initToolMenus() {
       button.type = "button";
       button.dataset.toolTarget = id;
       button.textContent = title;
+      if (tool.matches("[data-change-admin-only]")) {
+        button.dataset.changeAdminOnly = "";
+        button.hidden = true;
+      }
       button.addEventListener("click", async () => {
         const scannerName = tool.classList.contains("blueprint-import")
           ? "Blueprint Scanner"
@@ -749,6 +753,7 @@ async function loadMe() {
   try {
     currentUser = await api("/api/me");
     setAdminVisibility(Boolean(currentUser.authenticated && currentUser.can_manage_admin));
+    setChangeAdminVisibility(Boolean(currentUser.authenticated && currentUser.can_manage_changes));
     if (!currentUser.authenticated) {
       userPanel.innerHTML = `<div class="user-row">
         <span>${currentUser.discord_auth_enabled ? "Not signed in" : "Discord OAuth needs setup"}</span>
@@ -776,6 +781,7 @@ async function loadMe() {
     if (currentUser.can_manage_admin) await loadAudit();
   } catch (error) {
     setAdminVisibility(false);
+    setChangeAdminVisibility(false);
     userPanel.innerHTML = `<span>${escapeHtml(error.message)}</span>`;
   }
 }
@@ -1116,6 +1122,19 @@ function syncInventoryTypeSelectForCategory(categorySelect) {
   const validCurrent = current && (allowed.includes(current) || !allowed.length) ? current : "";
   typeSelect.innerHTML = inventoryTypeOptions(category, validCurrent, typeSelect.dataset.placeholder || "Item type");
   typeSelect.value = validCurrent;
+}
+
+function setChangeAdminVisibility(canManageChanges) {
+  document.querySelectorAll("[data-change-admin-only]").forEach((element) => {
+    element.hidden = !canManageChanges;
+    if (!canManageChanges && element.classList.contains("tool-panel")) element.classList.remove("active");
+  });
+  document.querySelectorAll("[data-change-admin-only][data-tool-target]").forEach((button) => {
+    button.hidden = !canManageChanges;
+    if (!canManageChanges) button.classList.remove("active");
+  });
+  const miningPanel = document.querySelector("#mining");
+  if (miningPanel) updateToolContainers(miningPanel);
 }
 
 function inventoryTotals(items) {
