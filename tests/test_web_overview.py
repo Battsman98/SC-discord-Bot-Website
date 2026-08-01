@@ -151,11 +151,11 @@ def test_industry_tools_support_crew_count_and_all_refining_methods() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert 'name="crew_mode"' in html
-    assert 'value="count"' in html
     assert 'name="member_count"' in html
-    assert "setupCrewPayoutMode" in javascript
-    assert 'data.crew_mode === "count"' in javascript
+    assert 'name="crew_mode"' not in html
+    assert 'placeholder="Crew names, separated by commas"' not in html
+    assert "setupCrewPayoutMode" not in javascript
+    assert "Number(data.member_count || 0)" in javascript
     for method in (
         "Cormack Method",
         "Dinyx Solventation",

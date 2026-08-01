@@ -226,12 +226,7 @@
             <div class="resource-card-heading"><h3>Crew Payout</h3><span>Calculator</span></div>
             <p>Subtract shared costs and divide the remaining payout evenly.</p>
             <div class="field-row"><input name="gross" type="number" min="0" step="1" placeholder="Gross payout (aUEC)" aria-label="Gross payout in aUEC" required><input name="expenses" type="number" min="0" step="1" value="0" placeholder="Shared expenses" aria-label="Shared expenses in aUEC"></div>
-            <select name="crew_mode" aria-label="Crew payout entry mode">
-              <option value="names">Enter crew names</option>
-              <option value="count">Enter member count</option>
-            </select>
-            <input name="crew" data-crew-names placeholder="Crew names, separated by commas" aria-label="Crew names separated by commas" required>
-            <input name="member_count" data-crew-count type="number" min="1" max="999" step="1" placeholder="Number of crew members" aria-label="Number of crew members" hidden disabled>
+            <input name="member_count" type="number" min="1" max="999" step="1" placeholder="Number of crew members" aria-label="Number of crew members" required>
             <button type="submit">Calculate Split</button>
             <div id="industrySplitOutput" class="mini-output" aria-live="polite"></div>
           </form>
