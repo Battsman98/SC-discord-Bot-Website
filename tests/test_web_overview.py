@@ -147,6 +147,19 @@ def test_mining_page_includes_original_industry_operation_tools_without_external
     assert "renderOperationBrief" in javascript
 
 
+def test_warbonds_load_on_first_ship_view_and_refresh_live_data_regularly() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    source = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+
+    lookup_activation = javascript.split('if (tabId === "lookup") {', 1)[1].split('if (tabId === "intel")', 1)[0]
+    assert "void loadWarbonds();" in lookup_activation
+    assert 'refresh=true&t=${Date.now()}' in javascript
+    assert "10 * 60 * 1000" in javascript
+    assert "_warbond_maintenance_loop" in source
+    assert "15 * 60" in source
+    assert "force_refresh=refresh" in source
+
+
 def test_material_location_editor_is_hidden_until_change_permission_is_confirmed() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")

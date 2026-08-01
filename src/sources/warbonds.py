@@ -25,18 +25,39 @@ class WarbondTrackerSource:
     def __init__(self, cache: SQLiteCache, timeout_seconds: int = 15) -> None:
         self._cache = cache
         self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_seconds))
+        self._refresh_lock = asyncio.Lock()
+        self._last_good: dict[str, Any] | None = None
 
-    async def active(self) -> dict[str, Any]:
+    async def active(self, force_refresh: bool = False) -> dict[str, Any]:
         cached = await self._cache.get(self.CACHE_KEY)
         if isinstance(cached, dict):
-            return cached
+            self._last_good = cached
+            if not force_refresh:
+                return cached
 
+        async with self._refresh_lock:
+            if not force_refresh:
+                cached = await self._cache.get(self.CACHE_KEY)
+                if isinstance(cached, dict):
+                    self._last_good = cached
+                    return cached
+            try:
+                result = await self._refresh()
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+                if self._last_good is not None:
+                    return {**self._last_good, "stale": True}
+                raise
+            self._last_good = result
+            await self._cache.set(self.CACHE_KEY, result, 900)
+            return result
+
+    async def _refresh(self) -> dict[str, Any]:
         prices_payload = await self._fetch(self.PRICES_URL)
         vehicles_payload = await self._fetch(self.VEHICLES_URL)
         rows = prices_payload.get("data") if isinstance(prices_payload, dict) else None
         vehicles = vehicles_payload.get("data") if isinstance(vehicles_payload, dict) else None
         if not isinstance(rows, list) or not isinstance(vehicles, list):
-            return {"offers": [], "updated_at": None, "source": "UEX / RSI pledge store"}
+            raise ValueError("Warbond sources returned an invalid payload.")
 
         usd_prices = self._latest_usd_prices(rows)
         rsi_results = await asyncio.gather(*(self._verify_rsi_ship(offer["name"]) for offer in self.ACTIVE_OFFERS.values()))
@@ -89,9 +110,9 @@ class WarbondTrackerSource:
         result = {
             "offers": offers,
             "updated_at": max((offer["updated_at"] for offer in offers if offer["updated_at"]), default=None),
+            "checked_at": datetime.now(tz=timezone.utc).isoformat(),
             "source": "UEX pledge prices and the RSI pledge store",
         }
-        await self._cache.set(self.CACHE_KEY, result, 1800)
         return result
 
     def _active_rows(self, prices: dict[str, dict], rsi_ships: dict[str, dict]) -> list[dict]:

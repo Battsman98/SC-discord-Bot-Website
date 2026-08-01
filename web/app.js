@@ -84,6 +84,7 @@ function activateTab(tabId) {
   if (tabId === "lookup") {
     showToolPanel(panel, "lookup-tool-0");
     void loadSavedShips({ quiet: true });
+    void loadWarbonds();
   }
   if (tabId === "intel") void loadIntel();
 }
@@ -2864,15 +2865,19 @@ function intelPublishedTime(value) {
 
 let warbondsLoaded = false;
 
-async function loadWarbonds(force = false) {
+async function loadWarbonds(force = false, options = {}) {
   if (!outputs.warbonds || (warbondsLoaded && !force)) return;
-  outputs.warbonds.innerHTML = stateMessage("Checking active warbond offers...");
+  if (!options.background) outputs.warbonds.innerHTML = stateMessage("Checking active warbond offers...");
   try {
-    const payload = await api("/api/ships/warbonds");
+    const path = force ? `/api/ships/warbonds?refresh=true&t=${Date.now()}` : "/api/ships/warbonds";
+    const payload = await api(path);
     const offers = payload.offers || [];
-    outputs.warbonds.innerHTML = offers.length
+    const cards = offers.length
       ? offers.map(renderWarbond).join("")
       : stateMessage("No active USD warbond CCUs were reported.");
+    const checkedAt = payload.checked_at ? new Date(payload.checked_at).toLocaleString() : "Unavailable";
+    const freshness = payload.stale ? "Last known data — live refresh unavailable" : `Checked ${checkedAt}`;
+    outputs.warbonds.innerHTML = `${cards}<p class="warbond-freshness">${escapeHtml(freshness)}</p>`;
     warbondsLoaded = true;
   } catch (error) {
     outputs.warbonds.innerHTML = errorMessage(`Could not load active warbonds: ${error.message}`);
@@ -3075,6 +3080,10 @@ function renderCrewSplit(data) {
     ${roundingNote}
   </div>`;
 }
+
+window.setInterval(() => {
+  if (!document.hidden) void loadWarbonds(true, { background: true });
+}, 10 * 60 * 1000);
 
 async function renderRefineryCompletion(data) {
   const hours = Number(data.hours || 0);

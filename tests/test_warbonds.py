@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import asyncio
+
 from src.sources.warbonds import WarbondTrackerSource
 
 
@@ -57,3 +59,35 @@ def test_warbond_prices_use_localized_pledge_currency_not_auec() -> None:
     assert "pledgeMoney(offer.standard_price, offer.currency)" in renderer
     assert "money(offer.warbond_price)" not in renderer
     assert 'style: "currency"' in javascript
+
+
+def test_forced_warbond_refresh_bypasses_cache_and_replaces_it() -> None:
+    class Cache:
+        def __init__(self) -> None:
+            self.value = {"offers": [{"name": "Cached"}]}
+
+        async def get(self, _key):
+            return self.value
+
+        async def set(self, _key, value, _ttl):
+            self.value = value
+
+    async def scenario() -> None:
+        source = WarbondTrackerSource.__new__(WarbondTrackerSource)
+        source._cache = Cache()
+        source._refresh_lock = asyncio.Lock()
+        source._last_good = None
+        refreshes = 0
+
+        async def refresh():
+            nonlocal refreshes
+            refreshes += 1
+            return {"offers": [{"name": "Live"}], "checked_at": "2026-08-01T00:00:00+00:00"}
+
+        source._refresh = refresh
+        assert (await source.active())["offers"][0]["name"] == "Cached"
+        assert (await source.active(force_refresh=True))["offers"][0]["name"] == "Live"
+        assert refreshes == 1
+        assert source._cache.value["offers"][0]["name"] == "Live"
+
+    asyncio.run(scenario())

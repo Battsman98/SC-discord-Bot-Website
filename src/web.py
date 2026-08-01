@@ -172,6 +172,7 @@ class AppState:
     updates: CitizenUpdatesSource
     warbonds: WarbondTrackerSource
     item_catalog_task: asyncio.Task | None
+    warbond_task: asyncio.Task | None
     scanner_gate: "InventoryScannerGate"
     request_limiter: SlidingWindowLimiter
 
@@ -335,6 +336,10 @@ async def lifespan(app: FastAPI):
         _item_catalog_maintenance_loop(sources),
         name="item-catalog-maintenance",
     )
+    app.state.game_assist.warbond_task = asyncio.create_task(
+        _warbond_maintenance_loop(warbonds),
+        name="warbond-maintenance",
+    )
     try:
         await asyncio.to_thread(_initialize_rapid_ocr_pool)
         await asyncio.to_thread(_warm_rapid_title_ocr)
@@ -344,8 +349,11 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         app.state.game_assist.item_catalog_task.cancel()
+        app.state.game_assist.warbond_task.cancel()
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.item_catalog_task
+        with suppress(asyncio.CancelledError):
+            await app.state.game_assist.warbond_task
         await warbonds.close()
         await updates.close()
         await sources.close()
@@ -440,6 +448,15 @@ async def _item_catalog_maintenance_loop(sources: SourceRegistry) -> None:
             status = {"status": "unavailable"}
         retry_seconds = 5 * 60 if status.get("status") in {"empty", "unavailable"} else 6 * 60 * 60
         await asyncio.sleep(retry_seconds)
+
+
+async def _warbond_maintenance_loop(warbonds: WarbondTrackerSource) -> None:
+    while True:
+        try:
+            await warbonds.active(force_refresh=True)
+        except Exception:
+            pass
+        await asyncio.sleep(15 * 60)
 
 
 @app.middleware("http")
@@ -735,8 +752,8 @@ async def ship_facets() -> dict[str, list[str]]:
 
 
 @app.get("/api/ships/warbonds")
-async def active_warbonds() -> dict[str, Any]:
-    return await state().warbonds.active()
+async def active_warbonds(refresh: bool = False) -> dict[str, Any]:
+    return await state().warbonds.active(force_refresh=refresh)
 
 
 @app.get("/api/ships")
