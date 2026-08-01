@@ -287,11 +287,12 @@ class GameAssistBot(commands.Bot):
         await self._run_startup_step("sync command references", self.sync_commands_reference_message)
         await self._run_startup_step("sync Executive Hangar status", self.sync_exec_status_message)
         await self._run_startup_step("sync contested-zone timers", self.sync_cz_timers_message)
+        await self._run_startup_step("sync Visitor timer examples", self.sync_visitor_timer_examples)
         self._commands_reference_synced = True
 
-        if self.settings.exec_status_channel_id and self._exec_status_task is None:
+        if (self.settings.exec_status_channel_id or self.visitor_channels.get("executive-hangar-status")) and self._exec_status_task is None:
             self._exec_status_task = asyncio.create_task(self._exec_status_loop())
-        if self.settings.cz_timers_channel_id and self._cz_timers_task is None:
+        if (self.settings.cz_timers_channel_id or self.visitor_channels.get("contested-zone-timers")) and self._cz_timers_task is None:
             self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
 
     async def _run_startup_step(self, label: str, operation) -> None:
@@ -367,13 +368,7 @@ class GameAssistBot(commands.Bot):
             color=discord.Color.dark_teal(),
             timestamp=discord.utils.utcnow(),
         )
-        notify_user_id = self.settings.bot_admin_user_ids[0] if self.settings.bot_admin_user_ids else None
-        content = f"<@{notify_user_id}>" if notify_user_id else None
-        await channel.send(
-            content=content,
-            embed=embed,
-            allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-        )
+        await channel.send(embed=embed, silent=True)
 
     async def record_website_deployment(self) -> None:
         revision = next((os.getenv(name, "").strip() for name in ("RENDER_GIT_COMMIT", "COMMIT_SHA", "GITHUB_SHA") if os.getenv(name, "").strip()), "")
@@ -811,17 +806,15 @@ class GameAssistBot(commands.Bot):
         logging.info("Synced %s commands reference message(s) in channel %s", len(updated_message_ids), channel_id)
 
     async def sync_exec_status_message(self) -> None:
-        if not self.settings.exec_status_channel_id:
-            return
-
-        try:
-            channel = await self.fetch_channel(self.settings.exec_status_channel_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            logging.warning("Could not access EXEC_STATUS_CHANNEL_ID %s", self.settings.exec_status_channel_id)
-            return
-
-        if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
-            logging.warning("EXEC_STATUS_CHANNEL_ID does not point to a messageable channel")
+        channel_ids = {
+            channel_id
+            for channel_id in (
+                self.settings.exec_status_channel_id,
+                self.visitor_channels.get("executive-hangar-status"),
+            )
+            if channel_id
+        }
+        if not channel_ids:
             return
 
         try:
@@ -831,7 +824,20 @@ class GameAssistBot(commands.Bot):
             return
 
         embed = build_exec_status_embed(status_context)
-        cache_key = f"discord:exec-status-message:{self.settings.exec_status_channel_id}"
+        for channel_id in channel_ids:
+            await self._sync_exec_status_channel(channel_id, embed)
+
+    async def _sync_exec_status_channel(self, channel_id: int, embed: discord.Embed) -> None:
+        try:
+            channel = await self.fetch_channel(channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.warning("Could not access Executive Hangar status channel %s", channel_id)
+            return
+        if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
+            logging.warning("Executive Hangar status channel %s is not messageable", channel_id)
+            return
+
+        cache_key = f"discord:exec-status-message:{channel_id}"
         message_id = await self.cache.get(cache_key)
 
         if isinstance(message_id, int):
@@ -930,23 +936,34 @@ class GameAssistBot(commands.Bot):
             logging.info("Could not scan for duplicate %s messages", title)
 
     async def sync_cz_timers_message(self) -> None:
-        if not self.settings.cz_timers_channel_id:
-            return
-
-        try:
-            channel = await self.fetch_channel(self.settings.cz_timers_channel_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            logging.warning("Could not access CZ_TIMERS_CHANNEL_ID %s", self.settings.cz_timers_channel_id)
-            return
-
-        if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
-            logging.warning("CZ_TIMERS_CHANNEL_ID does not point to a messageable channel")
+        channel_ids = {
+            channel_id
+            for channel_id in (
+                self.settings.cz_timers_channel_id,
+                self.visitor_channels.get("contested-zone-timers"),
+            )
+            if channel_id
+        }
+        if not channel_ids:
             return
 
         timers = await get_cz_dashboard_timers(self.cache)
         embed = build_cz_dashboard_embed(timers)
+        for channel_id in channel_ids:
+            await self._sync_cz_timers_channel(channel_id, embed)
+
+    async def _sync_cz_timers_channel(self, channel_id: int, embed: discord.Embed) -> None:
+        try:
+            channel = await self.fetch_channel(channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.warning("Could not access CZ timers channel %s", channel_id)
+            return
+        if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
+            logging.warning("CZ timers channel %s is not messageable", channel_id)
+            return
+
         view = CZTimerDashboardView()
-        cache_key = f"discord:cz-timers-message:{self.settings.cz_timers_channel_id}"
+        cache_key = f"discord:cz-timers-message:{channel_id}"
         message_id = await self.cache.get(cache_key)
 
         if isinstance(message_id, int):
@@ -977,6 +994,35 @@ class GameAssistBot(commands.Bot):
         await self.cache.set(cache_key, message.id, 315360000)
         await self.delete_recent_duplicate_embed_messages(channel, "Contested Zone Timers", message.id)
         logging.info("Created CZ timers dashboard message %s", message.id)
+
+    async def sync_visitor_timer_examples(self) -> None:
+        examples = (
+            (
+                "executive-hangar-status",
+                build_exec_example_embed(),
+            ),
+            (
+                "contested-zone-timers",
+                build_cz_example_embed(),
+            ),
+        )
+        for channel_name, embed in examples:
+            channel = self.get_channel(self.visitor_channels.get(channel_name, 0))
+            if not isinstance(channel, discord.TextChannel):
+                continue
+            cache_key = f"discord:visitor-example:{channel.id}"
+            message_id = await self.cache.get(cache_key)
+            message = None
+            if isinstance(message_id, int):
+                with suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    message = await channel.fetch_message(message_id)
+            if message is None:
+                message = await self.find_recent_embed_message(channel, embed.title or "")
+            if message:
+                await message.edit(content=None, embed=embed)
+            else:
+                message = await channel.send(embed=embed, silent=True)
+            await self.cache.set(cache_key, message.id, 315360000)
 
     async def resolve_exec_cycle_start(self) -> tuple[int, str]:
         override = await self.cache.get(EXEC_OVERRIDE_CACHE_KEY)
@@ -2575,6 +2621,22 @@ def build_exec_status_embed(status_context: dict) -> discord.Embed:
     return embed
 
 
+def build_exec_example_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title="Example /exec Response",
+        description="This is an example of what the live Executive Hangar response shows.",
+        color=discord.Color.blurple(),
+    )
+    embed.add_field(
+        name="Information included",
+        value="Current open/closed status, active phase, light state, and Discord-relative time until the next change.",
+        inline=False,
+    )
+    embed.add_field(name="Try it", value="Use `/exec` in this channel for a private, up-to-date response.", inline=False)
+    embed.set_footer(text="The separate Executive Hangar Clock embed in this channel updates automatically.")
+    return embed
+
+
 def _format_exec_status(status: ExecHangarStatus) -> str:
     return (
         f"Status: {status.status}\n"
@@ -2858,6 +2920,26 @@ def build_cz_dashboard_embed(timers: dict) -> discord.Embed:
         embed.add_field(name=label, value=value, inline=False)
 
     embed.set_footer(text="Shared dashboard. Timers update when buttons are used and refresh every 60s while the bot is running.")
+    return embed
+
+
+def build_cz_example_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title="Example /cztimer Response",
+        description="This is an example of how shared Contested Zone timer responses work.",
+        color=discord.Color.blurple(),
+    )
+    embed.add_field(
+        name="After starting a timer",
+        value="The response confirms the selected objective, shows when it will be ready, and records who started it.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Try it",
+        value="Use `/cztimer` or the buttons on the live Contested Zone Timers embed in this channel.",
+        inline=False,
+    )
+    embed.set_footer(text="The live dashboard updates automatically every 60 seconds.")
     return embed
 
 
