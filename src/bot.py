@@ -48,6 +48,44 @@ CZ_TIMER_DEFINITIONS = {
     "timer_door": ("Timer Doors", 20 * 60),
 }
 INVENTORY_CHANNEL_ID = 1528623944947597383
+FEEDBACK_TEMPLATE_CACHE_PREFIX = "discord:feedback-template-thread"
+
+
+def build_feedback_template_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title="Example: Guide button does not display the selected information",
+        description="Use this structure so maintainers can understand and reproduce your report quickly.",
+        color=discord.Color.from_rgb(54, 188, 232),
+    )
+    embed.add_field(name="Report type", value="Issue / Bug", inline=True)
+    embed.add_field(name="Website area", value="Overview → Website Guide", inline=True)
+    embed.add_field(
+        name="Issue / Feedback",
+        value="Selecting the Trade guide button leaves the Getting Started information visible.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Expected action or result",
+        value="The Getting Started information should hide and the Trade guide should appear below the buttons.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Steps to reproduce",
+        value="1. Open the Overview page.\n2. Scroll to Website Guide.\n3. Select Trade.\n4. Observe the information below.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Improvement recommendations",
+        value="Highlight the selected button and automatically show only its matching guide section.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Helpful attachments",
+        value="Add screenshots or a short video showing the problem. Never include passwords, tokens, or private account information.",
+        inline=False,
+    )
+    embed.set_footer(text="This is an example. Create a new forum post for your own report.")
+    return embed
 
 
 class GameAssistCommandTree(app_commands.CommandTree):
@@ -195,6 +233,7 @@ class GameAssistBot(commands.Bot):
             return
 
         self._commands_reference_synced = True
+        await self.ensure_feedback_forum()
         await self.ensure_inventory_search_channel()
         await self.sync_commands_reference_message()
         await self.sync_exec_status_message()
@@ -204,6 +243,103 @@ class GameAssistBot(commands.Bot):
             self._exec_status_task = asyncio.create_task(self._exec_status_loop())
         if self.settings.cz_timers_channel_id and self._cz_timers_task is None:
             self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
+
+    async def ensure_feedback_forum(self) -> None:
+        channel_id = self.settings.feedback_forum_channel_id
+        if not channel_id:
+            return
+        try:
+            channel = self.get_channel(channel_id) or await self.fetch_channel(channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.exception("Could not access feedback forum %s", channel_id)
+            return
+        if not isinstance(channel, discord.ForumChannel):
+            logging.error("FEEDBACK_FORUM_CHANNEL_ID %s is not a Discord forum channel", channel_id)
+            return
+        if self.settings.discord_guild_id and channel.guild.id != self.settings.discord_guild_id:
+            logging.error("FEEDBACK_FORUM_CHANNEL_ID %s is not in the configured guild", channel_id)
+            return
+
+        member = channel.guild.me
+        if member is None:
+            logging.error("Could not resolve the bot member for feedback forum %s", channel_id)
+            return
+        required = {
+            "view_channel": True,
+            "send_messages": True,
+            "send_messages_in_threads": True,
+            "create_public_threads": True,
+            "embed_links": True,
+            "attach_files": True,
+            "read_message_history": True,
+            "manage_threads": True,
+        }
+        permissions = channel.permissions_for(member)
+        missing = [name for name in required if not getattr(permissions, name, False)]
+        if missing and permissions.manage_channels:
+            overwrite = channel.overwrites_for(member)
+            for name, value in required.items():
+                setattr(overwrite, name, value)
+            try:
+                await channel.set_permissions(
+                    member,
+                    overwrite=overwrite,
+                    reason="Star Citizen Companion feedback forum integration",
+                )
+                logging.info("Applied feedback forum permissions for the bot in channel %s", channel_id)
+            except (discord.Forbidden, discord.HTTPException):
+                logging.exception("Could not apply feedback forum permissions in channel %s", channel_id)
+        elif missing:
+            logging.error(
+                "Feedback forum %s is missing bot permissions (%s); grant Manage Channels once or apply them manually",
+                channel_id,
+                ", ".join(missing),
+            )
+
+        await self.sync_feedback_template(channel)
+
+    async def sync_feedback_template(self, channel: discord.ForumChannel) -> None:
+        cache_key = f"{FEEDBACK_TEMPLATE_CACHE_PREFIX}:{channel.id}"
+        thread_id = await self.cache.get(cache_key)
+        thread: discord.Thread | None = None
+        if isinstance(thread_id, int):
+            try:
+                candidate = self.get_channel(thread_id) or await self.fetch_channel(thread_id)
+                if isinstance(candidate, discord.Thread):
+                    thread = candidate
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                thread = None
+
+        embed = build_feedback_template_embed()
+        content = (
+            "Use the **Feedback / Report Issue** button beside **Log out** on "
+            "[sccompanion.org](https://sccompanion.org), or copy this example into a new forum post. "
+            "Reply in your post whenever you need to add more details, screenshots, or videos."
+        )
+        try:
+            if thread is None:
+                applied_tags = list(channel.available_tags[:1]) if channel.flags.require_tag else []
+                created = await channel.create_thread(
+                    name="Example: How to submit a helpful website report",
+                    content=content,
+                    embed=embed,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                    applied_tags=applied_tags,
+                    reason="Create the Star Citizen Companion feedback template",
+                )
+                thread = created.thread
+                await self.cache.set(cache_key, thread.id, 315360000)
+            else:
+                if thread.archived:
+                    await thread.edit(archived=False, reason="Refresh the feedback template")
+                starter = await thread.fetch_message(thread.id)
+                await starter.edit(content=content, embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            try:
+                await thread.edit(pinned=True, reason="Keep the feedback template visible")
+            except (discord.Forbidden, discord.HTTPException):
+                logging.warning("Could not pin feedback template thread %s", thread.id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError):
+            logging.exception("Could not create or update the feedback forum template in channel %s", channel.id)
 
     async def ensure_inventory_search_channel(self) -> None:
         try:

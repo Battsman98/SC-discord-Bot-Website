@@ -1,4 +1,5 @@
 from src.config import Settings
+from src.bot import build_feedback_template_embed
 from src.web import _feedback_embed, _feedback_forum_url
 from src.web_auth import WebUser
 
@@ -58,3 +59,14 @@ def test_feedback_embed_has_structured_report_fields() -> None:
     assert fields["Steps to reproduce"] == "Open Overview and select Trade."
     assert fields["Improvement recommendations"] == "Add a visible selected state."
     assert embed["author"]["icon_url"] == "https://cdn.example/avatar.png"
+
+
+def test_bot_feedback_template_gives_users_a_complete_example() -> None:
+    embed = build_feedback_template_embed()
+    fields = {field.name: field.value for field in embed.fields}
+
+    assert embed.title == "Example: Guide button does not display the selected information"
+    assert fields["Report type"] == "Issue / Bug"
+    assert "Getting Started" in fields["Issue / Feedback"]
+    assert "Trade guide" in fields["Expected action or result"]
+    assert "screenshots" in fields["Helpful attachments"]
