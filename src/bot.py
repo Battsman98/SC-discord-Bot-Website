@@ -271,19 +271,26 @@ class GameAssistBot(commands.Bot):
         if self._commands_reference_synced:
             return
 
+        await self._run_startup_step("create Bot Manager role", self.ensure_bot_manager_role)
+        await self._run_startup_step("provision Visitor hub", self.ensure_visitor_access)
+        await self._run_startup_step("refresh Bot Manager channel access", self.ensure_bot_manager_role)
+        await self._run_startup_step("prepare feedback forum", self.ensure_feedback_forum)
+        await self._run_startup_step("verify inventory channel", self.ensure_inventory_search_channel)
+        await self._run_startup_step("sync command references", self.sync_commands_reference_message)
+        await self._run_startup_step("sync Executive Hangar status", self.sync_exec_status_message)
+        await self._run_startup_step("sync contested-zone timers", self.sync_cz_timers_message)
         self._commands_reference_synced = True
-        await self.ensure_visitor_access()
-        await self.ensure_bot_manager_role()
-        await self.ensure_feedback_forum()
-        await self.ensure_inventory_search_channel()
-        await self.sync_commands_reference_message()
-        await self.sync_exec_status_message()
-        await self.sync_cz_timers_message()
 
         if self.settings.exec_status_channel_id and self._exec_status_task is None:
             self._exec_status_task = asyncio.create_task(self._exec_status_loop())
         if self.settings.cz_timers_channel_id and self._cz_timers_task is None:
             self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
+
+    async def _run_startup_step(self, label: str, operation) -> None:
+        try:
+            await operation()
+        except Exception:
+            logging.exception("Discord startup step failed: %s", label)
 
     def allowed_command_channel_ids(self, command_name: str) -> set[int]:
         ids: set[int] = set()
