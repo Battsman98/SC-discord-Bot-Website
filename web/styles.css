@@ -465,34 +465,35 @@ button:hover, .button-link:hover, .tabs button.active {
   line-height: 1.6;
 }
 
-.guide-toc {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
+.guide-picker {
+  display: grid;
+  gap: 8px;
   margin-bottom: 24px;
   padding: 16px;
   border: 1px solid var(--line);
   background: rgba(5, 13, 21, 0.58);
 }
 
-.guide-toc a {
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color 160ms ease, background 160ms ease;
+.guide-picker span {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.guide-toc a:hover,
-.guide-toc a:focus-visible {
+.guide-picker select {
+  width: min(100%, 420px);
+  min-height: 46px;
+  padding: 10px 40px 10px 12px;
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.08);
+  background-color: rgba(5, 13, 21, 0.92);
+  color: var(--text);
+  font-size: 1rem;
 }
 
 .guide-sections {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  display: block;
 }
 
 .guide-section {
@@ -502,9 +503,8 @@ button:hover, .button-link:hover, .tabs button.active {
   background: rgba(5, 13, 21, 0.48);
 }
 
-.guide-section:first-child,
-.guide-section:last-child {
-  grid-column: 1 / -1;
+.guide-section[hidden] {
+  display: none;
 }
 
 .guide-section h3 {
@@ -520,17 +520,6 @@ button:hover, .button-link:hover, .tabs button.active {
 .guide-section p:last-child,
 .guide-section ol:last-child {
   margin-bottom: 0;
-}
-
-@media (max-width: 760px) {
-  .guide-sections {
-    grid-template-columns: 1fr;
-  }
-
-  .guide-section:first-child,
-  .guide-section:last-child {
-    grid-column: auto;
-  }
 }
 
 .overview-options {

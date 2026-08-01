@@ -35,6 +35,19 @@ if (overviewPanel && standaloneGuide) {
   }
   standaloneGuide.remove();
 }
+
+const guideTopic = document.querySelector("[data-guide-topic]");
+const guideSections = Array.from(document.querySelectorAll(".guide-section"));
+
+function showGuideTopic(sectionId) {
+  guideSections.forEach((section) => {
+    section.hidden = section.id !== sectionId;
+  });
+}
+
+guideTopic?.addEventListener("change", () => showGuideTopic(guideTopic.value));
+if (guideTopic) showGuideTopic(guideTopic.value);
+
 const mfdThemes = {
   overview: { theme: "overview", label: "RSI HOME SYSTEM" },
   lookup: { theme: "drake", label: "DRAKE INTERPLANETARY" },
