@@ -29,6 +29,7 @@ class Settings:
     max_upload_bytes: int = 10 * 1024 * 1024
     web_rate_limit_per_minute: int = 120
     discord_rate_limit_per_10_seconds: int = 8
+    feedback_forum_channel_id: int | None = 1533026212463775754
 
     @classmethod
     def from_env(cls, load_env_file: bool = True, require_discord_token: bool = True) -> "Settings":
@@ -52,6 +53,7 @@ class Settings:
         exec_status_channel_id = os.getenv("EXEC_STATUS_CHANNEL_ID", "").strip()
         cz_timers_channel_id = os.getenv("CZ_TIMERS_CHANNEL_ID", "").strip()
         audit_log_channel_id = os.getenv("AUDIT_LOG_CHANNEL_ID", "").strip()
+        feedback_forum_channel_id = os.getenv("FEEDBACK_FORUM_CHANNEL_ID", "1533026212463775754").strip()
         exec_admin_role_ids = tuple(
             int(role_id.strip())
             for role_id in os.getenv("EXEC_ADMIN_ROLE_IDS", "").split(",")
@@ -96,6 +98,7 @@ class Settings:
             max_upload_bytes=int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024))),
             web_rate_limit_per_minute=int(os.getenv("WEB_RATE_LIMIT_PER_MINUTE", "120")),
             discord_rate_limit_per_10_seconds=int(os.getenv("DISCORD_RATE_LIMIT_PER_10_SECONDS", "8")),
+            feedback_forum_channel_id=int(feedback_forum_channel_id) if feedback_forum_channel_id else None,
         )
 
 

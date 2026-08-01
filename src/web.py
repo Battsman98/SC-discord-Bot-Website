@@ -9,6 +9,7 @@ import queue
 import re
 import secrets
 import threading
+import aiohttp
 from io import BytesIO
 import time
 from contextlib import asynccontextmanager, suppress
@@ -16,7 +17,7 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -664,7 +665,147 @@ async def me(request: Request) -> dict[str, Any]:
         "guild_permissions": user.guild_permissions,
         "can_manage_changes": user.can_manage_changes,
         "can_manage_admin": user.can_manage_admin,
+        "feedback_forum_url": _feedback_forum_url(state().settings),
     }
+
+
+def _feedback_forum_url(settings: Settings) -> str | None:
+    if not settings.discord_guild_id or not settings.feedback_forum_channel_id:
+        return None
+    return f"https://discord.com/channels/{settings.discord_guild_id}/{settings.feedback_forum_channel_id}"
+
+
+def _feedback_embed(
+    *,
+    report_type: str,
+    details: str,
+    expected_action: str,
+    steps: str,
+    recommendations: str,
+    user: Any,
+) -> dict[str, Any]:
+    labels = {
+        "issue": "Issue / Bug",
+        "improvement": "Improvement recommendation",
+        "feedback": "General feedback",
+    }
+
+    def field(name: str, value: str, *, inline: bool = False) -> dict[str, Any]:
+        cleaned = value.strip() or "Not provided"
+        if len(cleaned) > 1024:
+            cleaned = cleaned[:1021].rstrip() + "..."
+        return {"name": name, "value": cleaned, "inline": inline}
+
+    embed: dict[str, Any] = {
+        "title": "Star Citizen Companion Website Report",
+        "color": 3587304,
+        "fields": [
+            field("Report type", labels.get(report_type, "Website report"), inline=True),
+            field("Reported by", f"{user.display_name or user.username} (`{user.id}`)", inline=True),
+            field("Issue / Feedback", details),
+            field("Expected action or result", expected_action),
+            field("Steps to reproduce", steps),
+            field("Improvement recommendations", recommendations),
+        ],
+        "footer": {"text": "Submitted from sccompanion.org • Reply in this thread to add more information or images."},
+    }
+    if user.avatar_url:
+        embed["author"] = {"name": user.display_name or user.username, "icon_url": user.avatar_url}
+    return embed
+
+
+@app.post("/api/me/feedback")
+async def submit_feedback(
+    report_type: str = Form(...),
+    title: str = Form(...),
+    details: str = Form(...),
+    expected_action: str = Form(default=""),
+    steps: str = Form(default=""),
+    recommendations: str = Form(default=""),
+    images: list[UploadFile] = File(default=[]),
+    user=Depends(require_user),
+) -> dict[str, str]:
+    settings = state().settings
+    channel_id = settings.feedback_forum_channel_id
+    if not channel_id or not settings.discord_token:
+        raise HTTPException(status_code=503, detail="The Discord feedback forum is not configured.")
+    if report_type not in {"issue", "improvement", "feedback"}:
+        raise HTTPException(status_code=400, detail="Choose a valid report type.")
+    title = " ".join(title.split())
+    details = details.strip()
+    if not title or not details:
+        raise HTTPException(status_code=400, detail="A title and report details are required.")
+    if len(title) > 100 or len(details) > 3000:
+        raise HTTPException(status_code=400, detail="The report title or details are too long.")
+    if len(images) > 4:
+        raise HTTPException(status_code=400, detail="Attach no more than 4 images.")
+
+    attachments: list[tuple[str, bytes, str]] = []
+    total_bytes = 0
+    allowed_types = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+    for index, upload in enumerate(images):
+        content_type = (upload.content_type or "").lower()
+        if content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Only PNG, JPG, WebP, and GIF images are supported.")
+        data = await upload.read(8 * 1024 * 1024 + 1)
+        if len(data) > 8 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Each image must be 8 MB or smaller.")
+        total_bytes += len(data)
+        if total_bytes > 20 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Combined image size must be 20 MB or smaller.")
+        try:
+            from PIL import Image
+            Image.open(BytesIO(data)).verify()
+        except Exception as error:
+            raise HTTPException(status_code=400, detail="One of the attachments is not a valid image.") from error
+        filename = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(upload.filename or f"image-{index + 1}").name).strip(".-")
+        attachments.append((filename or f"image-{index + 1}.png", data, content_type))
+
+    message: dict[str, Any] = {
+        "embeds": [_feedback_embed(
+            report_type=report_type,
+            details=details,
+            expected_action=expected_action,
+            steps=steps,
+            recommendations=recommendations,
+            user=user,
+        )],
+        "allowed_mentions": {"parse": []},
+    }
+    if attachments:
+        message["attachments"] = [
+            {"id": index, "filename": filename}
+            for index, (filename, _data, _content_type) in enumerate(attachments)
+        ]
+    payload = {"name": title, "message": message}
+    form = aiohttp.FormData()
+    form.add_field("payload_json", json.dumps(payload), content_type="application/json")
+    for index, (filename, data, content_type) in enumerate(attachments):
+        form.add_field(f"files[{index}]", data, filename=filename, content_type=content_type)
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=max(30, settings.http_timeout_seconds))
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/threads",
+                headers={"Authorization": f"Bot {settings.discord_token}"},
+                data=form,
+            ) as response:
+                response_payload = await response.json(content_type=None)
+                if response.status >= 400:
+                    logging.error("Discord feedback forum returned status %s", response.status)
+                    raise HTTPException(status_code=502, detail="Discord could not create the feedback post.")
+    except HTTPException:
+        raise
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+        logging.exception("Could not create Discord feedback forum post")
+        raise HTTPException(status_code=502, detail="The feedback post could not reach Discord.") from error
+
+    thread_id = str(response_payload.get("id") or "")
+    guild_id = str(response_payload.get("guild_id") or settings.discord_guild_id or "")
+    if not thread_id or not guild_id:
+        raise HTTPException(status_code=502, detail="Discord created the post but did not return its link.")
+    return {"status": "submitted", "forum_url": f"https://discord.com/channels/{guild_id}/{thread_id}"}
 
 
 @app.post("/api/activity", status_code=204)

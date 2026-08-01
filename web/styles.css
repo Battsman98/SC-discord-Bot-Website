@@ -221,10 +221,28 @@ h2 {
 }
 
 .feedback-intro,
+.feedback-forum-direct,
 .feedback-images small,
 .feedback-status {
   color: var(--muted);
   line-height: 1.55;
+}
+
+.feedback-forum-direct {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.feedback-forum-direct .button-link {
+  flex: 0 0 auto;
+}
+
+.feedback-status a {
+  color: var(--accent-2);
+  font-weight: 800;
 }
 
 .feedback-form {

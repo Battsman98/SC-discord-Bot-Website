@@ -45,6 +45,8 @@ services:
         sync: false
       - key: AUDIT_LOG_CHANNEL_ID
         sync: false
+      - key: FEEDBACK_FORUM_CHANNEL_ID
+        value: "1533026212463775754"
       - key: COMMAND_CHANNEL_IDS
         sync: false
       - key: BOT_COMMAND_PREFIX

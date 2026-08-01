@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260801-mining-permissions-v3-guide-buttons-v2-feedback-v1-warbond-v4">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260801-mining-permissions-v3-guide-buttons-v2-feedback-v2-warbond-v4">
   <link rel="stylesheet" href="/assets/hotfix-overlay.css?v=20260723-inline-wheel">
 </head>
 <body data-mfd-theme="overview">
@@ -665,6 +665,7 @@
         <button type="button" class="feedback-close" data-feedback-close aria-label="Close feedback form">Close</button>
       </div>
       <p id="feedbackIntro" class="feedback-intro">Share a problem, expected behavior, or an idea that could improve Star Citizen Companion.</p>
+      <p class="feedback-forum-direct"><a class="button-link" data-feedback-forum-link href="#" target="_blank" rel="noopener noreferrer" hidden>Open the Discord feedback forum</a><span>You can also start or continue a report directly in Discord and add more details or images there.</span></p>
       <form class="feedback-form" data-feedback-form>
         <div class="feedback-field-row">
           <label><span>Report type</span>
@@ -684,16 +685,16 @@
         <label><span>Improvement recommendations</span><textarea name="recommendations" rows="4" maxlength="2000" placeholder="How could this feature or experience be improved?"></textarea></label>
         <label class="feedback-images"><span>Images</span><input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple data-feedback-images><small>Attach up to 4 PNG, JPG, WebP, or GIF images. Maximum 8 MB each.</small></label>
         <div class="feedback-previews" data-feedback-previews aria-live="polite"></div>
-        <p class="feedback-status" data-feedback-status>Discord delivery will be enabled after the report channel is configured.</p>
+        <p class="feedback-status" data-feedback-status>Submit here to create a new Discord forum post. You will receive a direct link to continue the conversation.</p>
         <div class="feedback-actions">
           <button type="button" data-feedback-close>Cancel</button>
-          <button type="submit" data-feedback-submit disabled>Submit to Discord</button>
+          <button type="submit" data-feedback-submit>Submit to Discord</button>
         </div>
       </form>
     </section>
   </div>
 
   <script src="/assets/hotfix-overlay.js?v=20260723-inline-wheel" defer></script>
-  <script src="/assets/app.js?v=20260801-mining-permissions-v3-guide-buttons-v2-feedback-v1-warbond-v4" defer></script>
+  <script src="/assets/app.js?v=20260801-mining-permissions-v3-guide-buttons-v2-feedback-v2-warbond-v4" defer></script>
 </body>
 </html>

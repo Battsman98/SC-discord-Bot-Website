@@ -796,6 +796,11 @@ async function loadMe() {
       <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>
       <button type="button" data-feedback-open>Feedback / Report Issue</button>
     </div>`;
+    const feedbackForumLink = document.querySelector("[data-feedback-forum-link]");
+    if (feedbackForumLink && currentUser.feedback_forum_url) {
+      feedbackForumLink.href = currentUser.feedback_forum_url;
+      feedbackForumLink.hidden = false;
+    }
     await loadSavedShips();
     await loadSavedBlueprints();
     await loadInventory();
@@ -1151,6 +1156,7 @@ const feedbackForm = document.querySelector("[data-feedback-form]");
 const feedbackImages = document.querySelector("[data-feedback-images]");
 const feedbackPreviews = document.querySelector("[data-feedback-previews]");
 const feedbackStatus = document.querySelector("[data-feedback-status]");
+const feedbackSubmit = document.querySelector("[data-feedback-submit]");
 let feedbackPreviewUrls = [];
 
 function closeFeedbackModal() {
@@ -1196,6 +1202,18 @@ function renderFeedbackPreviews() {
   });
 }
 
+function setFeedbackStatus(message, forumUrl = "") {
+  if (!feedbackStatus) return;
+  feedbackStatus.textContent = message;
+  if (!forumUrl) return;
+  const link = document.createElement("a");
+  link.href = forumUrl;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Open your Discord forum post";
+  feedbackStatus.append(" ", link);
+}
+
 document.addEventListener("click", (event) => {
   if (event.target.closest("[data-feedback-open]")) openFeedbackModal();
   if (event.target.closest("[data-feedback-close]")) closeFeedbackModal();
@@ -1207,9 +1225,33 @@ document.addEventListener("keydown", (event) => {
 });
 
 feedbackImages?.addEventListener("change", renderFeedbackPreviews);
-feedbackForm?.addEventListener("submit", (event) => {
+feedbackForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (feedbackStatus) feedbackStatus.textContent = "Discord delivery is awaiting channel configuration.";
+  if (!feedbackForm.reportValidity()) return;
+  if (feedbackSubmit) {
+    feedbackSubmit.disabled = true;
+    feedbackSubmit.textContent = "Submitting...";
+  }
+  setFeedbackStatus("Creating your Discord forum post...");
+  try {
+    const response = await fetch("/api/me/feedback", {
+      method: "POST",
+      credentials: "same-origin",
+      body: new FormData(feedbackForm),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || "The report could not be submitted.");
+    feedbackForm.reset();
+    clearFeedbackPreviews();
+    setFeedbackStatus("Report submitted successfully.", payload.forum_url);
+  } catch (error) {
+    setFeedbackStatus(error.message);
+  } finally {
+    if (feedbackSubmit) {
+      feedbackSubmit.disabled = false;
+      feedbackSubmit.textContent = "Submit to Discord";
+    }
+  }
 });
 
 function setChangeAdminVisibility(canManageChanges) {
