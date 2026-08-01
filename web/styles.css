@@ -609,6 +609,74 @@ button:hover, .button-link:hover, .tabs button.active {
   line-height: 1.65;
 }
 
+.support-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 28px;
+  max-width: 1120px;
+  margin: 16px auto 0;
+  border-left: 4px solid var(--accent);
+  background:
+    linear-gradient(110deg, color-mix(in srgb, var(--accent) 10%, transparent), transparent 62%),
+    var(--surface);
+}
+
+.support-copy h2 {
+  margin: 0 0 8px;
+}
+
+.support-copy > p:not(.guide-kicker) {
+  max-width: 760px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.support-copy .support-disclosure {
+  font-size: 0.82rem;
+}
+
+.support-checkout {
+  display: grid;
+  gap: 8px;
+  min-width: 230px;
+  justify-items: stretch;
+  text-align: center;
+}
+
+.support-button {
+  justify-content: center;
+  min-height: 48px;
+  padding-inline: 22px;
+  background: #006aff;
+  border-color: #006aff;
+  color: #fff;
+}
+
+.support-button:hover {
+  background: #0056d6;
+  border-color: #0056d6;
+  color: #fff;
+}
+
+.support-checkout small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 720px) {
+  .support-section {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .support-checkout {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 .guide-hero {
   max-width: 760px;
   margin-bottom: 20px;
