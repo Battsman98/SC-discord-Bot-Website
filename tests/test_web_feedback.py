@@ -1,4 +1,10 @@
-from src.bot import BOT_MANAGER_ROLE_NAME, VISITOR_CHANNEL_SPECS, VISITOR_COMMAND_CHANNELS, build_feedback_template_embed
+from src.bot import (
+    BOT_MANAGER_ROLE_NAME,
+    VISITOR_CHANNEL_SPECS,
+    VISITOR_COMMAND_CHANNELS,
+    build_feedback_template_embed,
+    build_visitor_command_example_embeds,
+)
 from src.web import _feedback_embed
 from src.web_auth import WebUser
 
@@ -52,6 +58,13 @@ def test_visitor_hub_includes_public_bot_and_social_channels() -> None:
     assert VISITOR_COMMAND_CHANNELS["ship"] == "ship-search"
     assert VISITOR_COMMAND_CHANNELS["trade routing"] == "trade-tools"
     assert not any(name.startswith("admin") or name.startswith("audit") for name in VISITOR_COMMAND_CHANNELS)
+
+
+def test_every_visitor_command_channel_has_a_response_example() -> None:
+    examples = build_visitor_command_example_embeds()
+
+    assert set(VISITOR_COMMAND_CHANNELS.values()) <= set(examples)
+    assert all(embed.title and "Example" in embed.title for embed in examples.values())
 
 
 def test_bot_manager_role_name_is_stable_for_discord_and_website_access() -> None:

@@ -287,7 +287,7 @@ class GameAssistBot(commands.Bot):
         await self._run_startup_step("sync command references", self.sync_commands_reference_message)
         await self._run_startup_step("sync Executive Hangar status", self.sync_exec_status_message)
         await self._run_startup_step("sync contested-zone timers", self.sync_cz_timers_message)
-        await self._run_startup_step("sync Visitor timer examples", self.sync_visitor_timer_examples)
+        await self._run_startup_step("sync Visitor command examples", self.sync_visitor_command_examples)
         self._commands_reference_synced = True
 
         if (self.settings.exec_status_channel_id or self.visitor_channels.get("executive-hangar-status")) and self._exec_status_task is None:
@@ -995,18 +995,8 @@ class GameAssistBot(commands.Bot):
         await self.delete_recent_duplicate_embed_messages(channel, "Contested Zone Timers", message.id)
         logging.info("Created CZ timers dashboard message %s", message.id)
 
-    async def sync_visitor_timer_examples(self) -> None:
-        examples = (
-            (
-                "executive-hangar-status",
-                build_exec_example_embed(),
-            ),
-            (
-                "contested-zone-timers",
-                build_cz_example_embed(),
-            ),
-        )
-        for channel_name, embed in examples:
+    async def sync_visitor_command_examples(self) -> None:
+        for channel_name, embed in build_visitor_command_example_embeds().items():
             channel = self.get_channel(self.visitor_channels.get(channel_name, 0))
             if not isinstance(channel, discord.TextChannel):
                 continue
@@ -2635,6 +2625,85 @@ def build_exec_example_embed() -> discord.Embed:
     embed.add_field(name="Try it", value="Use `/exec` in this channel for a private, up-to-date response.", inline=False)
     embed.set_footer(text="The separate Executive Hangar Clock embed in this channel updates automatically.")
     return embed
+
+
+def _visitor_example_embed(
+    title: str,
+    command: str,
+    description: str,
+    fields: tuple[tuple[str, str], ...],
+) -> discord.Embed:
+    embed = discord.Embed(
+        title=title,
+        description=f"**Example command:** `{command}`\n{description}",
+        color=discord.Color.blurple(),
+    )
+    for name, value in fields:
+        embed.add_field(name=name, value=value, inline=False)
+    embed.set_footer(text="Example data only. Run the command for current results.")
+    return embed
+
+
+def build_visitor_command_example_embeds() -> dict[str, discord.Embed]:
+    """Return one durable, realistic response example for every Visitor command channel."""
+    return {
+        "bot-start-here": _visitor_example_embed(
+            "Example /lookup Response",
+            "/lookup query: Port Tressler",
+            "A quick reference result with a concise description and source link.",
+            (("Port Tressler", "Space station above microTech · Stanton system\nIncludes services, shops, and local landing information."),),
+        ),
+        "bot-status": _visitor_example_embed(
+            "Example /status Response",
+            "/status",
+            "Shows whether the bot and its data providers are ready.",
+            (("Bot", "Online"), ("Game data", "Ready · cached results available"), ("Uptime", "2 hours, 18 minutes")),
+        ),
+        "ship-search": _visitor_example_embed(
+            "Example /ship Response",
+            "/ship name: Carrack",
+            "Ship results summarize role, manufacturer, crew, cargo, and useful specifications.",
+            (("Anvil Carrack", "Expedition · Crew 4–6 · Cargo 456 SCU"), ("Key data", "Length 126.5 m · Large hangar · Medical facility"), ("Source", "Current game-data reference link")),
+        ),
+        "trade-tools": _visitor_example_embed(
+            "Example Trade Response",
+            "/trade routing starting_point: Area18 budget: 500000",
+            "Trade tools show an actionable route, commodity, investment, and estimated return.",
+            (("Buy", "Medical Supplies at Area18 · 18.25 aUEC/unit"), ("Sell", "Baijini Point · 19.41 aUEC/unit"), ("Estimate", "Cost 492,750 aUEC · Revenue 524,070 aUEC · Profit 31,320 aUEC"), ("Also available", "`/commodity name: Gold` for market locations and prices")),
+        ),
+        "mining-tools": _visitor_example_embed(
+            "Example /mining Response",
+            "/mining material: Quantanium",
+            "Mining results provide where to search, signature information, and extraction guidance.",
+            (("Best locations", "Lyria · Aaron Halo · microTech moon belts"), ("Scan signature", "High-value volatile mineral; confirm cluster composition before extraction"), ("Handling", "Transport promptly after collection and monitor instability"), ("Community data", "`/miningadd` can submit a verified location")),
+        ),
+        "industry-operations": _visitor_example_embed(
+            "Example Industry Response",
+            "/industry split gross: 1200000 crew: Alex,Bex,Cato expenses: 150000",
+            "Industry tools calculate operation payouts, refinery completion times, and crew briefs.",
+            (("Net payout", "1,050,000 aUEC"), ("Crew shares", "Alex 350,000 · Bex 350,000 · Cato 350,000"), ("Also available", "`/industry refinery` and `/industry brief`")),
+        ),
+        "blueprints-and-missions": _visitor_example_embed(
+            "Example Blueprint & Mission Response",
+            "/blueprint query: Atlas Quantum Drive",
+            "Blueprint results list ownership, category, ingredients, quantities, and related mission acquisition details.",
+            (("Atlas Quantum Drive", "Vehicle component · Size 1 · Blueprint available"), ("Ingredients", "Copper × 12 · Iron × 8 · Tungsten × 4"), ("Mission example", "`/mission query: executive security` shows contractor, objective, location, rewards, and prerequisites")),
+        ),
+        "item-locator": _visitor_example_embed(
+            "Example Item Locator Response",
+            "/item locator query: FS-9 LMG",
+            "Item results identify compatible variants and current purchase locations.",
+            (("FS-9 LMG", "Personal Weapons · Light machine gun"), ("Purchase locations", "CenterMass, Area18 · Live Fire Weapons, Port Tressler"), ("Details", "Price, stock status, manufacturer, size, and source link when available")),
+        ),
+        "inventory-search": _visitor_example_embed(
+            "Example /inventory search Response",
+            "/inventory search item: FS-9 station: Port Tressler",
+            "Searches your imported inventory and returns matching quantities and storage locations.",
+            (("FS-9 LMG × 2", "Port Tressler · Personal Weapons / Weapons"), ("FS-9 Magazine × 14", "Port Tressler · Personal Weapons / Ammunition"), ("Privacy", "Only your linked inventory is searched")),
+        ),
+        "executive-hangar-status": build_exec_example_embed(),
+        "contested-zone-timers": build_cz_example_embed(),
+    }
 
 
 def _format_exec_status(status: ExecHangarStatus) -> str:

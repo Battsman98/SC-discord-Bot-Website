@@ -65,6 +65,8 @@ Set `AUDIT_LOG_CHANNEL_ID` in `.env` to post a remote audit view of command usag
 
 On startup, the bot also creates private `website-changelog` and `discord-changelog` channels under the `audit log` category (`1516295744603164732`). Website deployments are recorded from Render's `RENDER_GIT_COMMIT` (or `COMMIT_SHA` / `GITHUB_SHA`), while Discord channel and role changes are recorded automatically. Bot Managers can read these channels; only the bot can post. Changelog posts are silent and do not mention an owner, role, or `@everyone`.
 
+Every command-focused channel in the Visitor Bot Hub also receives a durable example embed showing the command syntax and representative response data. These examples are refreshed on startup without duplicating posts. The Executive Hangar and Contested Zone channels keep their live auto-updating dashboards alongside their examples.
+
 Set `UEX_API_TOKEN` to the bearer token from your registered UEX API application. The token is used only by the Python backend for documented `api.uexcorp.uk` requests and must not be exposed to browser JavaScript or committed to source control. Mining locations and signatures use the public Star Citizen Wiki API, which does not require a token.
 
 Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive Hangar status message updated every 60 seconds.
