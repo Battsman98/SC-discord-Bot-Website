@@ -1,4 +1,4 @@
-from src.bot import build_feedback_template_embed
+from src.bot import VISITOR_CHANNEL_SPECS, VISITOR_COMMAND_CHANNELS, build_feedback_template_embed
 from src.web import _feedback_embed
 from src.web_auth import WebUser
 
@@ -43,3 +43,11 @@ def test_bot_feedback_template_gives_users_a_complete_example() -> None:
     assert "Getting Started" in fields["Issue / Feedback"]
     assert "Trade guide" in fields["Expected action or result"]
     assert "screenshots" in fields["Helpful attachments"]
+
+
+def test_visitor_hub_includes_public_bot_and_social_channels() -> None:
+    assert VISITOR_CHANNEL_SPECS["general-chat"] == "text"
+    assert VISITOR_CHANNEL_SPECS["visitor-lounge"] == "voice"
+    assert VISITOR_COMMAND_CHANNELS["ship"] == "ship-search"
+    assert VISITOR_COMMAND_CHANNELS["trade routing"] == "trade-tools"
+    assert not any(name.startswith("admin") or name.startswith("audit") for name in VISITOR_COMMAND_CHANNELS)

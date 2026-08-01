@@ -49,6 +49,41 @@ CZ_TIMER_DEFINITIONS = {
 }
 INVENTORY_CHANNEL_ID = 1528623944947597383
 FEEDBACK_TEMPLATE_CACHE_PREFIX = "discord:feedback-template-thread"
+VISITOR_ROLE_NAME = "Visitor"
+VISITOR_CATEGORY_NAME = "Visitor Bot Hub"
+VISITOR_CHANNEL_SPECS = {
+    "bot-start-here": "text",
+    "bot-status": "text",
+    "ship-search": "text",
+    "trade-tools": "text",
+    "mining-tools": "text",
+    "industry-operations": "text",
+    "blueprints-and-missions": "text",
+    "item-locator": "text",
+    "inventory-search": "text",
+    "executive-hangar-status": "text",
+    "contested-zone-timers": "text",
+    "general-chat": "text",
+    "visitor-lounge": "voice",
+}
+VISITOR_COMMAND_CHANNELS = {
+    "status": "bot-status",
+    "lookup": "bot-start-here",
+    "ship": "ship-search",
+    "commodity": "trade-tools",
+    "trade routing": "trade-tools",
+    "mining": "mining-tools",
+    "industry split": "industry-operations",
+    "industry refinery": "industry-operations",
+    "industry brief": "industry-operations",
+    "blueprint": "blueprints-and-missions",
+    "mission": "blueprints-and-missions",
+    "item locator": "item-locator",
+    "item search": "item-locator",
+    "inventory search": "inventory-search",
+    "exec": "executive-hangar-status",
+    "cztimer": "contested-zone-timers",
+}
 
 
 def build_feedback_template_embed() -> discord.Embed:
@@ -109,8 +144,9 @@ class GameAssistCommandTree(app_commands.CommandTree):
             return False
 
         command_name = _interaction_command_name(interaction)
-        allowed_channel_id = _allowed_command_channel_id(bot, command_name)
-        if allowed_channel_id and interaction.channel_id != allowed_channel_id:
+        allowed_channel_ids = bot.allowed_command_channel_ids(command_name)
+        if allowed_channel_ids and interaction.channel_id not in allowed_channel_ids:
+            allowed_channel_id = min(allowed_channel_ids)
             await interaction.response.send_message(
                 f"`/{command_name}` can only be used in <#{allowed_channel_id}>.",
                 ephemeral=True,
@@ -192,6 +228,7 @@ class GameAssistBot(commands.Bot):
         self.started_at_unix = int(discord.utils.utcnow().timestamp())
         self._commands_reference_synced = False
         self.inventory_channel_id: int = INVENTORY_CHANNEL_ID
+        self.visitor_channels: dict[str, int] = {}
         self._exec_status_task: asyncio.Task | None = None
         self._cz_timers_task: asyncio.Task | None = None
         self.command_limiter = SlidingWindowLimiter(
@@ -233,6 +270,7 @@ class GameAssistBot(commands.Bot):
             return
 
         self._commands_reference_synced = True
+        await self.ensure_visitor_access()
         await self.ensure_feedback_forum()
         await self.ensure_inventory_search_channel()
         await self.sync_commands_reference_message()
@@ -243,6 +281,135 @@ class GameAssistBot(commands.Bot):
             self._exec_status_task = asyncio.create_task(self._exec_status_loop())
         if self.settings.cz_timers_channel_id and self._cz_timers_task is None:
             self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
+
+    def allowed_command_channel_ids(self, command_name: str) -> set[int]:
+        ids: set[int] = set()
+        configured = _allowed_command_channel_id(self, command_name)
+        if configured:
+            ids.add(configured)
+        visitor_name = VISITOR_COMMAND_CHANNELS.get(command_name)
+        visitor_id = self.visitor_channels.get(visitor_name or "")
+        if visitor_id:
+            ids.add(visitor_id)
+        return ids
+
+    async def ensure_visitor_access(self) -> None:
+        guild = self.get_guild(self.settings.discord_guild_id or 0)
+        if guild is None:
+            logging.error("Could not resolve the configured guild for Visitor onboarding")
+            return
+        me = guild.me
+        if me is None or not me.guild_permissions.manage_roles or not me.guild_permissions.manage_channels:
+            logging.error("Bot requires Manage Roles and Manage Channels to provision Visitor access")
+            return
+
+        role = discord.utils.find(lambda item: item.name.casefold() == VISITOR_ROLE_NAME.casefold(), guild.roles)
+        if role is None:
+            permissions = discord.Permissions.none()
+            for name in (
+                "view_channel", "send_messages", "send_messages_in_threads", "create_public_threads",
+                "read_message_history", "embed_links", "attach_files", "add_reactions",
+                "use_application_commands", "connect", "speak", "stream",
+            ):
+                setattr(permissions, name, True)
+            role = await guild.create_role(
+                name=VISITOR_ROLE_NAME,
+                permissions=permissions,
+                reason="Website Visitor onboarding",
+            )
+
+        category = discord.utils.find(
+            lambda item: item.name.casefold() == VISITOR_CATEGORY_NAME.casefold(), guild.categories
+        )
+        category_overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            role: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                send_messages_in_threads=True,
+                create_public_threads=True,
+                read_message_history=True,
+                embed_links=True,
+                attach_files=True,
+                add_reactions=True,
+                use_application_commands=True,
+                connect=True,
+                speak=True,
+                stream=True,
+            ),
+            me: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, send_messages_in_threads=True,
+                create_public_threads=True, manage_threads=True, manage_channels=True,
+                read_message_history=True, embed_links=True, attach_files=True,
+            ),
+        }
+        if category is None:
+            category = await guild.create_category(
+                VISITOR_CATEGORY_NAME,
+                overwrites=category_overwrites,
+                reason="Create isolated Visitor bot access",
+            )
+        else:
+            await category.edit(overwrites=category_overwrites, reason="Refresh Visitor category permissions")
+
+        for name, channel_type in VISITOR_CHANNEL_SPECS.items():
+            existing = discord.utils.find(lambda item: item.name == name, category.channels)
+            if existing is None:
+                if channel_type == "voice":
+                    existing = await guild.create_voice_channel(name, category=category, reason="Visitor access channel")
+                else:
+                    existing = await guild.create_text_channel(name, category=category, reason="Visitor bot channel")
+            self.visitor_channels[name] = existing.id
+
+        feedback = self.get_channel(self.settings.feedback_forum_channel_id or 0)
+        if isinstance(feedback, discord.ForumChannel) and (
+            feedback.category_id != category.id or feedback.name != "feedback-and-issues"
+        ):
+            await feedback.edit(
+                name="feedback-and-issues",
+                category=category,
+                sync_permissions=True,
+                reason="Move feedback forum into Visitor hub",
+            )
+
+        allowed_ids = {category.id, *self.visitor_channels.values()}
+        if isinstance(feedback, discord.ForumChannel):
+            allowed_ids.add(feedback.id)
+        for channel in guild.channels:
+            if channel.id in allowed_ids:
+                continue
+            overwrite = channel.overwrites_for(role)
+            if overwrite.view_channel is not False:
+                overwrite.view_channel = False
+                await channel.set_permissions(role, overwrite=overwrite, reason="Isolate Visitor access")
+
+        welcome = self.get_channel(self.visitor_channels.get("bot-start-here", 0))
+        if isinstance(welcome, discord.TextChannel):
+            await self.sync_visitor_welcome(welcome, role)
+
+    async def sync_visitor_welcome(self, channel: discord.TextChannel, role: discord.Role) -> None:
+        cache_key = f"discord:visitor-welcome:{channel.id}"
+        message_id = await self.cache.get(cache_key)
+        embed = discord.Embed(
+            title="Welcome to the Star Citizen Companion Bot Hub",
+            description=(
+                f"Members joining through the website receive the {role.mention} role. "
+                "Use the topic channels for public bot commands, general-chat for conversation, "
+                "and feedback-and-issues for website reports. Administrative tools are not available here."
+            ),
+            color=discord.Color.from_rgb(54, 188, 232),
+        )
+        embed.add_field(name="Getting started", value="Open a topic channel and type `/` to see the available commands.", inline=False)
+        embed.add_field(name="Website", value="https://sccompanion.org", inline=False)
+        message = None
+        if isinstance(message_id, int):
+            with suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                message = await channel.fetch_message(message_id)
+        if message:
+            await message.edit(embed=embed)
+        else:
+            message = await channel.send(embed=embed)
+            await self.cache.set(cache_key, message.id, 315360000)
 
     async def ensure_feedback_forum(self) -> None:
         channel_id = self.settings.feedback_forum_channel_id

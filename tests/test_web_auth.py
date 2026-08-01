@@ -1,5 +1,5 @@
 from src.config import Settings
-from src.web_auth import WebUser, can_manage_admin_commands, can_manage_change_commands, decode_session, encode_session
+from src.web_auth import WebUser, build_discord_authorize_url, can_manage_admin_commands, can_manage_change_commands, decode_session, encode_session
 
 
 def settings(
@@ -67,3 +67,11 @@ def test_session_round_trip() -> None:
 
     assert decoded == user
     assert decode_session(encoded, "wrong-secret") is None
+
+
+def test_discord_authorization_can_join_new_visitors() -> None:
+    url = build_discord_authorize_url(settings(), "state-token")
+
+    assert "guilds.join" in url
+    assert "identify" in url
+    assert "state=state-token" in url

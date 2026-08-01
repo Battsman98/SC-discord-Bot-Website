@@ -19,6 +19,7 @@ ADMINISTRATOR_PERMISSION = 0x8
 SESSION_COOKIE_NAME = "game_assist_session"
 OAUTH_STATE_COOKIE_NAME = "game_assist_oauth_state"
 SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
+VISITOR_ROLE_NAME = "Visitor"
 
 
 @dataclass(frozen=True)
@@ -52,9 +53,8 @@ def build_discord_authorize_url(settings: Settings, state: str) -> str:
         "client_id": settings.discord_client_id,
         "redirect_uri": settings.discord_redirect_uri,
         "response_type": "code",
-        "scope": "identify",
+        "scope": "identify guilds.join",
         "state": state,
-        "prompt": "none",
     }
     query = "&".join(f"{key}={_quote(value)}" for key, value in params.items())
     return f"https://discord.com/oauth2/authorize?{query}"
@@ -90,7 +90,7 @@ async def fetch_web_user(settings: Settings, access_token: str) -> WebUser:
                 raise HTTPException(status_code=401, detail="Could not read Discord user.")
 
         user_id = int(user_payload["id"])
-        member_payload = await _fetch_guild_member(session, settings, user_id)
+        member_payload = await _fetch_or_join_guild_member(session, settings, user_id, access_token)
         role_ids = tuple(int(role_id) for role_id in member_payload.get("roles", []))
         permissions = await _resolve_member_permissions(session, settings, role_ids)
 
@@ -113,10 +113,11 @@ async def fetch_web_user(settings: Settings, access_token: str) -> WebUser:
     )
 
 
-async def _fetch_guild_member(
+async def _fetch_or_join_guild_member(
     session: aiohttp.ClientSession,
     settings: Settings,
     user_id: int,
+    access_token: str,
 ) -> dict[str, Any]:
     async with session.get(
         f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/members/{user_id}",
@@ -124,10 +125,49 @@ async def _fetch_guild_member(
     ) as response:
         payload = await response.json()
         if response.status == 404:
-            raise HTTPException(status_code=403, detail="You are not a member of the configured Discord server.")
+            return await _join_guild_as_visitor(session, settings, user_id, access_token)
         if response.status >= 400:
             raise HTTPException(status_code=403, detail="Could not verify Discord server membership.")
         return payload
+
+
+async def _join_guild_as_visitor(
+    session: aiohttp.ClientSession,
+    settings: Settings,
+    user_id: int,
+    access_token: str,
+) -> dict[str, Any]:
+    headers = {"Authorization": f"Bot {settings.discord_token}"}
+    async with session.get(
+        f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/roles",
+        headers=headers,
+    ) as response:
+        roles = await response.json()
+        if response.status >= 400:
+            raise HTTPException(status_code=503, detail="Could not prepare Visitor access.")
+    visitor_role = next(
+        (role for role in roles if str(role.get("name") or "").strip().casefold() == VISITOR_ROLE_NAME.casefold()),
+        None,
+    )
+    if visitor_role is None:
+        raise HTTPException(status_code=503, detail="Visitor access is still being prepared. Try again shortly.")
+
+    async with session.put(
+        f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/members/{user_id}",
+        headers=headers,
+        json={"access_token": access_token, "roles": [str(visitor_role["id"])]},
+    ) as response:
+        if response.status not in {201, 204}:
+            raise HTTPException(status_code=403, detail="Discord could not add you as a Visitor.")
+
+    async with session.get(
+        f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/members/{user_id}",
+        headers=headers,
+    ) as response:
+        member = await response.json()
+        if response.status >= 400:
+            raise HTTPException(status_code=403, detail="Discord could not confirm Visitor access.")
+        return member
 
 
 async def _resolve_member_permissions(

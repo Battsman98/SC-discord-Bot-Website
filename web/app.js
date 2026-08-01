@@ -778,7 +778,7 @@ async function loadMe() {
     if (!currentUser.authenticated) {
       userPanel.innerHTML = `<div class="user-row">
         <span>${currentUser.discord_auth_enabled ? "Not signed in" : "Discord OAuth needs setup"}</span>
-        <a class="button-link" href="/auth/discord/login">Log in with Discord</a>
+        <a class="button-link" href="/auth/discord/login">Join / Log in with Discord</a>
       </div>`;
       outputs.savedShips.innerHTML = stateMessage("Log in with Discord to save ships to your account.");
       outputs.savedBlueprints.innerHTML = stateMessage("Log in with Discord to save blueprints to your account.");
