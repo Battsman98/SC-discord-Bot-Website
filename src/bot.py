@@ -377,20 +377,41 @@ class GameAssistBot(commands.Bot):
         cache_key = "changelog:last-website-revision"
         if await self.cache.get(cache_key) == revision:
             return
+        summary = await self._deployment_change_summary(revision)
         await self._send_changelog(
             WEBSITE_CHANGELOG_CHANNEL_NAME,
             "Website deployed",
-            f"Revision: `{revision[:12]}`\nEnvironment: `{os.getenv('RENDER_SERVICE_NAME', 'website')}`",
+            f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nEnvironment: `{os.getenv('RENDER_SERVICE_NAME', 'website')}`",
         )
         await self.cache.set(cache_key, revision, 315360000)
+
+    async def _deployment_change_summary(self, revision: str) -> str:
+        """Read the deployed commit subject for a concise website changelog summary."""
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "git",
+                "show",
+                "-s",
+                "--format=%s",
+                revision,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=5)
+            subject = stdout.decode("utf-8", errors="replace").strip()
+            if process.returncode == 0 and subject:
+                return subject if len(subject) <= 300 else f"{subject[:297].rstrip()}..."
+        except (FileNotFoundError, OSError, asyncio.TimeoutError):
+            logging.info("Git commit summary is unavailable for website deployment %s", revision[:12])
+        return "Website code and services were updated to the latest deployed revision."
 
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel) -> None:
         if channel.name in {WEBSITE_CHANGELOG_CHANNEL_NAME, DISCORD_CHANGELOG_CHANNEL_NAME}:
             return
-        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel created", f"Name: `{channel.name}`\nType: `{channel.type}`")
+        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel created", f"A new Discord channel was added.\n\nName: `{channel.name}`\nType: `{channel.type}`")
 
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:
-        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel deleted", f"Name: `{channel.name}`\nType: `{channel.type}`")
+        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel deleted", f"A Discord channel was removed.\n\nName: `{channel.name}`\nType: `{channel.type}`")
 
     async def on_guild_channel_update(self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel) -> None:
         changes = []
@@ -398,13 +419,13 @@ class GameAssistBot(commands.Bot):
             if old != new:
                 changes.append(f"{label}: `{old}` → `{new}`")
         if changes:
-            await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel updated", "\n".join(changes))
+            await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel updated", "Channel settings were changed.\n\n" + "\n".join(changes))
 
     async def on_guild_role_create(self, role: discord.Role) -> None:
-        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role created", f"Role: `{role.name}`")
+        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role created", f"A new Discord role was added.\n\nRole: `{role.name}`")
 
     async def on_guild_role_delete(self, role: discord.Role) -> None:
-        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role deleted", f"Role: `{role.name}`")
+        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role deleted", f"A Discord role was removed.\n\nRole: `{role.name}`")
 
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
         changes = []
@@ -415,7 +436,7 @@ class GameAssistBot(commands.Bot):
         if before.color != after.color:
             changes.append(f"Color: `{before.color}` → `{after.color}`")
         if changes:
-            await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role updated", "\n".join(changes))
+            await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role updated", "Role settings were changed.\n\n" + "\n".join(changes))
 
     def allowed_command_channel_ids(self, command_name: str) -> set[int]:
         ids: set[int] = set()

@@ -63,7 +63,7 @@ Commands not listed in `COMMAND_CHANNEL_IDS` can be used in any channel.
 
 Set `AUDIT_LOG_CHANNEL_ID` in `.env` to post a remote audit view of command usage, blocked command attempts, and manual changes such as Executive Hangar corrections, CZ timer updates, and community mining location additions.
 
-On startup, the bot also creates private `website-changelog` and `discord-changelog` channels under the `audit log` category (`1516295744603164732`). Website deployments are recorded from Render's `RENDER_GIT_COMMIT` (or `COMMIT_SHA` / `GITHUB_SHA`), while Discord channel and role changes are recorded automatically. Bot Managers can read these channels; only the bot can post. Changelog posts are silent and do not mention an owner, role, or `@everyone`.
+On startup, the bot also creates private `website-changelog` and `discord-changelog` channels under the `audit log` category (`1516295744603164732`). Website deployments are recorded from Render's `RENDER_GIT_COMMIT` (or `COMMIT_SHA` / `GITHUB_SHA`) with the deployed commit subject as a brief change description, while Discord channel and role changes include a plain-language summary plus their changed details. Bot Managers can read these channels; only the bot can post. Changelog posts are silent and do not mention an owner, role, or `@everyone`.
 
 Every command-focused channel in the Visitor Bot Hub also receives a durable example embed showing the command syntax and representative response data. These examples are refreshed on startup without duplicating posts. The Executive Hangar and Contested Zone channels keep their live auto-updating dashboards alongside their examples.
 
