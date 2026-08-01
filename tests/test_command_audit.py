@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import discord
 
+from src.config import Settings
 from src.bot import (
     build_inventory_search_embed,
     build_command_channel_directory_embed,
@@ -13,10 +14,19 @@ from src.bot import (
     _format_interaction_options,
     _interaction_command_name,
     _message_embed_matches,
+    _deployment_targets_for_files,
     inventory_group,
     industry_group,
 )
-from src.config import Settings
+
+
+def test_deployment_changelog_targets_match_changed_application() -> None:
+    assert _deployment_targets_for_files(["src/bot.py", "README.md"]) == {"discord-changelog"}
+    assert _deployment_targets_for_files(["src/web.py", "web/app.js"]) == {"website-changelog"}
+    assert _deployment_targets_for_files(["src/bot.py", "web/app.js"]) == {
+        "discord-changelog",
+        "website-changelog",
+    }
 
 
 def test_interaction_command_name_handles_grouped_commands() -> None:

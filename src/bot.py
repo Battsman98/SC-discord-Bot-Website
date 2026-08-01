@@ -95,6 +95,21 @@ VISITOR_COMMAND_CHANNELS = {
 }
 
 
+def _deployment_targets_for_files(files: list[str]) -> set[str]:
+    normalized = {name.replace("\\", "/").lower() for name in files}
+    website = any(
+        name.startswith(("web/", "docs/")) or name in {"src/web.py", "src/web_auth.py"}
+        for name in normalized
+    )
+    discord_bot = "src/bot.py" in normalized or "src/timers.py" in normalized
+    targets: set[str] = set()
+    if website:
+        targets.add(WEBSITE_CHANGELOG_CHANNEL_NAME)
+    if discord_bot:
+        targets.add(DISCORD_CHANGELOG_CHANNEL_NAME)
+    return targets or {WEBSITE_CHANGELOG_CHANNEL_NAME, DISCORD_CHANGELOG_CHANNEL_NAME}
+
+
 def build_feedback_template_embed() -> discord.Embed:
     embed = discord.Embed(
         title="Example: Guide button does not display the selected information",
@@ -281,7 +296,7 @@ class GameAssistBot(commands.Bot):
 
         await self._run_startup_step("create Bot Manager role", self.ensure_bot_manager_role)
         await self._run_startup_step("provision changelog channels", self.ensure_changelog_channels)
-        await self._run_startup_step("record website deployment", self.record_website_deployment)
+        await self._run_startup_step("record deployment changelog", self.record_deployment)
         await self._run_startup_step("provision Visitor hub", self.ensure_visitor_access)
         await self._run_startup_step("refresh Bot Manager channel access", self.ensure_bot_manager_role)
         await self._run_startup_step("prepare feedback forum", self.ensure_feedback_forum)
@@ -372,40 +387,81 @@ class GameAssistBot(commands.Bot):
         )
         await channel.send(embed=embed, silent=True)
 
-    async def record_website_deployment(self) -> None:
+    async def record_deployment(self) -> None:
         revision = next((os.getenv(name, "").strip() for name in ("RENDER_GIT_COMMIT", "COMMIT_SHA", "GITHUB_SHA") if os.getenv(name, "").strip()), "")
         if not revision:
             return
-        cache_key = "changelog:last-website-revision"
-        if await self.cache.get(cache_key) == revision:
+        cache_key = "changelog:last-deployment-revision"
+        previous_revision = await self.cache.get(cache_key)
+        if previous_revision is None:
+            previous_revision = await self.cache.get("changelog:last-website-revision")
+        if previous_revision == revision:
             return
+        if isinstance(previous_revision, str):
+            await self._relocate_misclassified_deployment(previous_revision)
+
         summary = await self._deployment_change_summary(revision)
-        await self._send_changelog(
-            WEBSITE_CHANGELOG_CHANNEL_NAME,
-            "Website deployed",
-            f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nEnvironment: `{os.getenv('RENDER_SERVICE_NAME', 'website')}`",
-        )
+        targets = await self._deployment_targets(revision)
+        for target in targets:
+            application = "Website" if target == WEBSITE_CHANGELOG_CHANNEL_NAME else "Discord bot"
+            await self._send_changelog(
+                target,
+                f"{application} deployed",
+                f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nApplication: `{application}`",
+            )
         await self.cache.set(cache_key, revision, 315360000)
 
-    async def _deployment_change_summary(self, revision: str) -> str:
-        """Read the deployed commit subject for a concise website changelog summary."""
+    async def _deployment_targets(self, revision: str) -> set[str]:
+        files = await self._git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", revision)
+        return _deployment_targets_for_files(files)
+
+    async def _relocate_misclassified_deployment(self, revision: str) -> None:
+        marker_key = f"changelog:deployment-relocated:{revision}"
+        if await self.cache.get(marker_key):
+            return
+        targets = await self._deployment_targets(revision)
+        if targets != {DISCORD_CHANGELOG_CHANNEL_NAME}:
+            await self.cache.set(marker_key, True, 315360000)
+            return
+        website_channel = self.get_channel(self.changelog_channels.get(WEBSITE_CHANGELOG_CHANNEL_NAME, 0))
+        if isinstance(website_channel, discord.TextChannel):
+            async for message in website_channel.history(limit=25):
+                if any(
+                    embed.title == "Website deployed" and revision[:12] in (embed.description or "")
+                    for embed in message.embeds
+                ):
+                    await message.delete(reason="Move Discord-only deployment to the correct changelog")
+                    break
+        summary = await self._deployment_change_summary(revision)
+        await self._send_changelog(
+            DISCORD_CHANGELOG_CHANNEL_NAME,
+            "Discord bot deployed",
+            f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nApplication: `Discord bot`",
+        )
+        await self.cache.set(marker_key, True, 315360000)
+
+    async def _git_lines(self, *arguments: str) -> list[str]:
         try:
             process = await asyncio.create_subprocess_exec(
                 "git",
-                "show",
-                "-s",
-                "--format=%s",
-                revision,
+                *arguments,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
             stdout, _ = await asyncio.wait_for(process.communicate(), timeout=5)
-            subject = stdout.decode("utf-8", errors="replace").strip()
-            if process.returncode == 0 and subject:
-                return subject if len(subject) <= 300 else f"{subject[:297].rstrip()}..."
+            if process.returncode == 0:
+                return [line.strip() for line in stdout.decode("utf-8", errors="replace").splitlines() if line.strip()]
         except (FileNotFoundError, OSError, asyncio.TimeoutError):
-            logging.info("Git commit summary is unavailable for website deployment %s", revision[:12])
-        return "Website code and services were updated to the latest deployed revision."
+            logging.info("Git metadata is unavailable for deployment changelog")
+        return []
+
+    async def _deployment_change_summary(self, revision: str) -> str:
+        """Read the deployed commit subject for a concise changelog summary."""
+        subjects = await self._git_lines("show", "-s", "--format=%s", revision)
+        if subjects:
+            subject = subjects[0]
+            return subject if len(subject) <= 300 else f"{subject[:297].rstrip()}..."
+        return "Application code and services were updated to the latest deployed revision."
 
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel) -> None:
         if channel.name in {WEBSITE_CHANGELOG_CHANNEL_NAME, DISCORD_CHANGELOG_CHANNEL_NAME}:
