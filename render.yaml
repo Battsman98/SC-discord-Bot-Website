@@ -19,6 +19,8 @@ services:
         value: /var/data/bot.sqlite3
       - key: DISCORD_TOKEN
         sync: false
+      - key: UEX_API_TOKEN
+        sync: false
       - key: DISCORD_CLIENT_ID
         sync: false
       - key: DISCORD_CLIENT_SECRET

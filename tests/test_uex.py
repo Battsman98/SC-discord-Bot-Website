@@ -68,6 +68,52 @@ def test_parse_commodity_orders_buy_and_sell_markets() -> None:
     assert result.sell_to[0].location == "Mining Outpost"
 
 
+def test_parse_wiki_mining_locations_groups_documented_api_data() -> None:
+    source = UEXSource.__new__(UEXSource)
+    result = source._parse_wiki_mining_location_result(
+        {"name": "Agricium (Ore)", "code": "AGRI", "kind": "Metal", "price_sell": 2700},
+        {
+            "name": "Agricium (Ore)",
+            "signature": 4000,
+            "web_url": "https://api.star-citizen.wiki/commodities/agricium-ore",
+            "locations": [
+                {"name": "ARC L3", "system": "Stanton System", "type": "Asteroid", "resources": []},
+                {"name": "Daymar", "system": "Stanton System", "type": "Moon", "resources": []},
+                {"name": "Terminus", "system": "Pyro System", "type": "Planet", "resources": []},
+                {"name": "Aaron Halo", "system": "Stanton System", "type": "Asteroid", "resources": []},
+                {"name": "Stanton", "system": "Stanton System", "type": "Star", "resources": []},
+            ],
+        },
+        None,
+    )
+
+    assert result.systems == ["Pyro", "Stanton"]
+    assert result.lagrange_points == ["ARC L3"]
+    assert result.planets == ["Terminus"]
+    assert result.moons == ["Daymar"]
+    assert result.points_of_interest == ["Aaron Halo"]
+    assert result.rock_signatures == [4000]
+    assert result.source_name == "UEX + Star Citizen Wiki API"
+
+
+def test_parse_wiki_mining_locations_applies_system_filter() -> None:
+    source = UEXSource.__new__(UEXSource)
+    result = source._parse_wiki_mining_location_result(
+        {"name": "Gold (Ore)"},
+        {
+            "locations": [
+                {"name": "Daymar", "system": "Stanton System", "type": "Moon"},
+                {"name": "Terminus", "system": "Pyro System", "type": "Planet"},
+            ]
+        },
+        "PY",
+    )
+
+    assert result.systems == ["Pyro"]
+    assert result.planets == ["Terminus"]
+    assert result.moons == []
+
+
 def test_parse_commodity_lists_sell_only_commodities_as_sell_locations() -> None:
     source = UEXSource.__new__(UEXSource)
     result = source._parse_commodity(

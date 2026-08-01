@@ -30,6 +30,7 @@ def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUDIT_LOG_CHANNEL_ID", "444")
     monkeypatch.setenv("COMMAND_CHANNEL_IDS", "ship:100,trade routing=200;/item locator:300")
     monkeypatch.setenv("CACHE_TTL_SECONDS", "60")
+    monkeypatch.setenv("UEX_API_TOKEN", "uex-test-token")
 
     settings = Settings.from_env(load_env_file=False)
 
@@ -48,3 +49,4 @@ def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "item locator": 300,
     }
     assert settings.cache_ttl_seconds == 60
+    assert settings.uex_api_token == "uex-test-token"
