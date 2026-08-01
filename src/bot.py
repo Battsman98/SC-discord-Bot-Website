@@ -2,6 +2,8 @@ import logging
 import asyncio
 import os
 import re
+import time
+from contextlib import suppress
 from pathlib import Path
 
 import discord
@@ -74,6 +76,31 @@ VISITOR_CHANNEL_SPECS = {
     "general-chat": "text",
     "visitor-lounge": "voice",
 }
+VISITOR_CHANNEL_TOPICS = {
+    "bot-start-here": "Start here for Discord Bot Hub guidance and quick lookup commands.",
+    "bot-commands": "Permanent command directory for the Star Citizen Companion bot.",
+    "bot-status": "Check bot availability and connected data-provider health.",
+    "ship-search": "Search Star Citizen ships and vehicles with /ship.",
+    "trade-tools": "Commodity prices and trade-route planning commands.",
+    "mining-tools": "Mining material locations, scanning guidance, and community submissions.",
+    "industry-operations": "Crew splits, refinery orders, and operation briefs.",
+    "blueprints-and-missions": "Blueprint ownership, ingredients, and mission information.",
+    "item-locator": "Find in-game items and current purchase locations.",
+    "inventory-search": "Search your linked Star Citizen inventory.",
+    "executive-hangar-status": "Live Executive Hangar clock and command example.",
+    "contested-zone-timers": "Persistent contested-zone timer dashboard.",
+    "general-chat": "General conversation for Discord Bot Hub visitors.",
+}
+FEEDBACK_FORUM_TOPIC = "Submit website feedback, bug reports, screenshots, and reproducible examples."
+HUB_PROTECTED_ROLE_NAMES = {VISITOR_ROLE_NAME, BOT_MANAGER_ROLE_NAME}
+HUB_RECOVERY_COOLDOWN_SECONDS = 10
+HUB_PERMANENT_MESSAGE_PREFIXES = (
+    "discord:visitor-welcome",
+    "discord:visitor-example",
+    "discord:commands-reference-message",
+    "discord:exec-status-message",
+    "discord:cz-timers-message",
+)
 VISITOR_COMMAND_CHANNELS = {
     "status": "bot-status",
     "lookup": "bot-start-here",
@@ -93,6 +120,40 @@ VISITOR_COMMAND_CHANNELS = {
     "exec": "executive-hangar-status",
     "cztimer": "contested-zone-timers",
 }
+
+
+def _hub_role_permissions(role_name: str) -> discord.Permissions:
+    permissions = discord.Permissions.none()
+    common = (
+        "view_channel", "send_messages", "send_messages_in_threads", "read_message_history",
+        "embed_links", "attach_files", "add_reactions", "use_application_commands",
+    )
+    visitor_extra = ("create_public_threads", "connect", "speak", "stream")
+    for name in common + (visitor_extra if role_name == VISITOR_ROLE_NAME else ()):
+        setattr(permissions, name, True)
+    return permissions
+
+
+def _hub_category_overwrites(
+    guild: discord.Guild,
+    visitor_role: discord.Role,
+    bot_member: discord.Member,
+) -> dict[discord.Role | discord.Member, discord.PermissionOverwrite]:
+    public_access = discord.PermissionOverwrite(
+        view_channel=True, send_messages=True, send_messages_in_threads=True,
+        create_public_threads=True, read_message_history=True, embed_links=True,
+        attach_files=True, add_reactions=True, use_application_commands=True,
+        connect=True, speak=True, stream=True,
+    )
+    return {
+        guild.default_role: public_access,
+        visitor_role: public_access,
+        bot_member: discord.PermissionOverwrite(
+            view_channel=True, send_messages=True, send_messages_in_threads=True,
+            create_public_threads=True, manage_threads=True, manage_channels=True,
+            read_message_history=True, embed_links=True, attach_files=True,
+        ),
+    }
 
 
 def _deployment_targets_for_files(files: list[str]) -> set[str]:
@@ -253,9 +314,15 @@ class GameAssistBot(commands.Bot):
         self._commands_reference_synced = False
         self.inventory_channel_id: int = INVENTORY_CHANNEL_ID
         self.visitor_channels: dict[str, int] = {}
+        self.visitor_category_id: int | None = None
+        self.hub_role_ids: dict[str, int] = {}
         self.changelog_channels: dict[str, int] = {}
         self._exec_status_task: asyncio.Task | None = None
         self._cz_timers_task: asyncio.Task | None = None
+        self._hub_recovery_task: asyncio.Task | None = None
+        self._hub_last_recovery_monotonic = 0.0
+        self._hub_incident_count = 0
+        self._hub_pending_incident: tuple[str, discord.AuditLogAction | None, int | None] | None = None
         self.command_limiter = SlidingWindowLimiter(
             settings.discord_rate_limit_per_10_seconds, 10
         )
@@ -470,6 +537,220 @@ class GameAssistBot(commands.Bot):
 
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:
         await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel deleted", f"A Discord channel was removed.\n\nName: `{channel.name}`\nType: `{channel.type}`")
+        if self._is_discord_bot_hub_channel(channel):
+            self._schedule_hub_recovery(
+                f"deleted channel {channel.name}", discord.AuditLogAction.channel_delete, channel.id
+            )
+
+    def _is_discord_bot_hub_channel(self, channel: discord.abc.GuildChannel) -> bool:
+        if self.settings.discord_guild_id and channel.guild.id != self.settings.discord_guild_id:
+            return False
+        if channel.id == self.visitor_category_id or channel.id in self.visitor_channels.values():
+            return True
+        if isinstance(channel, discord.CategoryChannel):
+            return channel.name.casefold() == VISITOR_CATEGORY_NAME.casefold()
+        return bool(
+            channel.category
+            and channel.category.name.casefold() == VISITOR_CATEGORY_NAME.casefold()
+        )
+
+    def _schedule_hub_recovery(
+        self,
+        reason: str,
+        audit_action: discord.AuditLogAction | None = None,
+        target_id: int | None = None,
+    ) -> None:
+        self._hub_incident_count += 1
+        self._hub_pending_incident = (reason, audit_action, target_id)
+        if self._hub_recovery_task is not None and not self._hub_recovery_task.done():
+            return
+        self._hub_recovery_task = asyncio.create_task(self._recover_discord_bot_hub())
+
+    async def _recover_discord_bot_hub(self) -> None:
+        # Discord emits a burst of child deletion events when a category is removed.
+        # Debouncing and a cooldown prevent a deletion loop from flooding Discord.
+        wait_seconds = max(
+            1.0,
+            self._hub_last_recovery_monotonic + HUB_RECOVERY_COOLDOWN_SECONDS - time.monotonic(),
+        )
+        await asyncio.sleep(wait_seconds)
+        reason, audit_action, target_id = self._hub_pending_incident or ("hub integrity check", None, None)
+        incident_count = self._hub_incident_count
+        self._hub_pending_incident = None
+        self._hub_incident_count = 0
+        logging.warning("Restoring protected Discord Bot Hub content after %s", reason)
+        await self._restore_hub_components()
+        self._hub_last_recovery_monotonic = time.monotonic()
+        actor = await self._find_hub_incident_actor(audit_action, target_id)
+        fields: dict[str, object] = {
+            "Scope": VISITOR_CATEGORY_NAME,
+            "Trigger": reason,
+            "Events grouped": incident_count,
+            "Actor": actor or "Unavailable (bot needs View Audit Log)",
+            "Result": "Protected hub configuration and permanent messages restored",
+        }
+        await self.log_audit_event("Discord Bot Hub failsafe activated", fields, color=discord.Color.red())
+        await self._send_changelog(
+            DISCORD_CHANGELOG_CHANNEL_NAME,
+            "Discord Bot Hub restored",
+            "\n".join(f"**{name}:** {value}" for name, value in fields.items()),
+        )
+
+    async def _restore_hub_components(self) -> None:
+        await self._run_startup_step("restore Discord Bot Hub channels", self.ensure_visitor_access)
+        await self._run_startup_step("restore feedback forum", self.ensure_feedback_forum)
+        await self._run_startup_step("restore command references", self.sync_commands_reference_message)
+        await self._run_startup_step("restore command examples", self.sync_visitor_command_examples)
+        await self._run_startup_step("restore Executive Hangar status", self.sync_exec_status_message)
+        await self._run_startup_step("restore contested-zone timers", self.sync_cz_timers_message)
+        await self._run_startup_step("refresh Bot Manager access", self.ensure_bot_manager_role)
+
+    async def _find_hub_incident_actor(
+        self,
+        action: discord.AuditLogAction | None,
+        target_id: int | None,
+    ) -> str | None:
+        guild = self.get_guild(self.settings.discord_guild_id or 0)
+        if guild is None or guild.me is None or not guild.me.guild_permissions.view_audit_log:
+            return None
+        try:
+            async for entry in guild.audit_logs(limit=10, action=action):
+                entry_target_id = getattr(entry.target, "id", None)
+                if target_id is not None and entry_target_id not in (None, target_id):
+                    continue
+                return f"{entry.user} ({entry.user.id})"
+        except (discord.Forbidden, discord.HTTPException):
+            logging.info("Could not inspect the Discord audit log for a hub incident")
+        return None
+
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent) -> None:
+        if payload.guild_id != self.settings.discord_guild_id:
+            return
+        if not await self._is_protected_hub_message(payload.channel_id, payload.message_id):
+            return
+        self._schedule_hub_recovery(
+            f"deleted permanent message {payload.message_id}",
+            discord.AuditLogAction.message_delete,
+            None,
+        )
+
+    async def on_raw_bulk_message_delete(self, payload: discord.RawBulkMessageDeleteEvent) -> None:
+        if payload.guild_id != self.settings.discord_guild_id:
+            return
+        for message_id in payload.message_ids:
+            if await self._is_protected_hub_message(payload.channel_id, message_id):
+                self._schedule_hub_recovery(
+                    "bulk-deleted permanent hub messages",
+                    discord.AuditLogAction.message_bulk_delete,
+                    None,
+                )
+                return
+
+    async def _is_protected_hub_message(self, channel_id: int, message_id: int) -> bool:
+        if channel_id not in self.visitor_channels.values():
+            return False
+        keys = tuple(f"{prefix}:{channel_id}" for prefix in HUB_PERMANENT_MESSAGE_PREFIXES)
+        for key in keys:
+            stored = await self.cache.get(key)
+            if stored == message_id or isinstance(stored, list) and message_id in stored:
+                return True
+        return False
+
+    async def inspect_discord_bot_hub(self) -> list[str]:
+        guild = self.get_guild(self.settings.discord_guild_id or 0)
+        if guild is None:
+            return ["Configured Discord server is unavailable"]
+        issues: list[str] = []
+        category = guild.get_channel(self.visitor_category_id or 0)
+        if not isinstance(category, discord.CategoryChannel) or category.name != VISITOR_CATEGORY_NAME:
+            issues.append("Discord Bot Hub category is missing or renamed")
+            category = discord.utils.find(lambda item: item.name == VISITOR_CATEGORY_NAME, guild.categories)
+
+        roles: dict[str, discord.Role] = {}
+        for role_name in HUB_PROTECTED_ROLE_NAMES:
+            role = guild.get_role(self.hub_role_ids.get(role_name, 0))
+            if role is None:
+                role = discord.utils.find(lambda item: item.name == role_name, guild.roles)
+            if role is None:
+                issues.append(f"{role_name} role is missing")
+            elif (
+                role.permissions != _hub_role_permissions(role_name)
+                or role.colour != discord.Colour.default()
+                or role.hoist
+                or role.mentionable
+            ):
+                issues.append(f"{role_name} role settings were changed")
+                roles[role_name] = role
+            else:
+                roles[role_name] = role
+
+        visitor_role = roles.get(VISITOR_ROLE_NAME)
+        if (
+            isinstance(category, discord.CategoryChannel)
+            and visitor_role is not None
+            and guild.me is not None
+            and category.overwrites != _hub_category_overwrites(guild, visitor_role, guild.me)
+        ):
+            issues.append("Discord Bot Hub category permissions were changed")
+
+        for name, channel_type in VISITOR_CHANNEL_SPECS.items():
+            channel = guild.get_channel(self.visitor_channels.get(name, 0))
+            expected_type = discord.ChannelType.voice if channel_type == "voice" else discord.ChannelType.text
+            if channel is None or channel.name != name or channel.type != expected_type:
+                issues.append(f"#{name} is missing, renamed, or has the wrong type")
+            elif category is None or channel.category_id != category.id:
+                issues.append(f"#{name} is outside Discord Bot Hub")
+            elif not channel.permissions_synced:
+                issues.append(f"#{name} permissions are not synchronized with Discord Bot Hub")
+            elif isinstance(channel, discord.TextChannel) and channel.topic != VISITOR_CHANNEL_TOPICS.get(name):
+                issues.append(f"#{name} topic was changed")
+
+        forum = guild.get_channel(self.visitor_channels.get("feedback-and-issues", 0))
+        if not isinstance(forum, discord.ForumChannel) or forum.name != "feedback-and-issues":
+            issues.append("feedback-and-issues forum is missing or changed")
+        elif category is None or forum.category_id != category.id:
+            issues.append("feedback-and-issues is outside Discord Bot Hub")
+        elif not forum.permissions_synced:
+            issues.append("feedback-and-issues permissions are not synchronized with Discord Bot Hub")
+        elif forum.topic != FEEDBACK_FORUM_TOPIC:
+            issues.append("feedback-and-issues topic was changed")
+
+        for channel_id in set(self.visitor_channels.values()):
+            channel = guild.get_channel(channel_id)
+            if not isinstance(channel, discord.abc.Messageable) or not hasattr(channel, "fetch_message"):
+                continue
+            for prefix in HUB_PERMANENT_MESSAGE_PREFIXES:
+                stored = await self.cache.get(f"{prefix}:{channel_id}")
+                message_ids = stored if isinstance(stored, list) else [stored] if isinstance(stored, int) else []
+                for message_id in message_ids:
+                    try:
+                        await channel.fetch_message(message_id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        issues.append(f"Permanent bot message {message_id} is missing from <#{channel_id}>")
+        if isinstance(forum, discord.ForumChannel):
+            template_id = await self.cache.get(f"{FEEDBACK_TEMPLATE_CACHE_PREFIX}:{forum.id}")
+            if isinstance(template_id, int):
+                try:
+                    template = self.get_channel(template_id) or await self.fetch_channel(template_id)
+                    if not isinstance(template, discord.Thread):
+                        issues.append("Feedback example thread is missing")
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    issues.append("Feedback example thread is missing")
+        return issues
+
+    async def on_raw_thread_delete(self, payload: discord.RawThreadDeleteEvent) -> None:
+        if payload.guild_id != self.settings.discord_guild_id:
+            return
+        forum_id = self.visitor_channels.get("feedback-and-issues") or self.settings.feedback_forum_channel_id
+        if forum_id != payload.parent_id:
+            return
+        stored = await self.cache.get(f"{FEEDBACK_TEMPLATE_CACHE_PREFIX}:{forum_id}")
+        if stored == payload.thread_id:
+            self._schedule_hub_recovery(
+                f"deleted feedback template {payload.thread_id}",
+                discord.AuditLogAction.thread_delete,
+                payload.thread_id,
+            )
 
     async def on_guild_channel_update(self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel) -> None:
         changes = []
@@ -478,12 +759,20 @@ class GameAssistBot(commands.Bot):
                 changes.append(f"{label}: `{old}` → `{new}`")
         if changes:
             await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel updated", "Channel settings were changed.\n\n" + "\n".join(changes))
+        if self._is_discord_bot_hub_channel(before) or self._is_discord_bot_hub_channel(after):
+            self._schedule_hub_recovery(
+                f"modified channel {before.name}", discord.AuditLogAction.channel_update, after.id
+            )
 
     async def on_guild_role_create(self, role: discord.Role) -> None:
         await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role created", f"A new Discord role was added.\n\nRole: `{role.name}`")
 
     async def on_guild_role_delete(self, role: discord.Role) -> None:
         await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role deleted", f"A Discord role was removed.\n\nRole: `{role.name}`")
+        if role.name in HUB_PROTECTED_ROLE_NAMES or role.id in self.hub_role_ids.values():
+            self._schedule_hub_recovery(
+                f"deleted protected role {role.name}", discord.AuditLogAction.role_delete, role.id
+            )
 
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
         changes = []
@@ -495,6 +784,14 @@ class GameAssistBot(commands.Bot):
             changes.append(f"Color: `{before.color}` → `{after.color}`")
         if changes:
             await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role updated", "Role settings were changed.\n\n" + "\n".join(changes))
+        if (
+            before.name in HUB_PROTECTED_ROLE_NAMES
+            or after.name in HUB_PROTECTED_ROLE_NAMES
+            or after.id in self.hub_role_ids.values()
+        ):
+            self._schedule_hub_recovery(
+                f"modified protected role {before.name}", discord.AuditLogAction.role_update, after.id
+            )
 
     def allowed_command_channel_ids(self, command_name: str) -> set[int]:
         visitor_name = VISITOR_COMMAND_CHANNELS.get(command_name)
@@ -514,59 +811,39 @@ class GameAssistBot(commands.Bot):
             logging.error("Bot requires Manage Roles and Manage Channels to provision Visitor access")
             return
 
-        role = discord.utils.find(lambda item: item.name.casefold() == VISITOR_ROLE_NAME.casefold(), guild.roles)
+        role = guild.get_role(self.hub_role_ids.get(VISITOR_ROLE_NAME, 0))
         if role is None:
-            permissions = discord.Permissions.none()
-            for name in (
-                "view_channel", "send_messages", "send_messages_in_threads", "create_public_threads",
-                "read_message_history", "embed_links", "attach_files", "add_reactions",
-                "use_application_commands", "connect", "speak", "stream",
-            ):
-                setattr(permissions, name, True)
+            role = discord.utils.find(lambda item: item.name.casefold() == VISITOR_ROLE_NAME.casefold(), guild.roles)
+        expected_role_permissions = _hub_role_permissions(VISITOR_ROLE_NAME)
+        if role is None:
             role = await guild.create_role(
                 name=VISITOR_ROLE_NAME,
-                permissions=permissions,
+                permissions=expected_role_permissions,
                 reason="Website Visitor onboarding",
             )
+        elif (
+            role.name != VISITOR_ROLE_NAME
+            or role.permissions != expected_role_permissions
+            or role.colour != discord.Colour.default()
+            or role.hoist
+            or role.mentionable
+        ):
+            await role.edit(
+                name=VISITOR_ROLE_NAME,
+                permissions=expected_role_permissions,
+                colour=discord.Colour.default(),
+                hoist=False,
+                mentionable=False,
+                reason="Restore Discord Bot Hub role settings",
+            )
+        self.hub_role_ids[VISITOR_ROLE_NAME] = role.id
 
-        category = discord.utils.find(
-            lambda item: item.name.casefold() == VISITOR_CATEGORY_NAME.casefold(), guild.categories
-        )
-        category_overwrites = {
-            guild.default_role: discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                send_messages_in_threads=True,
-                create_public_threads=True,
-                read_message_history=True,
-                embed_links=True,
-                attach_files=True,
-                add_reactions=True,
-                use_application_commands=True,
-                connect=True,
-                speak=True,
-                stream=True,
-            ),
-            role: discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                send_messages_in_threads=True,
-                create_public_threads=True,
-                read_message_history=True,
-                embed_links=True,
-                attach_files=True,
-                add_reactions=True,
-                use_application_commands=True,
-                connect=True,
-                speak=True,
-                stream=True,
-            ),
-            me: discord.PermissionOverwrite(
-                view_channel=True, send_messages=True, send_messages_in_threads=True,
-                create_public_threads=True, manage_threads=True, manage_channels=True,
-                read_message_history=True, embed_links=True, attach_files=True,
-            ),
-        }
+        category = guild.get_channel(self.visitor_category_id or 0)
+        if not isinstance(category, discord.CategoryChannel):
+            category = discord.utils.find(
+                lambda item: item.name.casefold() == VISITOR_CATEGORY_NAME.casefold(), guild.categories
+            )
+        category_overwrites = _hub_category_overwrites(guild, role, me)
         if category is None:
             category = await guild.create_category(
                 VISITOR_CATEGORY_NAME,
@@ -574,33 +851,56 @@ class GameAssistBot(commands.Bot):
                 reason="Create isolated Visitor bot access",
             )
         else:
-            await category.edit(overwrites=category_overwrites, reason="Refresh Visitor category permissions")
+            await category.edit(
+                name=VISITOR_CATEGORY_NAME,
+                overwrites=category_overwrites,
+                reason="Restore Discord Bot Hub category settings",
+            )
+        self.visitor_category_id = category.id
 
         await self._remove_legacy_visitor_categories(guild, category)
 
         for name, channel_type in VISITOR_CHANNEL_SPECS.items():
-            existing = discord.utils.find(lambda item: item.name == name, category.channels)
+            existing = guild.get_channel(self.visitor_channels.get(name, 0))
+            expected_type = discord.ChannelType.voice if channel_type == "voice" else discord.ChannelType.text
+            if existing is None or existing.type != expected_type:
+                existing = discord.utils.find(
+                    lambda item: item.name == name and item.type == expected_type, category.channels
+                )
             if existing is None:
                 if channel_type == "voice":
                     existing = await guild.create_voice_channel(name, category=category, reason="Visitor access channel")
                 else:
-                    existing = await guild.create_text_channel(name, category=category, reason="Visitor bot channel")
+                    existing = await guild.create_text_channel(
+                        name,
+                        category=category,
+                        topic=VISITOR_CHANNEL_TOPICS.get(name),
+                        reason="Visitor bot channel",
+                    )
             else:
-                await existing.edit(
-                    category=category,
-                    sync_permissions=True,
-                    reason="Allow everyone to use Discord Bot Hub",
-                )
+                changes = {
+                    "name": name,
+                    "category": category,
+                    "sync_permissions": True,
+                    "reason": "Restore Discord Bot Hub channel settings",
+                }
+                if isinstance(existing, discord.TextChannel):
+                    changes["topic"] = VISITOR_CHANNEL_TOPICS.get(name)
+                await existing.edit(**changes)
             self.visitor_channels[name] = existing.id
 
-        feedback = self.get_channel(self.settings.feedback_forum_channel_id or 0)
+        feedback = discord.utils.find(lambda item: item.name == "feedback-and-issues", category.channels)
+        if feedback is None:
+            feedback = self.get_channel(self.settings.feedback_forum_channel_id or 0)
         if isinstance(feedback, discord.ForumChannel):
             await feedback.edit(
                 name="feedback-and-issues",
                 category=category,
+                topic=FEEDBACK_FORUM_TOPIC,
                 sync_permissions=True,
                 reason="Move feedback forum into Visitor hub",
             )
+            self.visitor_channels["feedback-and-issues"] = feedback.id
 
         await self.remove_legacy_star_citizen_bot_channels(guild)
 
@@ -708,19 +1008,32 @@ class GameAssistBot(commands.Bot):
             logging.error("Bot requires Manage Roles and Manage Channels to provision Bot Manager")
             return
 
-        role = discord.utils.find(lambda item: item.name.casefold() == BOT_MANAGER_ROLE_NAME.casefold(), guild.roles)
+        role = guild.get_role(self.hub_role_ids.get(BOT_MANAGER_ROLE_NAME, 0))
         if role is None:
-            permissions = discord.Permissions.none()
-            for name in (
-                "view_channel", "send_messages", "send_messages_in_threads", "read_message_history",
-                "embed_links", "attach_files", "add_reactions", "use_application_commands",
-            ):
-                setattr(permissions, name, True)
+            role = discord.utils.find(lambda item: item.name.casefold() == BOT_MANAGER_ROLE_NAME.casefold(), guild.roles)
+        expected_role_permissions = _hub_role_permissions(BOT_MANAGER_ROLE_NAME)
+        if role is None:
             role = await guild.create_role(
                 name=BOT_MANAGER_ROLE_NAME,
-                permissions=permissions,
+                permissions=expected_role_permissions,
                 reason="Create website and Discord bot management role",
             )
+        elif (
+            role.name != BOT_MANAGER_ROLE_NAME
+            or role.permissions != expected_role_permissions
+            or role.colour != discord.Colour.default()
+            or role.hoist
+            or role.mentionable
+        ):
+            await role.edit(
+                name=BOT_MANAGER_ROLE_NAME,
+                permissions=expected_role_permissions,
+                colour=discord.Colour.default(),
+                hoist=False,
+                mentionable=False,
+                reason="Restore Discord Bot Hub manager role",
+            )
+        self.hub_role_ids[BOT_MANAGER_ROLE_NAME] = role.id
 
         bot_channel_ids = {
             INVENTORY_CHANNEL_ID,
@@ -758,20 +1071,49 @@ class GameAssistBot(commands.Bot):
         logging.info("Bot Manager role %s is ready", role.id)
 
     async def ensure_feedback_forum(self) -> None:
-        channel_id = self.settings.feedback_forum_channel_id
-        if not channel_id:
-            return
+        channel_id = self.visitor_channels.get("feedback-and-issues") or self.settings.feedback_forum_channel_id
+        channel = self.get_channel(channel_id or 0)
         try:
-            channel = self.get_channel(channel_id) or await self.fetch_channel(channel_id)
+            if channel is None and channel_id:
+                channel = await self.fetch_channel(channel_id)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            logging.exception("Could not access feedback forum %s", channel_id)
-            return
+            channel = None
+        if channel is None:
+            guild = self.get_guild(self.settings.discord_guild_id or 0)
+            category = discord.utils.find(
+                lambda item: item.name.casefold() == VISITOR_CATEGORY_NAME.casefold(),
+                guild.categories if guild else [],
+            )
+            if guild is None or category is None or guild.me is None or not guild.me.guild_permissions.manage_channels:
+                logging.error("Could not restore feedback forum %s", channel_id)
+                return
+            channel = await guild.create_forum(
+                "feedback-and-issues",
+                category=category,
+                topic=FEEDBACK_FORUM_TOPIC,
+                reason="Restore protected Discord Bot Hub forum",
+            )
+            channel_id = channel.id
         if not isinstance(channel, discord.ForumChannel):
             logging.error("FEEDBACK_FORUM_CHANNEL_ID %s is not a Discord forum channel", channel_id)
             return
+        self.visitor_channels["feedback-and-issues"] = channel.id
         if self.settings.discord_guild_id and channel.guild.id != self.settings.discord_guild_id:
             logging.error("FEEDBACK_FORUM_CHANNEL_ID %s is not in the configured guild", channel_id)
             return
+        category = channel.guild.get_channel(self.visitor_category_id or 0)
+        if isinstance(category, discord.CategoryChannel) and (
+            channel.name != "feedback-and-issues"
+            or channel.category_id != category.id
+            or channel.topic != FEEDBACK_FORUM_TOPIC
+        ):
+            await channel.edit(
+                name="feedback-and-issues",
+                category=category,
+                topic=FEEDBACK_FORUM_TOPIC,
+                sync_permissions=True,
+                reason="Restore Discord Bot Hub feedback forum settings",
+            )
 
         member = channel.guild.me
         if member is None:
@@ -1220,6 +1562,8 @@ class GameAssistBot(commands.Bot):
             self._exec_status_task.cancel()
         if self._cz_timers_task:
             self._cz_timers_task.cancel()
+        if self._hub_recovery_task:
+            self._hub_recovery_task.cancel()
         await self.sources.close()
         await self.cache.close()
         await super().close()
@@ -2624,6 +2968,58 @@ async def admin_health_command(interaction: discord.Interaction) -> None:
 
     embed = build_admin_health_embed(bot)
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@admin_group.command(name="hub-health", description="Check protected Discord Bot Hub components.")
+async def admin_hub_health_command(interaction: discord.Interaction) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    if not _can_manage_admin_commands(interaction, bot.settings):
+        await interaction.response.send_message("You do not have permission to inspect the bot hub.", ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+    issues = await bot.inspect_discord_bot_hub()
+    embed = discord.Embed(
+        title="Discord Bot Hub - Integrity Check",
+        description=(
+            "All protected components are healthy."
+            if not issues
+            else "The following issues need repair:\n" + "\n".join(f"• {issue}" for issue in issues[:20])
+        ),
+        color=discord.Color.green() if not issues else discord.Color.orange(),
+        timestamp=discord.utils.utcnow(),
+    )
+    await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@admin_group.command(name="hub-repair", description="Repair protected Discord Bot Hub components now.")
+async def admin_hub_repair_command(interaction: discord.Interaction) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    if not _can_manage_admin_commands(interaction, bot.settings):
+        await interaction.response.send_message("You do not have permission to repair the bot hub.", ephemeral=True)
+        return
+    await interaction.response.defer(ephemeral=True)
+    before = await bot.inspect_discord_bot_hub()
+    await bot._restore_hub_components()
+    after = await bot.inspect_discord_bot_hub()
+    await bot.log_audit_event(
+        "Discord Bot Hub manual repair",
+        {
+            "User": _audit_user(interaction.user),
+            "Issues before": len(before),
+            "Issues after": len(after),
+            "Scope": VISITOR_CATEGORY_NAME,
+        },
+    )
+    result = "Repair completed; all protected components are healthy." if not after else (
+        f"Repair completed, but {len(after)} issue(s) remain. Check `/admin hub-health`."
+    )
+    await interaction.followup.send(result, ephemeral=True)
 
 
 audit_group = app_commands.Group(name="audit", description="Audit log commands.")

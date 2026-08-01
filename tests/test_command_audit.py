@@ -15,6 +15,8 @@ from src.bot import (
     _interaction_command_name,
     _message_embed_matches,
     _deployment_targets_for_files,
+    _hub_role_permissions,
+    admin_group,
     inventory_group,
     industry_group,
 )
@@ -109,6 +111,34 @@ def test_message_embed_matches_existing_embed_payload() -> None:
 
     changed_embed = discord.Embed(title="Discord Bot Commands - /mining", description="Updated help")
     assert not _message_embed_matches(message, changed_embed)
+
+
+def test_only_cached_bot_hub_messages_are_protected() -> None:
+    async def scenario() -> None:
+        bot = GameAssistBot.__new__(GameAssistBot)
+        bot.visitor_channels = {"bot-commands": 123}
+        bot.cache = SimpleNamespace(get=AsyncMock(side_effect=lambda key: [456, 789] if "commands-reference" in key else None))
+
+        assert await bot._is_protected_hub_message(123, 789)
+        assert not await bot._is_protected_hub_message(123, 999)
+        assert not await bot._is_protected_hub_message(321, 789)
+
+    asyncio.run(scenario())
+
+
+def test_hub_admin_commands_are_registered() -> None:
+    assert admin_group.get_command("hub-health") is not None
+    assert admin_group.get_command("hub-repair") is not None
+
+
+def test_hub_roles_have_scoped_permissions() -> None:
+    visitor = _hub_role_permissions("Visitor")
+    manager = _hub_role_permissions("Bot Manager")
+
+    assert visitor.view_channel and visitor.connect and visitor.use_application_commands
+    assert manager.view_channel and manager.send_messages
+    assert not manager.manage_guild
+    assert not visitor.administrator
 
 
 def test_inventory_search_command_is_registered() -> None:
