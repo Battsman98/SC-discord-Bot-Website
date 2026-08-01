@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Star Citizen Companion</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=20260801-mining-permissions-v3-guide-buttons-v2">
+  <link rel="stylesheet" href="/assets/styles.css?v=20260801-mining-permissions-v3-guide-buttons-v2-feedback-v1">
   <link rel="stylesheet" href="/assets/hotfix-overlay.css?v=20260723-inline-wheel">
 </head>
 <body data-mfd-theme="overview">
@@ -655,7 +655,45 @@
     <button type="button" data-overview-tab="admin" data-admin-only><span>Audit</span><small>Review recent audit events</small></button>
   </template>
 
+  <div class="feedback-backdrop" data-feedback-modal hidden>
+    <section class="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle" aria-describedby="feedbackIntro">
+      <div class="feedback-heading">
+        <div>
+          <p class="guide-kicker">COMMUNITY FEEDBACK</p>
+          <h2 id="feedbackTitle">Feedback / Issue Report</h2>
+        </div>
+        <button type="button" class="feedback-close" data-feedback-close aria-label="Close feedback form">Close</button>
+      </div>
+      <p id="feedbackIntro" class="feedback-intro">Share a problem, expected behavior, or an idea that could improve Star Citizen Companion.</p>
+      <form class="feedback-form" data-feedback-form>
+        <div class="feedback-field-row">
+          <label><span>Report type</span>
+            <select name="report_type" required>
+              <option value="issue">Issue / Bug</option>
+              <option value="improvement">Improvement recommendation</option>
+              <option value="feedback">General feedback</option>
+            </select>
+          </label>
+          <label><span>Title</span><input name="title" maxlength="120" required placeholder="Short summary of the report"></label>
+        </div>
+        <label><span>Issue or feedback details</span><textarea name="details" rows="5" maxlength="3000" required placeholder="What happened, and where on the website did it happen?"></textarea></label>
+        <div class="feedback-field-row">
+          <label><span>Expected action or result</span><textarea name="expected_action" rows="4" maxlength="1500" placeholder="What did you expect to happen?"></textarea></label>
+          <label><span>Steps to reproduce</span><textarea name="steps" rows="4" maxlength="1500" placeholder="List the steps that caused the issue"></textarea></label>
+        </div>
+        <label><span>Improvement recommendations</span><textarea name="recommendations" rows="4" maxlength="2000" placeholder="How could this feature or experience be improved?"></textarea></label>
+        <label class="feedback-images"><span>Images</span><input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple data-feedback-images><small>Attach up to 4 PNG, JPG, WebP, or GIF images. Maximum 8 MB each.</small></label>
+        <div class="feedback-previews" data-feedback-previews aria-live="polite"></div>
+        <p class="feedback-status" data-feedback-status>Discord delivery will be enabled after the report channel is configured.</p>
+        <div class="feedback-actions">
+          <button type="button" data-feedback-close>Cancel</button>
+          <button type="submit" data-feedback-submit disabled>Submit to Discord</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
   <script src="/assets/hotfix-overlay.js?v=20260723-inline-wheel" defer></script>
-  <script src="/assets/app.js?v=20260801-mining-permissions-v3-guide-buttons-v2" defer></script>
+  <script src="/assets/app.js?v=20260801-mining-permissions-v3-guide-buttons-v2-feedback-v1" defer></script>
 </body>
 </html>

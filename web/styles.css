@@ -181,6 +181,143 @@ h2 {
   margin: 0;
 }
 
+.feedback-backdrop {
+  position: fixed;
+  z-index: 1400;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.feedback-dialog {
+  width: min(900px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: clamp(20px, 4vw, 30px);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: linear-gradient(145deg, var(--panel-tint), transparent 58%), var(--surface);
+  box-shadow: 0 0 36px color-mix(in srgb, var(--accent) 24%, transparent), 0 24px 80px rgba(0, 0, 0, 0.78);
+}
+
+.feedback-heading,
+.feedback-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feedback-heading h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.feedback-close {
+  flex: 0 0 auto;
+}
+
+.feedback-intro,
+.feedback-images small,
+.feedback-status {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.feedback-form {
+  display: grid;
+  gap: 16px;
+}
+
+.feedback-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.feedback-form label > span {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.feedback-form textarea {
+  width: 100%;
+  resize: vertical;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--control);
+  color: var(--text);
+  padding: 10px 11px;
+  font: inherit;
+}
+
+.feedback-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.feedback-images input {
+  padding: 7px;
+}
+
+.feedback-previews {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.feedback-preview {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--control);
+}
+
+.feedback-preview img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.feedback-preview figcaption {
+  overflow: hidden;
+  padding: 7px 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feedback-status {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel-tint);
+}
+
+.feedback-actions {
+  justify-content: flex-end;
+}
+
+body.feedback-modal-open {
+  overflow: hidden;
+}
+
+@media (max-width: 680px) {
+  .feedback-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .feedback-previews {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 label {
   color: var(--muted);
   font-size: 0.78rem;

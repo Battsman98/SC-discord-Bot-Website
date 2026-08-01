@@ -793,6 +793,7 @@ async function loadMe() {
       ${currentUser.avatar_url ? `<img src="${escapeAttribute(currentUser.avatar_url)}" alt="">` : ""}
       <span><strong>${escapeHtml(currentUser.display_name || currentUser.username)}</strong><br>${escapeHtml(badges)}</span>
       <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>
+      <button type="button" data-feedback-open>Feedback / Report Issue</button>
     </div>`;
     await loadSavedShips();
     await loadSavedBlueprints();
@@ -1143,6 +1144,72 @@ function syncInventoryTypeSelectForCategory(categorySelect) {
   typeSelect.innerHTML = inventoryTypeOptions(category, validCurrent, typeSelect.dataset.placeholder || "Item type");
   typeSelect.value = validCurrent;
 }
+
+const feedbackModal = document.querySelector("[data-feedback-modal]");
+const feedbackForm = document.querySelector("[data-feedback-form]");
+const feedbackImages = document.querySelector("[data-feedback-images]");
+const feedbackPreviews = document.querySelector("[data-feedback-previews]");
+const feedbackStatus = document.querySelector("[data-feedback-status]");
+let feedbackPreviewUrls = [];
+
+function closeFeedbackModal() {
+  if (!feedbackModal) return;
+  feedbackModal.hidden = true;
+  document.body.classList.remove("feedback-modal-open");
+  document.querySelector("[data-feedback-open]")?.focus();
+}
+
+function openFeedbackModal() {
+  if (!feedbackModal) return;
+  feedbackModal.hidden = false;
+  document.body.classList.add("feedback-modal-open");
+  feedbackModal.querySelector('[name="report_type"]')?.focus();
+}
+
+function clearFeedbackPreviews() {
+  feedbackPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  feedbackPreviewUrls = [];
+  if (feedbackPreviews) feedbackPreviews.innerHTML = "";
+}
+
+function renderFeedbackPreviews() {
+  clearFeedbackPreviews();
+  if (!feedbackImages || !feedbackPreviews) return;
+  const files = Array.from(feedbackImages.files || []);
+  const validFiles = files.filter((file) => file.type.startsWith("image/") && file.size <= 8 * 1024 * 1024).slice(0, 4);
+  if (files.length !== validFiles.length && feedbackStatus) {
+    feedbackStatus.textContent = "Use up to 4 supported images, with a maximum size of 8 MB each.";
+  }
+  validFiles.forEach((file) => {
+    const url = URL.createObjectURL(file);
+    feedbackPreviewUrls.push(url);
+    const figure = document.createElement("figure");
+    figure.className = "feedback-preview";
+    const image = document.createElement("img");
+    image.src = url;
+    image.alt = "Attachment preview";
+    const caption = document.createElement("figcaption");
+    caption.textContent = file.name;
+    figure.append(image, caption);
+    feedbackPreviews.append(figure);
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (event.target.closest("[data-feedback-open]")) openFeedbackModal();
+  if (event.target.closest("[data-feedback-close]")) closeFeedbackModal();
+  if (event.target === feedbackModal) closeFeedbackModal();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && feedbackModal && !feedbackModal.hidden) closeFeedbackModal();
+});
+
+feedbackImages?.addEventListener("change", renderFeedbackPreviews);
+feedbackForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (feedbackStatus) feedbackStatus.textContent = "Discord delivery is awaiting channel configuration.";
+});
 
 function setChangeAdminVisibility(canManageChanges) {
   document.querySelectorAll("[data-change-admin-only]").forEach((element) => {
