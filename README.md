@@ -69,6 +69,8 @@ Every command-focused channel in the Discord Bot Hub also receives a durable exa
 
 The Discord Bot Hub is the sole public command area. On startup, known bot-managed text channels under the `Star Citizen` category are removed, while unrelated discussion channels are preserved. Each public command is accepted only in its associated Hub channel; for example, `/ship` is limited to `ship-search`, trade commands to `trade-tools`, and `/mining` plus `/miningadd` to `mining-tools`.
 
+The `@everyone` role can view and interact with the bot throughout `Discord Bot Hub`, including its text, thread, forum, and voice features. Individual slash commands remain restricted to their associated Hub channels.
+
 Set `UEX_API_TOKEN` to the bearer token from your registered UEX API application. The token is used only by the Python backend for documented `api.uexcorp.uk` requests and must not be exposed to browser JavaScript or committed to source control. Mining locations and signatures use the public Star Citizen Wiki API, which does not require a token.
 
 Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive Hangar status message updated every 60 seconds.

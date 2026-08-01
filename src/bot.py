@@ -533,7 +533,20 @@ class GameAssistBot(commands.Bot):
             lambda item: item.name.casefold() == VISITOR_CATEGORY_NAME.casefold(), guild.categories
         )
         category_overwrites = {
-            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                send_messages_in_threads=True,
+                create_public_threads=True,
+                read_message_history=True,
+                embed_links=True,
+                attach_files=True,
+                add_reactions=True,
+                use_application_commands=True,
+                connect=True,
+                speak=True,
+                stream=True,
+            ),
             role: discord.PermissionOverwrite(
                 view_channel=True,
                 send_messages=True,
@@ -572,12 +585,16 @@ class GameAssistBot(commands.Bot):
                     existing = await guild.create_voice_channel(name, category=category, reason="Visitor access channel")
                 else:
                     existing = await guild.create_text_channel(name, category=category, reason="Visitor bot channel")
+            else:
+                await existing.edit(
+                    category=category,
+                    sync_permissions=True,
+                    reason="Allow everyone to use Discord Bot Hub",
+                )
             self.visitor_channels[name] = existing.id
 
         feedback = self.get_channel(self.settings.feedback_forum_channel_id or 0)
-        if isinstance(feedback, discord.ForumChannel) and (
-            feedback.category_id != category.id or feedback.name != "feedback-and-issues"
-        ):
+        if isinstance(feedback, discord.ForumChannel):
             await feedback.edit(
                 name="feedback-and-issues",
                 category=category,
