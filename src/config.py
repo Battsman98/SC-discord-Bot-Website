@@ -31,6 +31,8 @@ class Settings:
     discord_rate_limit_per_10_seconds: int = 8
     feedback_forum_channel_id: int | None = 1533026212463775754
     uex_api_token: str = ""
+    turnstile_site_key: str = ""
+    turnstile_secret_key: str = ""
 
     @classmethod
     def from_env(cls, load_env_file: bool = True, require_discord_token: bool = True) -> "Settings":
@@ -101,6 +103,8 @@ class Settings:
             discord_rate_limit_per_10_seconds=int(os.getenv("DISCORD_RATE_LIMIT_PER_10_SECONDS", "8")),
             feedback_forum_channel_id=int(feedback_forum_channel_id) if feedback_forum_channel_id else None,
             uex_api_token=os.getenv("UEX_API_TOKEN", "").strip(),
+            turnstile_site_key=os.getenv("TURNSTILE_SITE_KEY", "").strip(),
+            turnstile_secret_key=os.getenv("TURNSTILE_SECRET_KEY", "").strip(),
         )
 
 

@@ -14,6 +14,7 @@ from src.config import Settings
 
 
 DISCORD_API_BASE_URL = "https://discord.com/api/v10"
+TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 MANAGE_GUILD_PERMISSION = 0x20
 ADMINISTRATOR_PERMISSION = 0x8
 SESSION_COOKIE_NAME = "game_assist_session"
@@ -153,6 +154,35 @@ async def _join_guild_as_visitor(
         (role for role in roles if str(role.get("name") or "").strip().casefold() == VISITOR_ROLE_NAME.casefold()),
         None,
     )
+
+
+def human_verification_configured(settings: Settings) -> bool:
+    return bool(settings.turnstile_site_key and settings.turnstile_secret_key)
+
+
+async def verify_human(
+    settings: Settings,
+    response_token: str,
+    remote_ip: str | None = None,
+) -> bool:
+    """Verify a single-use Cloudflare Turnstile response on the server."""
+    if not human_verification_configured(settings) or not response_token:
+        return False
+    payload = {
+        "secret": settings.turnstile_secret_key,
+        "response": response_token,
+        "idempotency_key": secrets.token_hex(16),
+    }
+    if remote_ip:
+        payload["remoteip"] = remote_ip
+    timeout = aiohttp.ClientTimeout(total=settings.http_timeout_seconds)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(TURNSTILE_VERIFY_URL, data=payload) as response:
+                result = await response.json()
+                return response.status < 400 and result.get("success") is True
+    except (aiohttp.ClientError, TimeoutError, ValueError):
+        return False
     if visitor_role is None:
         raise HTTPException(status_code=503, detail="Visitor access is still being prepared. Try again shortly.")
 

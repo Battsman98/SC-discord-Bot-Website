@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -57,8 +57,10 @@ from src.web_auth import (
     encode_session,
     exchange_discord_code,
     fetch_web_user,
+    human_verification_configured,
     oauth_state,
     session_secret,
+    verify_human,
 )
 
 
@@ -430,7 +432,9 @@ async def security_controls(request: Request, call_next):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; "
         "img-src 'self' data: https://cdn.discordapp.com https:; "
-        "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https:"
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' https://challenges.cloudflare.com; "
+        "frame-src https://challenges.cloudflare.com; connect-src 'self' https:"
     )
     if request.url.path.startswith(("/api/me", "/api/audit", "/auth/")):
         response.headers["Cache-Control"] = "no-store"
@@ -805,21 +809,53 @@ async def website_activity() -> None:
     return None
 
 
-@app.get("/auth/discord/login")
-async def discord_login() -> RedirectResponse:
-    settings = state().settings
-    if not discord_auth_configured(settings):
-        raise HTTPException(status_code=503, detail="Discord OAuth is not configured.")
+def _begin_discord_login(settings: Settings) -> RedirectResponse:
     state_token = oauth_state()
-    response = RedirectResponse(build_discord_authorize_url(settings, state_token))
+    response = RedirectResponse(build_discord_authorize_url(settings, state_token), status_code=303)
     response.set_cookie(
         OAUTH_STATE_COOKIE_NAME,
         state_token,
         httponly=True,
+        secure=settings.discord_redirect_uri.startswith("https://"),
         samesite="lax",
         max_age=300,
     )
     return response
+
+
+@app.get("/auth/discord/login", response_model=None)
+async def discord_login() -> RedirectResponse | HTMLResponse:
+    settings = state().settings
+    if not discord_auth_configured(settings):
+        raise HTTPException(status_code=503, detail="Discord OAuth is not configured.")
+    if not human_verification_configured(settings):
+        return _begin_discord_login(settings)
+    site_key = html.escape(settings.turnstile_site_key, quote=True)
+    return HTMLResponse(f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Human verification</title><script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<style>body{{margin:0;background:#07131d;color:#e7f7ff;font:16px system-ui;display:grid;min-height:100vh;place-items:center}}
+main{{width:min(420px,calc(100% - 40px));padding:28px;border:1px solid #247493;border-radius:12px;background:#0d2130}}
+h1{{margin-top:0}}button{{margin-top:20px;padding:11px 18px;background:#26a9df;color:#031018;border:0;border-radius:6px;font-weight:700;cursor:pointer}}</style>
+</head><body><main><h1>Verify you are human</h1><p>Complete this check before joining or linking Discord.</p>
+<form method="post" action="/auth/discord/login"><div class="cf-turnstile" data-sitekey="{site_key}" data-theme="dark"></div>
+<button type="submit">Continue with Discord</button></form></main></body></html>""")
+
+
+@app.post("/auth/discord/login")
+async def discord_login_verified(
+    request: Request,
+    turnstile_response: str = Form(alias="cf-turnstile-response"),
+) -> RedirectResponse:
+    settings = state().settings
+    if not discord_auth_configured(settings):
+        raise HTTPException(status_code=503, detail="Discord OAuth is not configured.")
+    if not human_verification_configured(settings):
+        raise HTTPException(status_code=503, detail="Human verification is not configured.")
+    client_ip = request.client.host if request.client else None
+    if not await verify_human(settings, turnstile_response, client_ip):
+        raise HTTPException(status_code=400, detail="Human verification failed. Please go back and try again.")
+    return _begin_discord_login(settings)
 
 
 @app.get("/auth/discord/callback")
@@ -842,6 +878,7 @@ async def discord_callback(
         SESSION_COOKIE_NAME,
         encode_session(user, secret),
         httponly=True,
+        secure=settings.discord_redirect_uri.startswith("https://"),
         samesite="lax",
         max_age=7 * 24 * 60 * 60,
     )

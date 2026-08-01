@@ -1,5 +1,7 @@
 from src.config import Settings
-from src.web_auth import WebUser, build_discord_authorize_url, can_manage_admin_commands, can_manage_change_commands, decode_session, encode_session
+from dataclasses import replace
+
+from src.web_auth import WebUser, build_discord_authorize_url, can_manage_admin_commands, can_manage_change_commands, decode_session, encode_session, human_verification_configured
 
 
 def settings(
@@ -75,3 +77,14 @@ def test_discord_authorization_can_join_new_visitors() -> None:
     assert "guilds.join" in url
     assert "identify" in url
     assert "state=state-token" in url
+
+
+def test_human_verification_requires_both_keys() -> None:
+    app_settings = settings()
+    assert human_verification_configured(app_settings) is False
+    assert human_verification_configured(
+        replace(app_settings, turnstile_site_key="site")
+    ) is False
+    assert human_verification_configured(
+        replace(app_settings, turnstile_site_key="site", turnstile_secret_key="secret")
+    ) is True

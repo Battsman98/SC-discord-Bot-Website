@@ -33,6 +33,10 @@ services:
         generateValue: true
       - key: WEB_ADMIN_TOKEN
         generateValue: true
+      - key: TURNSTILE_SITE_KEY
+        sync: false
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
       - key: COMMANDS_CHANNEL_ID
         sync: false
       - key: EXEC_STATUS_CHANNEL_ID

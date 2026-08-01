@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import os
 import re
 from pathlib import Path
 
@@ -52,6 +53,10 @@ FEEDBACK_TEMPLATE_CACHE_PREFIX = "discord:feedback-template-thread"
 VISITOR_ROLE_NAME = "Visitor"
 BOT_MANAGER_ROLE_NAME = "Bot Manager"
 VISITOR_CATEGORY_NAME = "Visitor Bot Hub"
+AUDIT_LOG_CATEGORY_ID = 1516295744603164732
+AUDIT_LOG_CATEGORY_NAME = "audit log"
+WEBSITE_CHANGELOG_CHANNEL_NAME = "website-changelog"
+DISCORD_CHANGELOG_CHANNEL_NAME = "discord-changelog"
 VISITOR_CHANNEL_SPECS = {
     "bot-start-here": "text",
     "bot-commands": "text",
@@ -231,6 +236,7 @@ class GameAssistBot(commands.Bot):
         self._commands_reference_synced = False
         self.inventory_channel_id: int = INVENTORY_CHANNEL_ID
         self.visitor_channels: dict[str, int] = {}
+        self.changelog_channels: dict[str, int] = {}
         self._exec_status_task: asyncio.Task | None = None
         self._cz_timers_task: asyncio.Task | None = None
         self.command_limiter = SlidingWindowLimiter(
@@ -272,6 +278,8 @@ class GameAssistBot(commands.Bot):
             return
 
         await self._run_startup_step("create Bot Manager role", self.ensure_bot_manager_role)
+        await self._run_startup_step("provision changelog channels", self.ensure_changelog_channels)
+        await self._run_startup_step("record website deployment", self.record_website_deployment)
         await self._run_startup_step("provision Visitor hub", self.ensure_visitor_access)
         await self._run_startup_step("refresh Bot Manager channel access", self.ensure_bot_manager_role)
         await self._run_startup_step("prepare feedback forum", self.ensure_feedback_forum)
@@ -291,6 +299,108 @@ class GameAssistBot(commands.Bot):
             await operation()
         except Exception:
             logging.exception("Discord startup step failed: %s", label)
+
+    async def ensure_changelog_channels(self) -> None:
+        """Ensure private website and Discord changelogs exist under Audit Log."""
+        guild = self.get_guild(self.settings.discord_guild_id or 0)
+        if guild is None:
+            logging.error("Could not resolve the configured guild for changelog provisioning")
+            return
+        me = guild.me
+        if me is None or not me.guild_permissions.manage_channels:
+            logging.warning("Manage Channels is required to provision changelog channels")
+            return
+
+        category = guild.get_channel(AUDIT_LOG_CATEGORY_ID)
+        if not isinstance(category, discord.CategoryChannel):
+            logging.error("AUDIT_LOG_CATEGORY_ID %s is not a Discord category", AUDIT_LOG_CATEGORY_ID)
+            return
+        if category.name != AUDIT_LOG_CATEGORY_NAME:
+            await category.edit(name=AUDIT_LOG_CATEGORY_NAME, reason="Standardize audit log category name")
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+        }
+        manager_role = discord.utils.find(lambda role: role.name == BOT_MANAGER_ROLE_NAME, guild.roles)
+        if manager_role:
+            overwrites[manager_role] = discord.PermissionOverwrite(
+                view_channel=True, send_messages=False, read_message_history=True
+            )
+
+        topics = {
+            WEBSITE_CHANGELOG_CHANNEL_NAME: "Automatic website deployment history and manually recorded website changes.",
+            DISCORD_CHANGELOG_CHANNEL_NAME: "Automatic Discord channel, role, and server configuration changes.",
+        }
+        for name, topic in topics.items():
+            channel = discord.utils.find(lambda item: item.name == name, guild.text_channels)
+            if channel is None:
+                channel = await guild.create_text_channel(
+                    name, category=category, topic=topic, overwrites=overwrites, reason="Create audit changelog"
+                )
+            elif channel.category_id != category.id:
+                await channel.edit(category=category, reason="Move changelog into audit log category")
+            self.changelog_channels[name] = channel.id
+
+    async def _send_changelog(self, channel_name: str, title: str, description: str) -> None:
+        channel_id = self.changelog_channels.get(channel_name)
+        channel = self.get_channel(channel_id or 0)
+        if not isinstance(channel, discord.TextChannel):
+            return
+        embed = discord.Embed(
+            title=title,
+            description=_truncate_audit_value(description),
+            color=discord.Color.dark_teal(),
+            timestamp=discord.utils.utcnow(),
+        )
+        await channel.send(embed=embed, silent=True)
+
+    async def record_website_deployment(self) -> None:
+        revision = next((os.getenv(name, "").strip() for name in ("RENDER_GIT_COMMIT", "COMMIT_SHA", "GITHUB_SHA") if os.getenv(name, "").strip()), "")
+        if not revision:
+            return
+        cache_key = "changelog:last-website-revision"
+        if await self.cache.get(cache_key) == revision:
+            return
+        await self._send_changelog(
+            WEBSITE_CHANGELOG_CHANNEL_NAME,
+            "Website deployed",
+            f"Revision: `{revision[:12]}`\nEnvironment: `{os.getenv('RENDER_SERVICE_NAME', 'website')}`",
+        )
+        await self.cache.set(cache_key, revision, 315360000)
+
+    async def on_guild_channel_create(self, channel: discord.abc.GuildChannel) -> None:
+        if channel.name in {WEBSITE_CHANGELOG_CHANNEL_NAME, DISCORD_CHANGELOG_CHANNEL_NAME}:
+            return
+        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel created", f"Name: `{channel.name}`\nType: `{channel.type}`")
+
+    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:
+        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel deleted", f"Name: `{channel.name}`\nType: `{channel.type}`")
+
+    async def on_guild_channel_update(self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel) -> None:
+        changes = []
+        for label, old, new in (("Name", before.name, after.name), ("Category", before.category_id, after.category_id), ("Position", before.position, after.position)):
+            if old != new:
+                changes.append(f"{label}: `{old}` → `{new}`")
+        if changes:
+            await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel updated", "\n".join(changes))
+
+    async def on_guild_role_create(self, role: discord.Role) -> None:
+        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role created", f"Role: `{role.name}`")
+
+    async def on_guild_role_delete(self, role: discord.Role) -> None:
+        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role deleted", f"Role: `{role.name}`")
+
+    async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
+        changes = []
+        if before.name != after.name:
+            changes.append(f"Name: `{before.name}` → `{after.name}`")
+        if before.permissions != after.permissions:
+            changes.append("Permissions changed")
+        if before.color != after.color:
+            changes.append(f"Color: `{before.color}` → `{after.color}`")
+        if changes:
+            await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role updated", "\n".join(changes))
 
     def allowed_command_channel_ids(self, command_name: str) -> set[int]:
         ids: set[int] = set()
