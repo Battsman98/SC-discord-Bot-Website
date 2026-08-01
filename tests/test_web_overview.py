@@ -162,6 +162,10 @@ def test_industry_tools_support_crew_count_and_all_refining_methods() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
     assert 'name="member_count"' in html
+    assert 'class="field-row crew-payout-inputs"' in html
+    assert 'aria-label="Gross profit in aUEC"' in html
+    assert 'aria-label="Total expenses in aUEC"' in html
+    assert 'aria-label="Number of crew"' in html
     assert 'name="crew_mode"' not in html
     assert 'placeholder="Crew names, separated by commas"' not in html
     assert "setupCrewPayoutMode" not in javascript

@@ -224,9 +224,8 @@
         <div class="resource-grid">
           <form class="resource-card form" data-action="industrySplit">
             <div class="resource-card-heading"><h3>Crew Payout</h3><span>Calculator</span></div>
-            <p>Subtract shared costs and divide the remaining payout evenly.</p>
-            <div class="field-row"><input name="gross" type="number" min="0" step="1" placeholder="Gross payout (aUEC)" aria-label="Gross payout in aUEC" required><input name="expenses" type="number" min="0" step="1" value="0" placeholder="Shared expenses" aria-label="Shared expenses in aUEC"></div>
-            <input name="member_count" type="number" min="1" max="999" step="1" placeholder="Number of crew members" aria-label="Number of crew members" required>
+            <p>Subtract total expenses from gross profit and divide the remainder evenly.</p>
+            <div class="field-row crew-payout-inputs"><input name="gross" type="number" min="0" step="1" placeholder="Gross profit (aUEC)" aria-label="Gross profit in aUEC" required><input name="expenses" type="number" min="0" step="1" value="0" placeholder="Total expenses (aUEC)" aria-label="Total expenses in aUEC"><input name="member_count" type="number" min="1" max="999" step="1" placeholder="Number of crew" aria-label="Number of crew" required></div>
             <button type="submit">Calculate Split</button>
             <div id="industrySplitOutput" class="mini-output" aria-live="polite"></div>
           </form>
