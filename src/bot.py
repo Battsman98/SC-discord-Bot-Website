@@ -759,7 +759,13 @@ class GameAssistBot(commands.Bot):
                 changes.append(f"{label}: `{old}` → `{new}`")
         if changes:
             await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel updated", "Channel settings were changed.\n\n" + "\n".join(changes))
-        if self._is_discord_bot_hub_channel(before) or self._is_discord_bot_hub_channel(after):
+        protected_settings_changed = any(
+            getattr(before, attribute, None) != getattr(after, attribute, None)
+            for attribute in ("name", "category_id", "topic", "overwrites")
+        )
+        if protected_settings_changed and (
+            self._is_discord_bot_hub_channel(before) or self._is_discord_bot_hub_channel(after)
+        ):
             self._schedule_hub_recovery(
                 f"modified channel {before.name}", discord.AuditLogAction.channel_update, after.id
             )
@@ -850,7 +856,7 @@ class GameAssistBot(commands.Bot):
                 overwrites=category_overwrites,
                 reason="Create isolated Visitor bot access",
             )
-        else:
+        elif category.name != VISITOR_CATEGORY_NAME or category.overwrites != category_overwrites:
             await category.edit(
                 name=VISITOR_CATEGORY_NAME,
                 overwrites=category_overwrites,
@@ -877,7 +883,13 @@ class GameAssistBot(commands.Bot):
                         topic=VISITOR_CHANNEL_TOPICS.get(name),
                         reason="Visitor bot channel",
                     )
-            else:
+            elif (
+                existing.name != name
+                or existing.category_id != category.id
+                or not existing.permissions_synced
+                or isinstance(existing, discord.TextChannel)
+                and existing.topic != VISITOR_CHANNEL_TOPICS.get(name)
+            ):
                 changes = {
                     "name": name,
                     "category": category,
@@ -892,7 +904,12 @@ class GameAssistBot(commands.Bot):
         feedback = discord.utils.find(lambda item: item.name == "feedback-and-issues", category.channels)
         if feedback is None:
             feedback = self.get_channel(self.settings.feedback_forum_channel_id or 0)
-        if isinstance(feedback, discord.ForumChannel):
+        if isinstance(feedback, discord.ForumChannel) and (
+            feedback.name != "feedback-and-issues"
+            or feedback.category_id != category.id
+            or feedback.topic != FEEDBACK_FORUM_TOPIC
+            or not feedback.permissions_synced
+        ):
             await feedback.edit(
                 name="feedback-and-issues",
                 category=category,
@@ -1067,7 +1084,8 @@ class GameAssistBot(commands.Bot):
             overwrite.embed_links = True
             overwrite.attach_files = True
             overwrite.use_application_commands = True
-            await channel.set_permissions(role, overwrite=overwrite, reason="Grant Bot Manager access")
+            if channel.overwrites_for(role) != overwrite:
+                await channel.set_permissions(role, overwrite=overwrite, reason="Grant Bot Manager access")
         logging.info("Bot Manager role %s is ready", role.id)
 
     async def ensure_feedback_forum(self) -> None:
@@ -1165,6 +1183,19 @@ class GameAssistBot(commands.Bot):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 thread = None
 
+        template_name = "Example: How to submit a helpful website report"
+        matching_threads = [item for item in channel.threads if item.name == template_name]
+        try:
+            async for item in channel.archived_threads(limit=100):
+                if item.name == template_name:
+                    matching_threads.append(item)
+        except (discord.Forbidden, discord.HTTPException):
+            logging.info("Could not inspect archived feedback template threads in channel %s", channel.id)
+
+        if thread is None and matching_threads:
+            thread = matching_threads[0]
+        duplicate_threads = [item for item in matching_threads if thread is not None and item.id != thread.id]
+
         embed = build_feedback_template_embed()
         content = (
             "Use the **Feedback / Report Issue** button beside **Log out** on "
@@ -1175,7 +1206,7 @@ class GameAssistBot(commands.Bot):
             if thread is None:
                 applied_tags = list(channel.available_tags[:1]) if channel.flags.require_tag else []
                 created = await channel.create_thread(
-                    name="Example: How to submit a helpful website report",
+                    name=template_name,
                     content=content,
                     embed=embed,
                     allowed_mentions=discord.AllowedMentions.none(),
@@ -1183,12 +1214,15 @@ class GameAssistBot(commands.Bot):
                     reason="Create the Star Citizen Companion feedback template",
                 )
                 thread = created.thread
-                await self.cache.set(cache_key, thread.id, 315360000)
             else:
                 if thread.archived:
                     await thread.edit(archived=False, reason="Refresh the feedback template")
                 starter = await thread.fetch_message(thread.id)
                 await starter.edit(content=content, embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            await self.cache.set(cache_key, thread.id, 315360000)
+            for duplicate in duplicate_threads:
+                if self.user is not None and duplicate.owner_id == self.user.id:
+                    await duplicate.delete(reason="Remove duplicate feedback template")
             try:
                 await thread.edit(pinned=True, reason="Keep the feedback template visible")
             except (discord.Forbidden, discord.HTTPException):

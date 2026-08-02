@@ -1,6 +1,6 @@
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import discord
 
@@ -139,6 +139,27 @@ def test_hub_roles_have_scoped_permissions() -> None:
     assert manager.view_channel and manager.send_messages
     assert not manager.manage_guild
     assert not visitor.administrator
+
+
+def test_channel_position_update_does_not_trigger_hub_repair() -> None:
+    async def scenario() -> None:
+        bot = GameAssistBot.__new__(GameAssistBot)
+        bot._send_changelog = AsyncMock()
+        bot._is_discord_bot_hub_channel = lambda channel: True
+        bot._schedule_hub_recovery = Mock()
+        before = SimpleNamespace(
+            name="trade-tools", category_id=1, position=2, topic="topic", overwrites={}
+        )
+        after = SimpleNamespace(
+            name="trade-tools", category_id=1, position=3, topic="topic", overwrites={}
+        )
+
+        await bot.on_guild_channel_update(before, after)
+
+        bot._send_changelog.assert_awaited_once()
+        bot._schedule_hub_recovery.assert_not_called()
+
+    asyncio.run(scenario())
 
 
 def test_inventory_search_command_is_registered() -> None:
