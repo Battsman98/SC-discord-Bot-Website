@@ -2,7 +2,7 @@ import asyncio
 from pathlib import Path
 
 from src.cache import SQLiteCache, audit_action_type
-from src.web import _safe_audit_query, _website_audit_metadata
+from src.web import _safe_audit_query, _safe_crash_message, _website_audit_metadata
 from starlette.requests import Request
 
 
@@ -33,6 +33,13 @@ def test_audit_query_redacts_authentication_secrets() -> None:
     assert _safe_audit_query(request) == "query=Carrack"
 
 
+def test_crash_message_redacts_secrets() -> None:
+    message = "upstream failed token=abc123 password: hunter2 request=42"
+    assert _safe_crash_message(message) == (
+        "upstream failed token=[redacted] password: [redacted] request=42"
+    )
+
+
 def test_audit_events_filter_and_sort_by_action_type(tmp_path) -> None:
     async def run() -> None:
         cache = await SQLiteCache.create(str(tmp_path / "audit.sqlite3"))
@@ -60,5 +67,6 @@ def test_audit_ui_has_category_filter_and_sort_controls() -> None:
     assert '<option value="mining">Mining</option>' in html
     assert '<option value="inventory">Inventory</option>' in html
     assert '<option value="updates">Updates</option>' in html
+    assert '<option value="crashes">Crashes</option>' in html
     assert '<option value="action">Action type A-Z</option>' in html
     assert 'params.set("action_type", actionType)' in javascript

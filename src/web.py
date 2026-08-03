@@ -9,6 +9,7 @@ import queue
 import re
 import secrets
 import threading
+import traceback
 import aiohttp
 from io import BytesIO
 import time
@@ -523,11 +524,18 @@ async def audit_website_action(request: Request, call_next):
     metadata = _website_audit_metadata(request.method, request.url.path)
     response = None
     error_name = None
+    error_message = None
+    error_location = None
     try:
         response = await call_next(request)
         return response
     except Exception as error:
         error_name = type(error).__name__
+        error_message = _safe_crash_message(str(error))
+        frames = traceback.extract_tb(error.__traceback__)
+        if frames:
+            frame = frames[-1]
+            error_location = f"{Path(frame.filename).name}:{frame.lineno} in {frame.name}"
         raise
     finally:
         explicit_success = (
@@ -535,8 +543,9 @@ async def audit_website_action(request: Request, call_next):
             and response is not None
             and response.status_code < 400
         )
-        if metadata and not explicit_success and hasattr(app.state, "game_assist"):
-            action_type, title = metadata
+        should_record = error_name is not None or (metadata and not explicit_success)
+        if should_record and hasattr(app.state, "game_assist"):
+            action_type, title = ("crashes", "Website Crash") if error_name else metadata
             user = current_user_from_request(request, state().settings)
             fields = {
                 "Source": "Website",
@@ -551,10 +560,25 @@ async def audit_website_action(request: Request, call_next):
                 fields["Query"] = safe_query
             if error_name:
                 fields["Error"] = error_name
+                if error_message:
+                    fields["Cause"] = error_message
+                if error_location:
+                    fields["Location"] = error_location
+                fields["Revision"] = os.getenv("RENDER_GIT_COMMIT", "local")[:12]
             try:
                 await state().cache.add_audit_event(title, fields, action_type)
             except Exception:
                 pass
+
+
+def _safe_crash_message(message: str) -> str:
+    """Keep a useful admin-facing cause without persisting common secret values."""
+    clean = re.sub(
+        r"(?i)(token|secret|password|authorization|cookie)(\s*[=:]\s*)[^\s,;]+",
+        r"\1\2[redacted]",
+        message,
+    )
+    return clean[:500]
 
 
 def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:

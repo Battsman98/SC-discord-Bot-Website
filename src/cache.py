@@ -7,7 +7,7 @@ from typing import Any
 
 
 AUDIT_ACTION_TYPES = {
-    "admin", "audit", "authentication", "blueprints", "commands", "inventory",
+    "admin", "audit", "authentication", "blueprints", "commands", "crashes", "inventory",
     "items", "mining", "other", "ships", "timers", "trade", "updates",
 }
 
@@ -32,6 +32,7 @@ def audit_action_type(title: str, fields: dict[str, Any]) -> str:
 
     text = " ".join([title, command]).lower()
     keywords = (
+        ("crashes", ("crash", "unhandled exception")),
         ("authentication", ("login", "logout", "oauth", "authentication")),
         ("inventory", ("inventory",)),
         ("blueprints", ("blueprint", "crafting")),
