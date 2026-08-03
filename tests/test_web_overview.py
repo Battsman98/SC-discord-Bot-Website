@@ -490,7 +490,7 @@ def test_scanner_tool_panels_show_work_in_progress_notice() -> None:
 def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "inventoryScannerQueueLimit = 1" in javascript
+    assert "inventoryScannerQueueLimit = 12" in javascript
     assert "inventoryScannerCaptureBusy" in javascript
     assert "drainInventoryScannerQueue()" in javascript
     assert "processInventoryScannerCapture(capture)" in javascript
@@ -498,6 +498,16 @@ def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     assert "deferRender: true" in javascript
     assert "Recognized: ${names.join" in javascript
     assert "inventoryScannerQueue.shift()" in javascript
+
+
+def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "inventoryScannerLastQueuedHash" in javascript
+    assert "inventoryScannerLastQueuedContextToken" in javascript
+    assert "const titleChanged = imageHashDistance" in javascript
+    assert "const contextChanged = inventoryScannerCaptureChanged" in javascript
+    assert "inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)" in javascript
 
 
 def test_scanner_review_queue_has_individual_and_bulk_remove_actions() -> None:

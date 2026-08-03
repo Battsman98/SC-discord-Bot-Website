@@ -251,12 +251,16 @@ const inventoryScannerMaxInFlight = 1;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
-const inventoryScannerQueueLimit = 1;
+// Production OCR can take several seconds on a small instance. Retain enough
+// distinct hover transitions for a user moving at one item per second.
+const inventoryScannerQueueLimit = 12;
 let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
+let inventoryScannerLastQueuedHash = "";
+let inventoryScannerLastQueuedContextToken = "";
 let inventoryScannerLastCountedKey = "";
 let inventoryScannerLastCountedCaptureToken = "";
 let inventoryScannerTitleBox = "";
@@ -1987,6 +1991,8 @@ async function startInventoryScanner() {
   inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
   inventoryScannerLastContextHash = "";
+  inventoryScannerLastQueuedHash = "";
+  inventoryScannerLastQueuedContextToken = "";
   inventoryScannerLastCountedKey = "";
   inventoryScannerLastCountedCaptureToken = "";
   inventoryScannerTitleBox = "";
@@ -2080,7 +2086,18 @@ async function scanInventoryHover() {
   try {
     const capture = await captureInventoryScannerCrop();
     const captureMs = Math.round(performance.now() - captureStartedAt);
-    const captureToken = `${capture.hash}:${capture.tileToken || capture.contextHash}`;
+    const contextToken = capture.tileToken || capture.contextHash;
+    const captureToken = `${capture.hash}:${contextToken}`;
+    const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 4;
+    const contextChanged = inventoryScannerCaptureChanged(
+      inventoryScannerLastQueuedContextToken,
+      contextToken,
+    );
+    const alreadyQueued = inventoryScannerPendingHashes.has(captureToken)
+      || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken);
+    if (alreadyQueued || (!titleChanged && !contextChanged)) return;
+    inventoryScannerLastQueuedHash = capture.hash;
+    inventoryScannerLastQueuedContextToken = contextToken;
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
