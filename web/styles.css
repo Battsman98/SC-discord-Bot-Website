@@ -991,6 +991,24 @@ article.tool-panel.active {
   text-transform: uppercase;
 }
 
+.inventory-catalog-name {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.inventory-catalog-name > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.inventory-catalog-name > small {
+  color: var(--muted);
+  line-height: 1.25;
+}
+
 .persistent-form-field {
   align-content: start;
 }

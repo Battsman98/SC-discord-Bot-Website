@@ -385,7 +385,12 @@
       <form class="panel form wide" data-action="inventoryAdd">
         <h2>Add Inventory Item</h2>
         <div class="field-row">
-          <input name="name" placeholder="Item name" required>
+          <label class="inventory-catalog-name">
+            <span>Item name</span>
+            <input name="name" list="inventoryCatalogSuggestions" autocomplete="off" placeholder="Start typing an in-game item name" required>
+            <datalist id="inventoryCatalogSuggestions"></datalist>
+            <small data-inventory-catalog-status>Suggestions use the live Data.p4k and Wiki catalogs.</small>
+          </label>
           <select name="category" data-inventory-category-select data-placeholder="Category"></select>
           <select name="item_type" data-inventory-type-select data-placeholder="Item type"></select>
           <input name="item_size" placeholder="Size">

@@ -319,6 +319,7 @@ const shipDisplayPrefixes = [
 
 setupInventoryScannerOverlay();
 setupStaticInventorySelects();
+setupInventoryCatalogAutocomplete();
 
 function initToolMenus() {
   document.querySelectorAll(".tab-panel").forEach((tab) => {
@@ -1149,6 +1150,78 @@ function syncInventoryTypeSelectForCategory(categorySelect) {
   const validCurrent = current && (allowed.includes(current) || !allowed.length) ? current : "";
   typeSelect.innerHTML = inventoryTypeOptions(category, validCurrent, typeSelect.dataset.placeholder || "Item type");
   typeSelect.value = validCurrent;
+}
+
+function setupInventoryCatalogAutocomplete() {
+  const form = document.querySelector('form[data-action="inventoryAdd"]');
+  const nameInput = form?.querySelector('[name="name"]');
+  const categorySelect = form?.querySelector('[name="category"]');
+  const typeSelect = form?.querySelector('[name="item_type"]');
+  const sizeInput = form?.querySelector('[name="item_size"]');
+  const datalist = document.querySelector("#inventoryCatalogSuggestions");
+  const status = form?.querySelector("[data-inventory-catalog-status]");
+  if (!form || !nameInput || !categorySelect || !typeSelect || !sizeInput || !datalist) return;
+  let suggestions = [];
+  let requestNumber = 0;
+  let timer = null;
+
+  const applySuggestion = () => {
+    const normalized = normalizeInventoryMergeKey(nameInput.value);
+    const suggestion = suggestions.find((item) => normalizeInventoryMergeKey(item.name) === normalized);
+    if (!suggestion) return;
+    nameInput.value = suggestion.name;
+    if (!categorySelect.value && suggestion.category) {
+      categorySelect.value = suggestion.category;
+    }
+    const category = categorySelect.value || suggestion.category || "";
+    typeSelect.innerHTML = inventoryTypeOptions(
+      category,
+      suggestion.item_type || "",
+      typeSelect.dataset.placeholder || "Item type",
+    );
+    typeSelect.value = suggestion.item_type || "";
+    sizeInput.value = suggestion.item_size || "";
+    if (status) status.textContent = `Matched ${suggestion.source_name || "game catalog"}; type and size filled automatically.`;
+  };
+
+  const loadSuggestions = async () => {
+    const query = nameInput.value.trim();
+    if (query.length < 2) {
+      suggestions = [];
+      datalist.replaceChildren();
+      return;
+    }
+    const currentRequest = ++requestNumber;
+    const params = new URLSearchParams({ query, limit: "12" });
+    if (categorySelect.value) params.set("category", categorySelect.value);
+    try {
+      const payload = await api(`/api/me/inventory/catalog?${params}`);
+      if (currentRequest !== requestNumber) return;
+      suggestions = payload || [];
+      datalist.replaceChildren(...suggestions.map((item) => {
+        const option = document.createElement("option");
+        option.value = item.name;
+        option.label = [item.category, item.item_type, item.item_size].filter(Boolean).join(" / ");
+        return option;
+      }));
+      if (status) status.textContent = suggestions.length
+        ? `${suggestions.length} game-catalog match${suggestions.length === 1 ? "" : "es"}. Select one to autofill details.`
+        : "No catalog match yet; keep typing or enter the item manually.";
+      applySuggestion();
+    } catch (error) {
+      if (status) status.textContent = `Catalog suggestions unavailable: ${error.message}`;
+    }
+  };
+
+  nameInput.addEventListener("input", () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(loadSuggestions, 180);
+  });
+  nameInput.addEventListener("change", applySuggestion);
+  categorySelect.addEventListener("change", () => {
+    loadSuggestions();
+    applySuggestion();
+  });
 }
 
 const feedbackModal = document.querySelector("[data-feedback-modal]");

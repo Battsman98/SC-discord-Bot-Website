@@ -1710,6 +1710,58 @@ async def my_inventory_facets(user=Depends(require_user)) -> dict[str, list[str]
     return await state().cache.user_inventory_facets(user.id)
 
 
+@app.get("/api/me/inventory/catalog")
+async def inventory_catalog_suggestions(
+    query: str = Query(default="", max_length=120),
+    category: str | None = Query(default=None, max_length=40),
+    limit: int = Query(default=12, ge=1, le=25),
+    user=Depends(require_user),
+) -> list[dict[str, Any]]:
+    """Autocomplete manual entry from the local Wiki and Data.p4k indexes."""
+    del user
+    clean_query = " ".join(query.split())
+    if len(clean_query) < 2:
+        return []
+    wiki_results = await state().sources.lookup_inventory_items(
+        clean_query, limit=limit, category=(category or None)
+    )
+    p4k_results = P4K_INVENTORY_CATALOG.lookup(clean_query, limit * 2)
+    merged: dict[str, Any] = {}
+    for result in [*wiki_results, *p4k_results]:
+        key = _normalize_text(getattr(result, "name", ""))
+        if key and key not in merged:
+            merged[key] = result
+    query_norm = _normalize_text(clean_query)
+
+    def rank(result: Any) -> tuple[float, float, float, str]:
+        name = str(getattr(result, "name", ""))
+        name_norm = _normalize_text(name)
+        prefix = 1.0 if name_norm.startswith(query_norm) else 0.0
+        query_words = re.findall(r"[a-z0-9]+", query_norm)
+        name_words = re.findall(r"[a-z0-9]+", name_norm)
+        token_coverage = sum(
+            1 for word in query_words if any(candidate.startswith(word) for candidate in name_words)
+        ) / max(len(query_words), 1)
+        aliases = (name, *getattr(result, "catalog_aliases", ()))
+        score = max(_inventory_match_confidence(clean_query, alias) for alias in aliases)
+        return (-token_coverage, -prefix, -score, name.casefold())
+
+    suggestions: list[dict[str, Any]] = []
+    for result in sorted(merged.values(), key=rank)[:limit]:
+        result_category = (category or "").strip() or _inventory_manual_catalog_category(result)
+        suggestions.append({
+            "name": result.name,
+            "category": result_category,
+            "item_type": (
+                _inventory_catalog_item_type(result.name, result_category)
+                or getattr(result, "section", None)
+            ),
+            "item_size": getattr(result, "size", None),
+            "source_name": getattr(result, "source_name", None),
+        })
+    return suggestions
+
+
 @app.post("/api/me/inventory/import/text")
 async def import_inventory_from_text(
     request: InventoryTextImportRequest,
@@ -2764,6 +2816,29 @@ def _inventory_catalog_item_type(name: str, category: str | None) -> str | None:
     return None
 
 
+def _inventory_manual_catalog_category(result: Any) -> str | None:
+    source_category = _normalize_text(getattr(result, "category", "") or "")
+    section = _normalize_text(getattr(result, "section", "") or "")
+    combined = f"{source_category} {section}"
+    direct_markers = (
+        ("Armor", ("armor", "armour", "undersuit", "backpack")),
+        ("Clothing", ("clothing", "clothes")),
+        ("Ammunition", ("ammunition", "magazine", "ammo")),
+        ("Sustenance", ("food", "drink", "sustenance")),
+        ("Utility", ("usable", "utility", "multitool", "tractor beam", "medical")),
+        ("Components", ("vehicle component", "cooler", "power plant", "quantum drive", "shield")),
+        ("Weapons", ("personal weapon", "weaponpersonal")),
+    )
+    for category, markers in direct_markers:
+        if any(marker in combined for marker in markers):
+            return category
+    name = str(getattr(result, "name", "") or "")
+    for category in ("Armor", "Clothing", "Weapons", "Utility", "Ammunition", "Components", "Sustenance", "Other"):
+        if _inventory_catalog_item_type(name, category):
+            return category
+    return None
+
+
 def _inventory_scanner_accepted_matches(
     scored_matches: list[tuple[Any, float]],
     min_score: float,
@@ -3699,9 +3774,13 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         r"^uminala\s+s5\s*coin$": "Luminalia '55 Coin",
         r"^abml\s*cargo\s+plushie$": "T.A.B.A. Cargo Plushie",
         r"^redi\s*make\s+ltem\s+fabricator\s+aa\s+support$": "RediMake Item Fabricator AA Support",
+        r"\barrowh(?:e|c)ad\b": "Arrowhead",
+        r"\bexecutlve\b": "Executive",
+        r"\bsnlper\b": "Sniper",
     }
     for pattern, replacement in replacements.items():
         value = re.sub(pattern, replacement, value, flags=re.IGNORECASE)
+    value = re.sub(r'(\w)\s+"(?=\s|$)', r'\1"', value)
     return " ".join(value.split())
 
 

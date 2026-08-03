@@ -536,6 +536,18 @@ def test_scanner_uses_inventory_tile_context_to_count_duplicate_titles() -> None
     assert "contextHash = imageAverageHash(contextCanvas, 24)" in javascript
 
 
+def test_manual_inventory_entry_uses_hybrid_catalog_autocomplete() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert 'list="inventoryCatalogSuggestions"' in html
+    assert 'id="inventoryCatalogSuggestions"' in html
+    assert "setupInventoryCatalogAutocomplete()" in javascript
+    assert "/api/me/inventory/catalog?" in javascript
+    assert "suggestion.item_type" in javascript
+    assert "suggestion.item_size" in javascript
+
+
 def test_scanner_review_rows_use_compact_inventory_density() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
