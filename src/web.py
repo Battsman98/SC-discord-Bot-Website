@@ -2770,7 +2770,7 @@ def _inventory_scanner_accepted_matches(
     if not accepted:
         return []
     if candidate:
-        candidate_words = _normalize_text(candidate).split()
+        candidate_words = _normalize_text(_normalize_inventory_tooltip_name(candidate)).split()
         result_words = _normalize_text(accepted[0][0].name).split()
         if len(candidate_words) >= 3 and len(result_words) >= 3:
             family_similarity = difflib.SequenceMatcher(
@@ -2779,8 +2779,24 @@ def _inventory_scanner_accepted_matches(
             if family_similarity < 0.70:
                 return []
     if len(accepted) > 1 and accepted[0][1] - accepted[1][1] < 0.04:
-        return []
+        if not candidate or not _inventory_top_match_has_distinctive_candidate_word(
+            candidate, accepted[0][0].name, accepted[1][0].name
+        ):
+            return []
     return [accepted[0]]
+
+
+def _inventory_top_match_has_distinctive_candidate_word(
+    candidate: str, top_name: str, runner_up_name: str
+) -> bool:
+    words = lambda value: set(re.findall(r"[a-z0-9]+", _normalize_text(value)))
+    candidate_words = words(_normalize_inventory_tooltip_name(candidate))
+    top_words = words(top_name)
+    runner_up_words = words(runner_up_name)
+    distinctive = {
+        word for word in top_words - runner_up_words if len(word) >= 3 and not word.isdigit()
+    }
+    return bool(candidate_words & distinctive)
 
 
 def _inventory_tooltip_match_agrees_with_result(item: dict[str, Any], result_name: str) -> bool:
@@ -3548,7 +3564,15 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
     replacements = {
         r"\bmed\s+pen\b": "MedPen",
         r"\bchemozaly\b": "Hemozal",
+        r"\bchemozan\b": "Hemozal",
+        r"\bhemozan\b": "Hemozal",
         r"\bbloodino\b": "Bloodline",
+        r"\bbloodlino\b": "Bloodline",
+        r"\bpiconlla\b": "Piconalia",
+        r"\barelight\b": "Arclight",
+        r"\brangetinder\b": "Rangefinder",
+        r"\bx\s*dl[- ]*mark\b": "XDL Mark",
+        r"\bx\s*l[- ]*mark\b": "XDL Mark",
         r"\bpyro\s*ryt\b": "Pyro RYT",
         r"\bryt\s*(bloodline|hurston|micro\s*tech)\b": r"RYT \1",
         r"\bmulti[- ]?tooi\b": "Multi-Tool",
@@ -3557,7 +3581,7 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         r"\bmult[- ]?tol\b": "Multi-Tool",
         r"\bmut[- ]?tool\b": "Multi-Tool",
         r"\b(bloodline|hurston|micro\s*tech)[' ]+(?=multi[- ]?tool\b)": r"\1 ",
-        r"\bmax\s*(?:lit|ift)\b": "MaxLift",
+        r"\bmax\s*(?:lit|lift|ift)\b": "MaxLift",
         r"\bkilshot\b": "Killshot",
         r"\bkillshot\b": "Killshot",
         r"\brrie\b": "Rifle",

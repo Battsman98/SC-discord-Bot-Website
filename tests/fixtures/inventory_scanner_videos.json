@@ -1,6 +1,7 @@
 [
   {
     "name": "weapons",
+    "category": "Personal Weapons",
     "url": "https://medal.tv/games/star-citizen/clips/nbqzzCKiE_OcMcDIo?invite=cr-MSxBR1IsMjY4Nzc3NTUz",
     "samples": [
       {"second": 32, "expected": "Parallax \"Piconalia\" Energy Assault Rifle"},
@@ -17,13 +18,14 @@
   },
   {
     "name": "mixed-items",
+    "category": "Utility",
     "url": "https://medal.tv/games/star-citizen/clips/naIVmfq9NQYRWGR1m?invite=cr-MSxTSUIsMjY4Nzc3NTUz",
     "samples": [
       {"second": 19, "expected": "Cambio SRT"},
-      {"second": 26, "expected": "XDL Mark I Monocular Rangefinder"},
+      {"second": 26, "expected": "XDL \"Mark I\" Monocular Rangefinder"},
       {"second": 34, "expected": "Pyro RYT \"Bloodline\" Multi-Tool"},
       {"second": 39, "expected": "MedPen (Hemozal)"},
-      {"second": 43, "expected": "Arclight Pistol"},
+      {"second": 43, "expected": "Arclight Pistol", "category": "Personal Weapons"},
       {"second": 47, "expected": "Pyro RYT \"Bloodline\" Multi-Tool"},
       {"second": 52, "expected": "MaxLift AA Support Tractor Beam"},
       {"second": 59, "expected": "Pyro RYT Multi-Tool"},
@@ -32,6 +34,7 @@
   },
   {
     "name": "nf4HYGOW5OK8dNzYt",
+    "category": "Utility",
     "url": "https://medal.tv/games/star-citizen/clips/nf4HYGOW5OK8dNzYt?invite=cr-MSxyYXksMjY4Nzc3NTUz",
     "samples": [
       {"second": 247, "expected": "TruHold Tractor Beam Attachment"},

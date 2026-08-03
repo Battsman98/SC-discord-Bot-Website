@@ -568,6 +568,15 @@ def test_inventory_scanner_rejects_suffix_driven_wrong_item_family() -> None:
     ) == []
 
 
+def test_inventory_scanner_accepts_close_variant_when_ocr_contains_variant_word() -> None:
+    mark_one = SimpleNamespace(name='XDL "Mark I" Monocular Rangefinder')
+    generic = SimpleNamespace(name="XDL Monocular Rangefinder")
+
+    assert _inventory_scanner_accepted_matches(
+        [(mark_one, 0.94), (generic, 0.91)], 0.88, "xDLMarkMonocular Rangefinder"
+    ) == [(mark_one, 0.94)]
+
+
 def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
     assert _inventory_catalog_item_type("Navoi Boot and Pants Striker", "Clothing") == "Footwear"
     assert _inventory_catalog_item_type("ThermoWave Gloves ASD Edition", "Clothing") == "Gloves"
