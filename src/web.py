@@ -2071,7 +2071,6 @@ async def export_my_inventory(
         headers.extend([
             "Average UEX Terminal Sell Price (aUEC)",
             "Average UEX Player Seller Price (aUEC)",
-            "Selected Sell Price (aUEC)",
             "Price Source",
             "Estimated Sell Total (aUEC)",
         ])
@@ -2099,15 +2098,16 @@ async def export_my_inventory(
             row.extend([
                 terminal_price if terminal_price is not None else "",
                 player_price if player_price is not None else "",
-                selected_price if selected_price is not None else "",
                 "UEX Player Marketplace" if player_price is not None else ("UEX Terminal Buyback" if terminal_price is not None else ""),
                 selected_price * float(item["quantity"]) if selected_price is not None else "",
             ])
         sheet.append(row)
     if selling:
         for row_number in range(2, sheet.max_row + 1):
-            for column_number in (10, 11, 12, 14):
+            for column_number in (10, 11, 13):
                 sheet.cell(row=row_number, column=column_number).number_format = '#,##0.00'
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
     for column in sheet.columns:
         max_length = max(len(str(cell.value or "")) for cell in column)
         sheet.column_dimensions[column[0].column_letter].width = min(max(max_length + 2, 12), 48)

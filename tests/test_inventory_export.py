@@ -60,10 +60,10 @@ def test_inventory_export_filters_categories_blanks_notes_and_adds_sell_prices(m
     headers = [cell.value for cell in sheet[1]]
     assert "Updated At" not in headers
     assert headers[:6] == ["Location", "Category", "Item Type", "Quantity", "Name", "Size"]
-    assert headers[-5:] == [
+    assert "Selected Sell Price (aUEC)" not in headers
+    assert headers[-4:] == [
         "Average UEX Terminal Sell Price (aUEC)",
         "Average UEX Player Seller Price (aUEC)",
-        "Selected Sell Price (aUEC)",
         "Price Source",
         "Estimated Sell Total (aUEC)",
     ]
@@ -74,6 +74,7 @@ def test_inventory_export_filters_categories_blanks_notes_and_adds_sell_prices(m
     assert sheet["I2"].value is None
     assert sheet["J2"].value == 125.5
     assert sheet["K2"].value == 500
-    assert sheet["L2"].value == 500
-    assert sheet["M2"].value == "UEX Player Marketplace"
-    assert sheet["N2"].value == 1000
+    assert sheet["L2"].value == "UEX Player Marketplace"
+    assert sheet["M2"].value == 1000
+    assert sheet.freeze_panes == "A2"
+    assert sheet.auto_filter.ref == "A1:M2"
