@@ -33,7 +33,7 @@ def test_all_rendered_errors_and_connector_failures_trigger_hotfix_animation() -
     application = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     overlay = (WEB_DIR / "hotfix-overlay.js").read_text(encoding="utf-8")
 
-    assert 'src="/assets/app.js?v=20260801-mining-permissions-v3-inventory-autocomplete-v4-player-prices-v1"' in html
+    assert 'src="/assets/app.js?v=20260801-mining-permissions-v3-inventory-autocomplete-v5-player-prices-v1"' in html
     assert 'function errorMessage(message) {\n  notifyPotentialHotfix();' in application
     assert 'outputs.savedShips.innerHTML = connectorInstallPrompt(error.message);' in application
     connector_catch = application.split('outputs.savedShips.innerHTML = connectorInstallPrompt(error.message);', 1)[0]
