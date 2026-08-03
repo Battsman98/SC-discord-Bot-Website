@@ -1714,13 +1714,16 @@ async def my_inventory_facets(user=Depends(require_user)) -> dict[str, list[str]
 @app.get("/api/me/inventory/catalog")
 async def inventory_catalog_suggestions(
     query: str = Query(default="", max_length=120),
-    category: str | None = Query(default=None, max_length=40),
+    category: str = Query(min_length=1, max_length=40),
     limit: int = Query(default=12, ge=1, le=25),
     user=Depends(require_user),
 ) -> list[dict[str, Any]]:
     """Autocomplete manual entry from the local Wiki and Data.p4k indexes."""
     del user
     clean_query = " ".join(query.split())
+    clean_category = " ".join(category.split())
+    if not clean_category:
+        raise HTTPException(status_code=422, detail="Select a category before searching the game catalog.")
     if len(clean_query) < 2:
         return []
     # Manual autocomplete must remain instant even while the Wiki catalog is
@@ -1748,8 +1751,15 @@ async def inventory_catalog_suggestions(
         return (-token_coverage, -prefix, -score, name.casefold())
 
     suggestions: list[dict[str, Any]] = []
-    for result in sorted(merged.values(), key=rank)[:limit]:
-        result_category = (category or "").strip() or _inventory_manual_catalog_category(result)
+    for result in sorted(merged.values(), key=rank):
+        # Manual typing should narrow predictably by the visible item name;
+        # OCR-oriented fuzzy aliases are useful to the scanner but make an
+        # autocomplete query such as "bliz" return unrelated names.
+        if query_norm not in _normalize_text(getattr(result, "name", "")):
+            continue
+        result_category = _inventory_manual_catalog_category(result)
+        if not result_category or result_category.casefold() != clean_category.casefold():
+            continue
         suggestions.append({
             "name": result.name,
             "category": result_category,
@@ -1760,6 +1770,8 @@ async def inventory_catalog_suggestions(
             "item_size": getattr(result, "size", None),
             "source_name": getattr(result, "source_name", None),
         })
+        if len(suggestions) >= limit:
+            break
     return suggestions
 
 

@@ -561,6 +561,10 @@ def test_manual_inventory_entry_uses_hybrid_catalog_autocomplete() -> None:
     assert "renderSuggestionMenu()" in javascript
     assert "setupInventorySearchEnterKey()" in javascript
     assert "form.requestSubmit()" in javascript
+    assert 'placeholder="Select a category first" required disabled' in html
+    assert 'data-placeholder="Select category first (required)" required' in html
+    assert "Select a category before searching the game catalog." in javascript
+    assert "nameInput.disabled = !hasCategory" in javascript
     assert "Suggestions use the live Data.p4k and Wiki catalogs." not in html
 
 

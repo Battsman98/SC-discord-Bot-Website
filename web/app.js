@@ -1167,16 +1167,31 @@ function setupInventoryCatalogAutocomplete() {
   let requestNumber = 0;
   let timer = null;
 
+  const clearSuggestions = (message = "") => {
+    suggestions = [];
+    requestNumber += 1;
+    datalist.replaceChildren();
+    menu.replaceChildren();
+    menu.hidden = true;
+    if (status) status.textContent = message;
+  };
+
+  const syncCategoryRequirement = () => {
+    const hasCategory = Boolean(categorySelect.value);
+    nameInput.disabled = !hasCategory;
+    nameInput.placeholder = hasCategory
+      ? `Start typing a ${categorySelect.value.toLowerCase()} item name`
+      : "Select a category first";
+    if (!hasCategory) clearSuggestions("Select a category before searching the game catalog.");
+  };
+
   const applySuggestion = (selectedSuggestion = null) => {
     const normalized = normalizeInventoryMergeKey(nameInput.value);
     const suggestion = selectedSuggestion
       || suggestions.find((item) => normalizeInventoryMergeKey(item.name) === normalized);
     if (!suggestion) return;
     nameInput.value = suggestion.name;
-    if (!categorySelect.value && suggestion.category) {
-      categorySelect.value = suggestion.category;
-    }
-    const category = categorySelect.value || suggestion.category || "";
+    const category = categorySelect.value;
     typeSelect.innerHTML = inventoryTypeOptions(
       category,
       suggestion.item_type || "",
@@ -1206,11 +1221,12 @@ function setupInventoryCatalogAutocomplete() {
 
   const loadSuggestions = async () => {
     const query = nameInput.value.trim();
+    if (!categorySelect.value) {
+      clearSuggestions("Select a category before searching the game catalog.");
+      return;
+    }
     if (query.length < 2) {
-      suggestions = [];
-      datalist.replaceChildren();
-      menu.replaceChildren();
-      menu.hidden = true;
+      clearSuggestions();
       return;
     }
     const currentRequest = ++requestNumber;
@@ -1250,9 +1266,11 @@ function setupInventoryCatalogAutocomplete() {
     if (suggestions.length) menu.hidden = false;
   });
   categorySelect.addEventListener("change", () => {
+    clearSuggestions();
+    syncCategoryRequirement();
     loadSuggestions();
-    applySuggestion();
   });
+  syncCategoryRequirement();
 }
 
 function setupInventorySearchEnterKey() {
