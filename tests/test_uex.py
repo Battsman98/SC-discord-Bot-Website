@@ -26,17 +26,19 @@ def test_inventory_sell_price_comparison_combines_terminal_and_weighted_player_p
             {"item_name": "FS-9 LMG", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 1000, "listings_count": 3},
             {"item_name": "FS-9 LMG", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 2000, "listings_count": 1},
             {"item_name": "Gold", "operation": "buy", "currency": "UEC", "unit": "unit", "price_avg": 9999, "listings_count": 5},
+            {"item_name": "Omarof (16x Telescopic)", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 75000, "listings_count": 2},
         ]
 
     monkeypatch.setattr(source, "_fetch_all_item_prices", item_prices)
     monkeypatch.setattr(source, "_fetch_all_prices", commodity_prices)
     monkeypatch.setattr(source, "_fetch_all_marketplace_prices", marketplace_prices)
 
-    prices = asyncio.run(source.inventory_sell_price_comparison(["FS-9 LMG", "Gold", "Unknown"]))
+    prices = asyncio.run(source.inventory_sell_price_comparison(["FS-9 LMG", "Gold", "Omarof(l6x Telescopic)", "Unknown"]))
 
     assert prices == {
         "fs 9 lmg": {"terminal_average": 120.0, "player_average": 1250.0},
         "gold": {"terminal_average": 60.0},
+        "omarof 16x telescopic": {"player_average": 75000.0},
     }
 
 

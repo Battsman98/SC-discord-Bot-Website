@@ -654,7 +654,8 @@ class UEXSource:
         return matches[0]
 
     def _price_name_key(self, value: object) -> str:
-        return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").casefold()).split())
+        normalized = " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").casefold()).split())
+        return re.sub(r"\bl6x\b", "16x", normalized)
 
     async def _get_buyable_items(self) -> list[dict]:
         if self._buyable_items is not None:
