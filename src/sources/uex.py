@@ -568,6 +568,50 @@ class UEXSource:
         await self._cache.set(cache_key, prices, self._settings.cache_ttl_seconds)
         return prices
 
+    async def inventory_average_sell_prices(self, names: list[str]) -> dict[str, float]:
+        """Average positive prices paid by UEX terminals for inventory items."""
+        wanted = {self._normalize(name) for name in names if self._normalize(name)}
+        if not wanted:
+            return {}
+
+        item_names_by_id: dict[int, str] = {}
+        for category in await self._get_item_categories():
+            category_id = self._int_or_none(category.get("id"))
+            if category_id is None:
+                continue
+            for item in await self._fetch_items_by_category(category_id):
+                item_id = self._int_or_none(item.get("id"))
+                item_name = self._normalize(item.get("name"))
+                if item_id is not None and item_name in wanted:
+                    item_names_by_id[item_id] = item_name
+
+        commodity_names_by_id = {
+            commodity_id: name
+            for commodity in await self._get_commodities()
+            if (commodity_id := self._int_or_none(commodity.get("id"))) is not None
+            and (name := self._normalize(commodity.get("name"))) in wanted
+        }
+        samples: dict[str, list[float]] = {name: [] for name in wanted}
+
+        def collect(rows: list[dict], names_by_id: dict[int, str], id_fields: tuple[str, ...]) -> None:
+            for row in rows:
+                try:
+                    price = float(row.get("price_sell") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if price <= 0:
+                    continue
+                row_name = self._normalize(row.get("item_name") or row.get("commodity_name") or row.get("name"))
+                if row_name not in wanted:
+                    row_id = next((self._int_or_none(row.get(field)) for field in id_fields if row.get(field) is not None), None)
+                    row_name = names_by_id.get(row_id) if row_id is not None else None
+                if row_name in samples:
+                    samples[row_name].append(price)
+
+        collect(await self._fetch_all_item_prices(), item_names_by_id, ("id_item", "item_id"))
+        collect(await self._fetch_all_prices(), commodity_names_by_id, ("id_commodity", "commodity_id"))
+        return {name: sum(values) / len(values) for name, values in samples.items() if values}
+
     async def _get_buyable_items(self) -> list[dict]:
         if self._buyable_items is not None:
             return self._buyable_items

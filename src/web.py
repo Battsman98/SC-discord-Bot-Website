@@ -2023,9 +2023,10 @@ async def clear_my_inventory(request: InventoryClearRequest, user=Depends(requir
 @app.get("/api/me/inventory/export")
 async def export_my_inventory(
     location: str | None = None,
-    category: str | None = None,
+    category: list[str] = Query(default=[]),
     query: str | None = None,
     sort_by: str = "location",
+    selling: bool = False,
     user=Depends(require_user),
 ) -> Response:
     from openpyxl import Workbook
@@ -2034,20 +2035,32 @@ async def export_my_inventory(
     items = await state().cache.user_inventory_items(
         user.id,
         location.strip() if location else None,
-        category.strip() if category else None,
+        None,
         query.strip() if query else None,
         sort_by,
     )
+    selected_categories = {value.strip().casefold() for value in category if value.strip()}
+    if selected_categories:
+        items = [item for item in items if str(item.get("category") or "").strip().casefold() in selected_categories]
+
+    average_prices: dict[str, float] = {}
+    if selling and items:
+        try:
+            average_prices = await state().sources.inventory_average_sell_prices([str(item["name"]) for item in items])
+        except Exception:
+            logging.exception("UEX inventory selling prices were unavailable during export")
+
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Station Inventory"
-    headers = ["Location", "Category", "Item Type", "Size", "Name", "Quantity", "Quality", "Volume SCU", "Notes", "Updated At"]
+    headers = ["Location", "Category", "Item Type", "Size", "Name", "Quantity", "Quality", "Volume SCU", "Notes"]
+    if selling:
+        headers.extend(["Average UEX Sell Price (aUEC)", "Estimated Sell Total (aUEC)"])
     sheet.append(headers)
     for cell in sheet[1]:
         cell.font = Font(bold=True)
     for item in items:
-        sheet.append(
-            [
+        row = [
                 item["location"],
                 item["category"] or "",
                 item["item_type"] or "",
@@ -2056,10 +2069,20 @@ async def export_my_inventory(
                 item["quantity"],
                 item["quality"] if item["quality"] is not None else "",
                 item["volume_scu"] if item["volume_scu"] is not None else "",
-                item["notes"] or "",
-                item["updated_at"],
+                "",
             ]
-        )
+        if selling:
+            normalized_name = " ".join(str(item["name"]).lower().replace("-", " ").split())
+            average_price = average_prices.get(normalized_name)
+            row.extend([
+                average_price if average_price is not None else "",
+                average_price * float(item["quantity"]) if average_price is not None else "",
+            ])
+        sheet.append(row)
+    if selling:
+        for row_number in range(2, sheet.max_row + 1):
+            sheet.cell(row=row_number, column=10).number_format = '#,##0.00'
+            sheet.cell(row=row_number, column=11).number_format = '#,##0.00'
     for column in sheet.columns:
         max_length = max(len(str(cell.value or "")) for cell in column)
         sheet.column_dimensions[column[0].column_letter].width = min(max(max_length + 2, 12), 48)

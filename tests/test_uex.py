@@ -4,6 +4,45 @@ from unittest.mock import AsyncMock
 from src.sources.uex import UEXSource
 
 
+def test_inventory_average_sell_prices_combines_items_and_commodities(monkeypatch) -> None:
+    source = UEXSource.__new__(UEXSource)
+
+    async def item_categories():
+        return [{"id": 1}]
+
+    async def items_by_category(_category_id):
+        return [{"id": 10, "name": "FS-9 LMG"}]
+
+    async def commodities():
+        return [{"id": 20, "name": "Gold"}]
+
+    async def item_prices():
+        return [
+            {"id_item": 10, "price_sell": 100},
+            {"id_item": 10, "price_sell": 140},
+            {"id_item": 10, "price_sell": 0},
+        ]
+
+    async def commodity_prices():
+        return [
+            {"id_commodity": 20, "price_sell": 50},
+            {"commodity_name": "Gold", "price_sell": 70},
+            {"id_commodity": 20, "price_sell": "unavailable"},
+        ]
+
+    monkeypatch.setattr(source, "_get_item_categories", item_categories)
+    monkeypatch.setattr(source, "_fetch_items_by_category", items_by_category)
+    monkeypatch.setattr(source, "_get_commodities", commodities)
+    monkeypatch.setattr(source, "_fetch_all_item_prices", item_prices)
+    monkeypatch.setattr(source, "_fetch_all_prices", commodity_prices)
+
+    import asyncio
+
+    prices = asyncio.run(source.inventory_average_sell_prices(["FS-9 LMG", "Gold", "Unknown"]))
+
+    assert prices == {"fs 9 lmg": 120.0, "gold": 60.0}
+
+
 def test_parse_commodity_orders_buy_and_sell_markets() -> None:
     source = UEXSource.__new__(UEXSource)
     result = source._parse_commodity(
