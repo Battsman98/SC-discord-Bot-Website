@@ -15,6 +15,17 @@ def test_home_page_uses_companion_branding_and_guidance() -> None:
     assert "The guide below provides a complete walkthrough" in html
 
 
+def test_inventory_export_offers_categories_and_uex_selling_prices() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert "chooseInventoryExportOptions" in javascript
+    assert "Prepare this Excel file for selling items" in javascript
+    assert 'params.append("category", category)' in javascript
+    assert 'params.set("selling", "true")' in javascript
+    assert ".inventory-export-dialog" in css
+
+
 def test_site_uses_gunmetal_and_amber_palette() -> None:
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
 
@@ -542,10 +553,14 @@ def test_manual_inventory_entry_uses_hybrid_catalog_autocomplete() -> None:
 
     assert 'list="inventoryCatalogSuggestions"' in html
     assert 'id="inventoryCatalogSuggestions"' in html
+    assert "data-inventory-catalog-menu" in html
     assert "setupInventoryCatalogAutocomplete()" in javascript
     assert "/api/me/inventory/catalog?" in javascript
     assert "suggestion.item_type" in javascript
     assert "suggestion.item_size" in javascript
+    assert "renderSuggestionMenu()" in javascript
+    assert "setupInventorySearchEnterKey()" in javascript
+    assert "form.requestSubmit()" in javascript
 
 
 def test_scanner_review_rows_use_compact_inventory_density() -> None:

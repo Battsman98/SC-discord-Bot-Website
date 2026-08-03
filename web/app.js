@@ -320,6 +320,7 @@ const shipDisplayPrefixes = [
 setupInventoryScannerOverlay();
 setupStaticInventorySelects();
 setupInventoryCatalogAutocomplete();
+setupInventorySearchEnterKey();
 
 function initToolMenus() {
   document.querySelectorAll(".tab-panel").forEach((tab) => {
@@ -1159,15 +1160,17 @@ function setupInventoryCatalogAutocomplete() {
   const typeSelect = form?.querySelector('[name="item_type"]');
   const sizeInput = form?.querySelector('[name="item_size"]');
   const datalist = document.querySelector("#inventoryCatalogSuggestions");
+  const menu = form?.querySelector("[data-inventory-catalog-menu]");
   const status = form?.querySelector("[data-inventory-catalog-status]");
-  if (!form || !nameInput || !categorySelect || !typeSelect || !sizeInput || !datalist) return;
+  if (!form || !nameInput || !categorySelect || !typeSelect || !sizeInput || !datalist || !menu) return;
   let suggestions = [];
   let requestNumber = 0;
   let timer = null;
 
-  const applySuggestion = () => {
+  const applySuggestion = (selectedSuggestion = null) => {
     const normalized = normalizeInventoryMergeKey(nameInput.value);
-    const suggestion = suggestions.find((item) => normalizeInventoryMergeKey(item.name) === normalized);
+    const suggestion = selectedSuggestion
+      || suggestions.find((item) => normalizeInventoryMergeKey(item.name) === normalized);
     if (!suggestion) return;
     nameInput.value = suggestion.name;
     if (!categorySelect.value && suggestion.category) {
@@ -1181,7 +1184,24 @@ function setupInventoryCatalogAutocomplete() {
     );
     typeSelect.value = suggestion.item_type || "";
     sizeInput.value = suggestion.item_size || "";
+    menu.hidden = true;
     if (status) status.textContent = `Matched ${suggestion.source_name || "game catalog"}; type and size filled automatically.`;
+  };
+
+  const renderSuggestionMenu = () => {
+    menu.replaceChildren(...suggestions.slice(0, 8).map((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "inventory-catalog-option";
+      const name = document.createElement("strong");
+      name.textContent = item.name;
+      const details = document.createElement("small");
+      details.textContent = [item.category, item.item_type, item.item_size].filter(Boolean).join(" / ");
+      button.append(name, details);
+      button.addEventListener("click", () => applySuggestion(item));
+      return button;
+    }));
+    menu.hidden = !suggestions.length;
   };
 
   const loadSuggestions = async () => {
@@ -1189,6 +1209,8 @@ function setupInventoryCatalogAutocomplete() {
     if (query.length < 2) {
       suggestions = [];
       datalist.replaceChildren();
+      menu.replaceChildren();
+      menu.hidden = true;
       return;
     }
     const currentRequest = ++requestNumber;
@@ -1204,6 +1226,7 @@ function setupInventoryCatalogAutocomplete() {
         option.label = [item.category, item.item_type, item.item_size].filter(Boolean).join(" / ");
         return option;
       }));
+      renderSuggestionMenu();
       if (status) status.textContent = suggestions.length
         ? `${suggestions.length} game-catalog match${suggestions.length === 1 ? "" : "es"}. Select one to autofill details.`
         : "No catalog match yet; keep typing or enter the item manually.";
@@ -1217,10 +1240,29 @@ function setupInventoryCatalogAutocomplete() {
     window.clearTimeout(timer);
     timer = window.setTimeout(loadSuggestions, 180);
   });
-  nameInput.addEventListener("change", applySuggestion);
+  nameInput.addEventListener("change", () => applySuggestion());
+  nameInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || !suggestions.length) return;
+    event.preventDefault();
+    applySuggestion(suggestions[0]);
+  });
+  nameInput.addEventListener("focus", () => {
+    if (suggestions.length) menu.hidden = false;
+  });
   categorySelect.addEventListener("change", () => {
     loadSuggestions();
     applySuggestion();
+  });
+}
+
+function setupInventorySearchEnterKey() {
+  const form = document.querySelector('form[data-action="inventorySearch"]');
+  const query = form?.querySelector('[name="query"]');
+  if (!form || !query) return;
+  query.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    form.requestSubmit();
   });
 }
 
@@ -1569,13 +1611,65 @@ function inventoryFilterParams() {
   return form ? queryParams(Object.fromEntries(new FormData(form).entries()), ["query", "location", "category", "sort_by"]) : "";
 }
 
-function exportInventory() {
+async function exportInventory() {
   if (!currentUser.authenticated) {
     outputs.inventory.innerHTML = stateMessage("Log in with Discord before exporting inventory.");
     return;
   }
-  const params = inventoryFilterParams();
-  window.location.href = `/api/me/inventory/export?${params}`;
+  try {
+    const facets = await api("/api/me/inventory/facets");
+    const options = await chooseInventoryExportOptions(facets.categories || []);
+    if (!options) return;
+    const params = new URLSearchParams(inventoryFilterParams());
+    params.delete("category");
+    options.categories.forEach((category) => params.append("category", category));
+    if (options.selling) params.set("selling", "true");
+    window.location.href = `/api/me/inventory/export?${params.toString()}`;
+  } catch (error) {
+    outputs.inventory.innerHTML = errorMessage(error.message);
+  }
+}
+
+function chooseInventoryExportOptions(categories) {
+  return new Promise((resolve) => {
+    const backdrop = document.createElement("div");
+    backdrop.className = "inventory-export-backdrop";
+    const categoryOptions = categories.length
+      ? categories.map((category) => `<label><input type="checkbox" value="${escapeAttribute(category)}" checked> <span>${escapeHtml(category)}</span></label>`).join("")
+      : `<p class="inventory-export-empty">No categorized inventory items are available.</p>`;
+    backdrop.innerHTML = `<section class="inventory-export-dialog" role="dialog" aria-modal="true" aria-labelledby="inventoryExportTitle">
+      <h2 id="inventoryExportTitle">Export Inventory</h2>
+      <label class="inventory-export-selling"><input type="checkbox" data-inventory-export-selling> <span>Prepare this Excel file for selling items</span></label>
+      <p class="inventory-export-help">Adds the current average UEX sell price and an estimated total for every matched item.</p>
+      <fieldset>
+        <legend>Categories to include</legend>
+        <div class="inventory-export-category-actions"><button type="button" data-inventory-export-all>Select all</button><button type="button" data-inventory-export-none>Clear all</button></div>
+        <div class="inventory-export-categories">${categoryOptions}</div>
+      </fieldset>
+      <div class="inventory-export-actions"><button type="button" data-inventory-export-cancel>Cancel</button><button type="button" data-inventory-export-accept>Export Excel</button></div>
+    </section>`;
+    const finish = (value) => {
+      document.removeEventListener("keydown", onKeyDown);
+      backdrop.remove();
+      resolve(value);
+    };
+    const onKeyDown = (event) => { if (event.key === "Escape") finish(null); };
+    backdrop.addEventListener("click", (event) => { if (event.target === backdrop) finish(null); });
+    backdrop.querySelector("[data-inventory-export-cancel]").addEventListener("click", () => finish(null));
+    backdrop.querySelector("[data-inventory-export-all]").addEventListener("click", () => backdrop.querySelectorAll('.inventory-export-categories input').forEach((input) => { input.checked = true; }));
+    backdrop.querySelector("[data-inventory-export-none]").addEventListener("click", () => backdrop.querySelectorAll('.inventory-export-categories input').forEach((input) => { input.checked = false; }));
+    backdrop.querySelector("[data-inventory-export-accept]").addEventListener("click", () => {
+      const selected = [...backdrop.querySelectorAll('.inventory-export-categories input:checked')].map((input) => input.value);
+      if (categories.length && !selected.length) {
+        backdrop.querySelector("fieldset").classList.add("inventory-export-selection-error");
+        return;
+      }
+      finish({ selling: backdrop.querySelector("[data-inventory-export-selling]").checked, categories: selected });
+    });
+    document.addEventListener("keydown", onKeyDown);
+    document.body.append(backdrop);
+    backdrop.querySelector("[data-inventory-export-selling]").focus();
+  });
 }
 
 async function clearStationInventory() {
