@@ -40,6 +40,7 @@ from src.cache import AUDIT_ACTION_TYPES, SQLiteCache
 from src.config import Settings
 from src.security import SlidingWindowLimiter, install_secret_redaction
 from src.sources.registry import SourceRegistry, build_default_registry
+from src.sources.base import ItemLocatorResult
 from src.sources.citizen_updates import CitizenUpdatesSource
 from src.sources.warbonds import WarbondTrackerSource
 from src.timers import (
@@ -2929,6 +2930,7 @@ async def _inventory_lookup_scored_matches(
     if quick:
         queries = queries[:2]
     result_groups = await asyncio.gather(*(lookup(query) for query in queries))
+    result_groups.append(_inventory_scanner_catalog_supplements(candidate))
     for results in result_groups:
         for result in results:
             key = _normalize_text(getattr(result, "name", ""))
@@ -2943,6 +2945,36 @@ async def _inventory_lookup_scored_matches(
                 )
             )
     return sorted(scored, key=lambda item: (-item[1], item[0].name.lower()))[:limit]
+
+
+def _inventory_scanner_catalog_supplements(candidate: str) -> list[ItemLocatorResult]:
+    """Supply confirmed variants missing from the upstream searchable item catalog."""
+    normalized = _normalize_text(_normalize_inventory_tooltip_name(candidate))
+    variants = {
+        "bloodline": 'Pyro RYT "Bloodline" Multi-Tool',
+        "hurston": 'Pyro RYT "Hurston" Multi-Tool',
+    }
+    results: list[ItemLocatorResult] = []
+    for marker, name in variants.items():
+        if marker not in normalized:
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "_", marker).strip("_")
+        results.append(
+            ItemLocatorResult(
+                id=-(10_000 + len(results)),
+                name=name,
+                section="Multitool",
+                category="Utility",
+                company_name="Greycat Industrial",
+                size=None,
+                wiki_url=f"https://starcitizen.tools/Pyro_RYT_%22{marker.title()}%22_Multi-Tool",
+                source_url=f"https://starcitizen.tools/Pyro_RYT_%22{marker.title()}%22_Multi-Tool",
+                source_name="Star Citizen Wiki",
+                purchases=[],
+                catalog_aliases=(f"pyro_ryt_{slug}_multitool",),
+            )
+        )
+    return results
 
 
 def _inventory_lookup_queries(candidate: str) -> list[str]:

@@ -579,6 +579,19 @@ def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
     assert _inventory_catalog_item_type("Unknown Item", "Clothing") is None
 
 
+def test_inventory_scanner_supplements_missing_multitool_variants() -> None:
+    bloodline = web_module._inventory_scanner_catalog_supplements(
+        'Pyro RYT "Bloodino" Multi-Tooi'
+    )
+    hurston = web_module._inventory_scanner_catalog_supplements(
+        'Pyro RYT "Hurston" Multi-Tool'
+    )
+
+    assert [item.name for item in bloodline] == ['Pyro RYT "Bloodline" Multi-Tool']
+    assert [item.name for item in hurston] == ['Pyro RYT "Hurston" Multi-Tool']
+    assert web_module._inventory_scanner_catalog_supplements("Pyro RYT Multi-Tool") == []
+
+
 def test_inventory_title_ocr_uses_top_line_and_rejects_metadata_calibration() -> None:
     title = ([[0, 4], [100, 4], [100, 14], [0, 14]], "FS-9 LMG", 0.98)
     metadata = ([[0, 30], [100, 30], [100, 40], [0, 40]], "Volume: 8000 µSCU", 0.99)
