@@ -668,6 +668,8 @@ async def health() -> dict[str, Any]:
         "inventory_scanner": {
             "workers": state().scanner_gate.worker_count,
             "capacity": state().scanner_gate.capacity,
+            "p4k_catalog_items": P4K_INVENTORY_CATALOG.item_count,
+            "p4k_catalog_version": P4K_INVENTORY_CATALOG.version,
         },
         "item_catalog": catalog,
     }
