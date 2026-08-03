@@ -1010,6 +1010,10 @@ article.tool-panel.active {
   line-height: 1.25;
 }
 
+.inventory-catalog-name > small:empty {
+  display: none;
+}
+
 .inventory-catalog-menu {
   position: absolute;
   z-index: 40;

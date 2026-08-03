@@ -561,6 +561,7 @@ def test_manual_inventory_entry_uses_hybrid_catalog_autocomplete() -> None:
     assert "renderSuggestionMenu()" in javascript
     assert "setupInventorySearchEnterKey()" in javascript
     assert "form.requestSubmit()" in javascript
+    assert "Suggestions use the live Data.p4k and Wiki catalogs." not in html
 
 
 def test_scanner_review_rows_use_compact_inventory_density() -> None:
