@@ -118,10 +118,10 @@ class SourceRegistry:
 
         return matches
 
-    async def inventory_average_sell_prices(self, names: list[str]) -> dict[str, float]:
-        """Return current average UEX terminal sell prices keyed by normalized item name."""
+    async def inventory_sell_price_comparison(self, names: list[str]) -> dict[str, dict[str, float]]:
+        """Return UEX terminal and player-market averages keyed by normalized item name."""
         for source in self._sources:
-            lookup = getattr(source, "inventory_average_sell_prices", None)
+            lookup = getattr(source, "inventory_sell_price_comparison", None)
             if lookup is not None:
                 return await lookup(names)
         return {}

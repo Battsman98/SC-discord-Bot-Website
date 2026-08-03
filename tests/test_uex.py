@@ -4,43 +4,40 @@ from unittest.mock import AsyncMock
 from src.sources.uex import UEXSource
 
 
-def test_inventory_average_sell_prices_combines_items_and_commodities(monkeypatch) -> None:
+def test_inventory_sell_price_comparison_combines_terminal_and_weighted_player_prices(monkeypatch) -> None:
     source = UEXSource.__new__(UEXSource)
-
-    async def item_categories():
-        return [{"id": 1}]
-
-    async def items_by_category(_category_id):
-        return [{"id": 10, "name": "FS-9 LMG"}]
-
-    async def commodities():
-        return [{"id": 20, "name": "Gold"}]
 
     async def item_prices():
         return [
-            {"id_item": 10, "price_sell": 100},
-            {"id_item": 10, "price_sell": 140},
-            {"id_item": 10, "price_sell": 0},
+            {"item_name": "FS-9 LMG", "price_sell": 100},
+            {"item_name": "FS-9 LMG", "price_sell": 140},
+            {"item_name": "FS-9 LMG", "price_sell": 0},
         ]
 
     async def commodity_prices():
         return [
-            {"id_commodity": 20, "price_sell": 50},
+            {"commodity_name": "Gold", "price_sell": 50},
             {"commodity_name": "Gold", "price_sell": 70},
-            {"id_commodity": 20, "price_sell": "unavailable"},
+            {"commodity_name": "Gold", "price_sell": "unavailable"},
         ]
 
-    monkeypatch.setattr(source, "_get_item_categories", item_categories)
-    monkeypatch.setattr(source, "_fetch_items_by_category", items_by_category)
-    monkeypatch.setattr(source, "_get_commodities", commodities)
+    async def marketplace_prices():
+        return [
+            {"item_name": "FS-9 LMG", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 1000, "listings_count": 3},
+            {"item_name": "FS-9 LMG", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 2000, "listings_count": 1},
+            {"item_name": "Gold", "operation": "buy", "currency": "UEC", "unit": "unit", "price_avg": 9999, "listings_count": 5},
+        ]
+
     monkeypatch.setattr(source, "_fetch_all_item_prices", item_prices)
     monkeypatch.setattr(source, "_fetch_all_prices", commodity_prices)
+    monkeypatch.setattr(source, "_fetch_all_marketplace_prices", marketplace_prices)
 
-    import asyncio
+    prices = asyncio.run(source.inventory_sell_price_comparison(["FS-9 LMG", "Gold", "Unknown"]))
 
-    prices = asyncio.run(source.inventory_average_sell_prices(["FS-9 LMG", "Gold", "Unknown"]))
-
-    assert prices == {"fs 9 lmg": 120.0, "gold": 60.0}
+    assert prices == {
+        "fs 9 lmg": {"terminal_average": 120.0, "player_average": 1250.0},
+        "gold": {"terminal_average": 60.0},
+    }
 
 
 def test_parse_commodity_orders_buy_and_sell_markets() -> None:
