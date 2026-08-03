@@ -4646,7 +4646,7 @@ def _format_rock_signatures(signatures: list[int] | None) -> str:
         clusters = [f"{count}x {_format_number(signature * count)}" for count in range(1, 7)]
         lines.append(f"{_format_number(signature)}: {' | '.join(clusters)}")
     if len(signatures) > 8:
-        lines.append("More signatures available in Star-Head.")
+        lines.append("Additional signatures are available from the Star Citizen Wiki.")
     return _limit_lines(lines, 1000)
 
 

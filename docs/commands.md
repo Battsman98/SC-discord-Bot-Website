@@ -134,8 +134,8 @@ Current output:
 Location logic:
 
 - Uses direct UEX mining locations when available.
-- If direct locations are empty for the selected filters, uses shared rock/deposit composition data to surface locations from materials that can appear in the same deposit.
-- Rock signatures use Star-Head mining location data and are shown as base signatures multiplied through 6-rock clusters.
+- Falls back to the bundled mining-location data when UEX has no result for a material.
+- Rock signatures use Star Citizen Wiki API data and are shown as base signatures multiplied through 6-rock clusters.
 
 Examples:
 

@@ -1547,7 +1547,7 @@ async def multi_mining_signature_payload(query: str, terms: list[str]) -> dict[s
         "missing": missing,
         "rock_signatures": shared_signatures,
         "ranked_locations": ranked_locations,
-        "source_name": "Star-Head mining signatures",
+        "source_name": "Star Citizen Wiki mining signatures",
     }
 
 

@@ -40,7 +40,6 @@ class UEXSource:
         self._terminals_by_id: dict[str, dict] | None = None
         self._terminals_loaded_at = 0.0
         self._location_filter_names: list[str] | None = None
-        self._mining_associations: dict[str, list[str]] | None = None
         self._mining_signatures: dict[str, list[int]] | None = None
         self._mining_fallbacks: dict[str, dict] | None = None
 
@@ -849,132 +848,6 @@ class UEXSource:
         )
         return self._mining_signatures
 
-    def _parse_star_head_signatures(self, script: str) -> dict[str, list[int]]:
-        signatures: dict[str, set[int]] = {}
-        for match in re.finditer(r"\{signature:(?P<signature>\d+),materials:\[(?P<materials>[^\]]+)\]\}", script):
-            signature = int(match.group("signature"))
-            materials = re.findall(r'"([^"]+)"', match.group("materials"))
-            for material in materials:
-                signatures.setdefault(self._normalize(material), set()).add(signature)
-
-        return {
-            material: sorted(values)
-            for material, values in signatures.items()
-        }
-
-    async def _expand_mining_result_from_associated_deposits(
-        self,
-        result: MiningLocationResult,
-        commodity: dict,
-        system_code: str | None,
-    ) -> MiningLocationResult:
-        associated_names = await self._get_associated_mining_material_names(self._mining_material_base_name(commodity))
-        if not associated_names:
-            return result
-
-        merged = result
-        used_names: list[str] = []
-        for name in associated_names[:8]:
-            associated_commodity = await self._find_mining_material(name)
-            if associated_commodity is None:
-                continue
-            associated_result = await self._fetch_mining_location_result(associated_commodity, system_code)
-            if associated_result is None or not self._has_mining_locations(associated_result):
-                continue
-            merged = self._merge_mining_location_results(merged, associated_result)
-            used_names.append(associated_result.material_name)
-
-        if not used_names:
-            return result
-
-        basis = "Direct UEX locations plus shared deposit composition"
-        return MiningLocationResult(
-            material_name=merged.material_name,
-            code=merged.code,
-            kind=merged.kind,
-            refined_sell_price=merged.refined_sell_price,
-            raw_sell_price=merged.raw_sell_price,
-            is_harvestable=merged.is_harvestable,
-            is_volatile_qt=merged.is_volatile_qt,
-            is_volatile_time=merged.is_volatile_time,
-            is_explosive=merged.is_explosive,
-            systems=merged.systems,
-            lagrange_points=merged.lagrange_points,
-            planets=merged.planets,
-            moons=merged.moons,
-            points_of_interest=merged.points_of_interest,
-            source_url=merged.source_url,
-            source_name="UEX + Star Citizen Mining Mom",
-            location_basis=basis,
-            rock_signatures=merged.rock_signatures or [],
-            location_groups=merged.location_groups or [],
-        )
-
-    async def _get_associated_mining_material_names(self, material_name: str) -> list[str]:
-        associations = await self._get_mining_associations()
-        return associations.get(self._normalize(material_name), [])
-
-    async def _get_mining_associations(self) -> dict[str, list[str]]:
-        if self._mining_associations is not None:
-            return self._mining_associations
-
-        cached = await self._cache.get("mining-mom:deposit-associations:v1")
-        if isinstance(cached, dict):
-            self._mining_associations = {
-                str(key): [str(value) for value in values if value]
-                for key, values in cached.items()
-                if isinstance(values, list)
-            }
-            return self._mining_associations
-
-        html = await self._fetch_text("https://www.scminingmom.com/mining/locations/deposits")
-        if not html:
-            self._mining_associations = {}
-            return self._mining_associations
-
-        asset_match = re.search(r'<script[^>]+src="([^"]*index-[^"]+\.js)"', html)
-        if not asset_match:
-            self._mining_associations = {}
-            return self._mining_associations
-
-        asset_url = asset_match.group(1)
-        if asset_url.startswith("/"):
-            asset_url = f"https://www.scminingmom.com{asset_url}"
-
-        script = await self._fetch_text(asset_url)
-        self._mining_associations = self._parse_mining_mom_associations(script or "")
-        await self._cache.set("mining-mom:deposit-associations:v1", self._mining_associations, 24 * 60 * 60)
-        return self._mining_associations
-
-    def _parse_mining_mom_associations(self, script: str) -> dict[str, list[str]]:
-        element_names: dict[str, str] = {}
-        for match in re.finditer(
-            r'"(?P<key>[0-9a-f-]{36})":\{id:"(?P<id>[0-9a-f-]{36})".*?mineableResource:"(?P<name>[^"]+)".*?\}',
-            script,
-            re.DOTALL,
-        ):
-            element_names[match.group("id")] = match.group("name")
-
-        associations: dict[str, set[str]] = {}
-        for match in re.finditer(r"MineableCompositionPart:\[(?P<parts>.*?)\]\},depositName:", script, re.DOTALL):
-            names = {
-                element_names[element_id]
-                for element_id in re.findall(r'mineableElement:"([0-9a-f-]{36})"', match.group("parts"))
-                if element_id in element_names
-            }
-            if len(names) < 2:
-                continue
-            for name in names:
-                normalized_name = self._normalize(name)
-                associations.setdefault(normalized_name, set()).update(
-                    other for other in names if self._normalize(other) != normalized_name
-                )
-
-        return {
-            name: sorted(values, key=str.lower)
-            for name, values in associations.items()
-        }
-
     def _market(self, row: dict, price_key: str, demand_key: str) -> CommodityMarket:
         return CommodityMarket(
             terminal_name=str(row.get("terminal_name") or "Unknown terminal"),
@@ -1211,39 +1084,6 @@ class UEXSource:
                 result.points_of_interest,
             ]
         )
-
-    def _merge_mining_location_results(
-        self,
-        primary: MiningLocationResult,
-        secondary: MiningLocationResult,
-    ) -> MiningLocationResult:
-        return MiningLocationResult(
-            material_name=primary.material_name,
-            code=primary.code,
-            kind=primary.kind,
-            refined_sell_price=primary.refined_sell_price,
-            raw_sell_price=primary.raw_sell_price,
-            is_harvestable=primary.is_harvestable,
-            is_volatile_qt=primary.is_volatile_qt,
-            is_volatile_time=primary.is_volatile_time,
-            is_explosive=primary.is_explosive,
-            systems=self._merge_location_names(primary.systems, secondary.systems),
-            lagrange_points=self._merge_location_names(primary.lagrange_points, secondary.lagrange_points),
-            planets=self._merge_location_names(primary.planets, secondary.planets),
-            moons=self._merge_location_names(primary.moons, secondary.moons),
-            points_of_interest=self._merge_location_names(primary.points_of_interest, secondary.points_of_interest),
-            source_url=primary.source_url,
-            source_name=primary.source_name,
-            location_basis=primary.location_basis,
-            rock_signatures=primary.rock_signatures or [],
-            location_groups=primary.location_groups or [],
-        )
-
-    def _merge_location_names(self, first: list[str], second: list[str]) -> list[str]:
-        names: dict[str, str] = {}
-        for name in [*first, *second]:
-            names.setdefault(self._normalize(name), name)
-        return sorted(names.values(), key=str.lower)
 
     def _mining_system_group(self, result: MiningLocationResult, system: str) -> MiningSystemLocations:
         return MiningSystemLocations(
