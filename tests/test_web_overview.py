@@ -334,7 +334,7 @@ def test_selecting_ships_opens_and_refreshes_the_hangar() -> None:
 def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert 'canvas.toBlob(resolve, "image/webp", 0.9)' in javascript
+    assert 'canvas.toBlob(resolve, "image/png")' in javascript
     assert 'params.set("live_scan", "true")' in javascript
     assert "requestTitleBox = options.titleBox !== undefined" in javascript
     assert 'params.set("title_box", requestTitleBox)' in javascript
@@ -413,7 +413,12 @@ def test_live_inventory_scanner_keeps_fast_calibration_and_places_confirmed_resu
     assert "requestTitleBox = inventoryScannerTitleBox" in javascript
     assert 'requestTitleBox = "0,0,1,1"' not in javascript
     assert 'addInventoryScannerHistory(payload, countedScannerItems, options.captureToken || "")' in javascript
-    assert "entry.captureToken === captureToken" in javascript
+    assert "inventoryScannerPendingReview.samples < 2" in javascript
+    assert "inventoryScannerReviewEntriesMatch(entry, stableEntry, false)" in javascript
+    assert "inventoryScannerReviewEntriesMatch(inventoryScannerPendingReview.entry, reviewEntry, true)" in javascript
+    assert "inventoryScannerTextSimilarity(left?.text, right?.text) >= 0.72" in javascript
+    assert 'text: reviewText' in javascript
+    assert '"Unread tooltip"' not in javascript
     assert "titleBox: capture.requestTitleBox" in javascript
     assert "payload.calibration?.title_box && options.titleBox === undefined" in javascript
 
@@ -431,14 +436,27 @@ def test_window_share_auto_starts_scanning_and_stop_ignores_late_results() -> No
 
 def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> None:
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
     assert "await asyncio.to_thread(_initialize_rapid_ocr_pool)" in python
     assert "await asyncio.to_thread(_read_image_text, data)" in python
     assert "candidate_limit=1," in python
-    assert "for candidate_box in _inventory_title_boxes(title_box)" in python
+    assert "candidate_boxes = _inventory_title_boxes(title_box)" in python
+    assert "candidate_texts = await asyncio.gather" in python
     assert "if candidate_items:" in python
     assert "attempts=%r" in python
     assert "effective_min_score = max(min_score, 0.88) if live_scan else min_score" in python
+    assert "candidate_boxes = _inventory_title_boxes(title_box)" in python
+
+
+def test_live_scanner_preserves_screen_resolution_and_lossless_titles() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "width: { ideal: 1920, max: 2560 }" in javascript
+    assert "height: { ideal: 1080, max: 1440 }" in javascript
+    assert "const maxWidth = 1920" in javascript
+    assert 'canvas.toBlob(resolve, "image/png")' in javascript
+    assert 'new File([blob], "inventory-tooltip.png", { type: "image/png" })' in javascript
 
 
 def test_live_scanner_avoids_ocr_cpu_contention_and_reports_stage_timings() -> None:

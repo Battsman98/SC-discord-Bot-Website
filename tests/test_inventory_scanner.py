@@ -419,7 +419,11 @@ def test_inventory_tooltip_parser_uses_block_matching_catalog_item() -> None:
 def test_inventory_scanner_corrects_common_weapon_ocr_typos() -> None:
     assert _normalize_inventory_tooltip_name("Kilshot Rrie") == "Killshot Rifle"
     assert _normalize_inventory_tooltip_name("Paralax'Sorguine Energy Assault Rifle") == "Parallax'Sanguine Energy Assault Rifle"
+    assert _normalize_inventory_tooltip_name("Deedbolticannon") == "Deadbolt III Cannon"
+    assert _normalize_inventory_tooltip_name("Deadboltim Cannon") == "Deadbolt III Cannon"
+    assert _normalize_inventory_tooltip_name("Deadboltvicannon") == "Deadboltvicannon"
     assert _inventory_match_confidence("Kilshot Rrie", "Killshot Rifle") >= 0.72
+    assert _inventory_match_confidence("Deedbolticannon", "Deadbolt III Cannon") >= 0.88
 
 
 def test_inventory_match_confidence_does_not_mix_attachment_families() -> None:
@@ -543,14 +547,25 @@ def test_inventory_scanner_preserves_internal_item_key_for_catalog_alias_matchin
     ) >= 0.88
 
 
-def test_inventory_title_regions_ignore_stale_calibration_and_cover_full_frame() -> None:
+def test_inventory_title_regions_prioritize_one_second_tooltip_geometry() -> None:
     stale = "0.300000,0.230000,0.380000,0.055000"
 
     boxes = web_module._inventory_title_boxes(stale)
 
     assert boxes[0] == web_module._DEFAULT_INVENTORY_TITLE_BOX
     assert boxes[1] == stale
-    assert any(float(box.split(",")[1]) >= 0.5 for box in boxes)
+    assert len(boxes) == 2
+    assert web_module._inventory_title_boxes(None) == (
+        web_module._DEFAULT_INVENTORY_TITLE_BOX,
+    )
+
+
+def test_inventory_scanner_rejects_suffix_driven_wrong_item_family() -> None:
+    wrong = SimpleNamespace(name="Aril Core Red Alert")
+
+    assert _inventory_scanner_accepted_matches(
+        [(wrong, 0.97)], 0.88, "ArdenisL Core Red Alert"
+    ) == []
 
 
 def test_inventory_catalog_item_type_fills_missing_catalog_subtypes() -> None:
@@ -711,7 +726,7 @@ def test_inventory_scanner_reuses_catalog_lookups_for_results_and_diagnostics(mo
     text = "FS-9 LMG\nWeapon\nSize 1\nEffective Range 100 m"
     calls: list[str] = []
 
-    async def fake_lookup(candidate: str, limit: int = 5):
+    async def fake_lookup(candidate: str, limit: int = 5, **_kwargs):
         calls.append(candidate)
         return [(
             SimpleNamespace(
@@ -742,7 +757,7 @@ def test_inventory_scanner_reuses_catalog_lookups_for_results_and_diagnostics(mo
 
 
 def test_inventory_scanner_optional_type_filter_restricts_catalog_matches(monkeypatch) -> None:
-    async def fake_lookup(candidate: str, limit: int = 5, category: str | None = None):
+    async def fake_lookup(candidate: str, limit: int = 5, category: str | None = None, **_kwargs):
         del candidate, limit, category
         return [
             (SimpleNamespace(name="FS-9 LMG", category="Weapons", section="Light machine gun"), 1.0),

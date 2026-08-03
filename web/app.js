@@ -244,6 +244,7 @@ let inventoryScannerDrag = null;
 let inventoryScannerTimer = null;
 let inventoryImportItems = [];
 let inventoryScannerHistory = [];
+let inventoryScannerPendingReview = null;
 let inventoryScannerStatus = "";
 let inventoryScannerInFlight = 0;
 const inventoryScannerMaxInFlight = 1;
@@ -1677,6 +1678,7 @@ function addInventoryScannerHistory(payload, countedItems = payload.items || [],
   const items = countedItems;
   if ((payload.items || []).length && !items.length) return;
   if (items.length) {
+    inventoryScannerPendingReview = null;
     items.forEach((item) => {
       const existingIndex = inventoryScannerHistory.findIndex((entry) =>
         entry.status === "accepted" && normalizeInventoryMergeKey(entry.text) === normalizeInventoryMergeKey(item.name)
@@ -1701,10 +1703,12 @@ function addInventoryScannerHistory(payload, countedItems = payload.items || [],
     const candidates = payload.diagnostics?.candidates || [];
     const best = candidates.find((candidate) => candidate.matches?.length) || candidates[0];
     const suggested = best?.matches?.[0];
+    const reviewText = best?.text || firstInventoryOcrLine(payload.ocr_text) || "";
+    if (!reviewText) return;
     const reviewEntry = {
       timestamp,
       status: "review",
-      text: best?.text || firstInventoryOcrLine(payload.ocr_text) || "Unread tooltip",
+      text: reviewText,
       captureToken,
       suggestedName: suggested?.name || "",
       category: suggested?.category || "",
@@ -1714,14 +1718,66 @@ function addInventoryScannerHistory(payload, countedItems = payload.items || [],
         ? `Suggested: ${suggested.name} (${Math.round(Number(suggested.score || 0) * 100)}%)`
         : "OCR text needs manual correction",
     };
-    inventoryScannerHistory = inventoryScannerHistory.filter((entry) =>
-      !(entry.status === "review"
-        && normalizeInventoryMergeKey(entry.text) === normalizeInventoryMergeKey(reviewEntry.text)
-        && (!captureToken || entry.captureToken === captureToken))
+    const pendingIsSame = inventoryScannerPendingReview
+      && inventoryScannerReviewEntriesMatch(inventoryScannerPendingReview.entry, reviewEntry, true);
+    if (!pendingIsSame) {
+      inventoryScannerPendingReview = { entry: reviewEntry, samples: 1 };
+      return;
+    }
+    inventoryScannerPendingReview.samples += 1;
+    inventoryScannerPendingReview.entry = betterInventoryScannerReview(
+      inventoryScannerPendingReview.entry,
+      reviewEntry,
     );
-    inventoryScannerHistory.unshift(reviewEntry);
+    if (inventoryScannerPendingReview.samples < 2) return;
+    const stableEntry = inventoryScannerPendingReview.entry;
+    const existingIndex = inventoryScannerHistory.findIndex((entry) =>
+      entry.status === "review" && inventoryScannerReviewEntriesMatch(entry, stableEntry, false)
+    );
+    if (existingIndex >= 0) {
+      const existing = inventoryScannerHistory.splice(existingIndex, 1)[0];
+      inventoryScannerHistory.unshift(betterInventoryScannerReview(existing, stableEntry));
+    } else {
+      inventoryScannerHistory.unshift(stableEntry);
+    }
   }
   inventoryScannerHistory = inventoryScannerHistory.slice(0, 100);
+}
+
+function inventoryScannerReviewEntriesMatch(left, right, allowTextSimilarity = false) {
+  if (left?.captureToken && right?.captureToken && left.captureToken === right.captureToken) return true;
+  const leftSuggestion = normalizeInventoryMergeKey(left?.suggestedName);
+  const rightSuggestion = normalizeInventoryMergeKey(right?.suggestedName);
+  if (leftSuggestion && rightSuggestion && leftSuggestion === rightSuggestion) return true;
+  return allowTextSimilarity && inventoryScannerTextSimilarity(left?.text, right?.text) >= 0.72;
+}
+
+function inventoryScannerTextSimilarity(left, right) {
+  const a = normalizeInventoryMergeKey(left).replaceAll(" ", "");
+  const b = normalizeInventoryMergeKey(right).replaceAll(" ", "");
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const distances = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= a.length; row += 1) {
+    let diagonal = distances[0];
+    distances[0] = row;
+    for (let column = 1; column <= b.length; column += 1) {
+      const above = distances[column];
+      distances[column] = Math.min(
+        distances[column] + 1,
+        distances[column - 1] + 1,
+        diagonal + (a[row - 1] === b[column - 1] ? 0 : 1),
+      );
+      diagonal = above;
+    }
+  }
+  return 1 - (distances[b.length] / Math.max(a.length, b.length));
+}
+
+function betterInventoryScannerReview(left, right) {
+  const score = (entry) => Number(String(entry?.detail || "").match(/\((\d+)%\)/)?.[1] || 0);
+  const best = score(right) > score(left) ? right : left;
+  return { ...best, timestamp: right.timestamp, captureToken: right.captureToken };
 }
 
 function renderInventoryScanProgress() {
@@ -1769,6 +1825,7 @@ document.addEventListener("click", (event) => {
   const dismissAll = event.target.closest("[data-scanner-dismiss-all]");
   if (dismissAll) {
     inventoryScannerHistory = inventoryScannerHistory.filter((entry) => entry.status !== "review");
+    inventoryScannerPendingReview = null;
     renderInventoryImportItems(
       { items: inventoryImportItems },
       { scannerMode: true, recordHistory: false, liveScan: Boolean(inventoryScannerStream) },
@@ -1920,6 +1977,7 @@ async function startInventoryScanner() {
   stopInventoryScanner(false);
   inventoryImportItems = [];
   inventoryScannerHistory = [];
+  inventoryScannerPendingReview = null;
   inventoryScannerStatus = "Scanner ready.";
   inventoryScannerInFlight = 0;
   inventoryScannerPendingHashes.clear();
@@ -1937,8 +1995,8 @@ async function startInventoryScanner() {
   inventoryScannerStream = await navigator.mediaDevices.getDisplayMedia({
     video: {
       frameRate: { ideal: 5, max: 8 },
-      width: { ideal: 960, max: 1280 },
-      height: { ideal: 540, max: 720 },
+      width: { ideal: 1920, max: 2560 },
+      height: { ideal: 1080, max: 1440 },
     },
     audio: false,
   });
@@ -2212,7 +2270,7 @@ async function captureInventoryScannerCrop() {
     && calibratedValues[3] > 0) {
     requestTitleBox = inventoryScannerTitleBox;
   }
-  const maxWidth = 1280;
+  const maxWidth = 1920;
   const scale = Math.min(1, maxWidth / Math.max(1, sw));
   const targetWidth = Math.max(1, Math.round(sw * scale));
   const targetHeight = Math.max(1, Math.round(sh * scale));
@@ -2238,10 +2296,12 @@ async function captureInventoryScannerCrop() {
   );
   const contextHash = imageAverageHash(contextCanvas, 24);
   const tileToken = detectInventoryScannerTileToken(contextCanvas);
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
+  // Inventory titles are small, thin, low-contrast text. PNG avoids the extra
+  // ringing and blur that WebP introduces before server-side OCR.
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("Could not encode the inventory capture.");
   return {
-    file: new File([blob], "inventory-tooltip.webp", { type: "image/webp" }),
+    file: new File([blob], "inventory-tooltip.png", { type: "image/png" }),
     hash,
     contextHash,
     tileToken,

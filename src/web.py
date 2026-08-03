@@ -345,7 +345,26 @@ async def lifespan(app: FastAPI):
     )
     try:
         await asyncio.to_thread(_initialize_rapid_ocr_pool)
-        await asyncio.to_thread(_warm_rapid_title_ocr)
+        await asyncio.gather(*(
+            asyncio.to_thread(_warm_rapid_title_ocr)
+            for _ in range(_RAPID_TITLE_OCR_POOL_SIZE)
+        ))
+        from PIL import Image
+        warm_frame = Image.new("RGB", (1280, 720), "black")
+        warm_output = BytesIO()
+        warm_frame.save(warm_output, format="PNG")
+        warm_image_data = warm_output.getvalue()
+        await asyncio.gather(*(
+            asyncio.to_thread(
+                _read_calibrated_inventory_title,
+                warm_image_data,
+                _DEFAULT_INVENTORY_TITLE_BOX,
+            )
+            for _ in range(_RAPID_TITLE_OCR_POOL_SIZE)
+        ))
+        # Build the local item-catalog indexes during startup instead of making
+        # the first scanner request pay the cold-load cost.
+        await sources.lookup_inventory_items("inventory scanner warmup", limit=1)
     except Exception:
         pass
     try:
@@ -1798,6 +1817,8 @@ async def _import_inventory_scanner_images(
     effective_min_score = max(min_score, 0.88) if live_scan else min_score
     if not live_scan:
         ocr_text, ocr_error = await _ocr_blueprint_images(files)
+        ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
+        match_started_at = time.perf_counter()
         scanner_lookups = await _inventory_scanner_lookups(
             ocr_text,
             exclude_words,
@@ -1812,6 +1833,7 @@ async def _import_inventory_scanner_images(
             exclude_words,
             scanner_lookups,
         ) if ocr_text.strip() else []
+        match_ms = round((time.perf_counter() - match_started_at) * 1000)
         attempted_titles: list[tuple[str, str]] = []
     else:
         image_data, ocr_error = await _read_inventory_scanner_image(files)
@@ -1820,22 +1842,32 @@ async def _import_inventory_scanner_images(
         items: list[dict[str, Any]] = []
         attempted_titles = []
         best_review: tuple[float, str, str, dict[str, list[tuple[Any, float]]]] | None = None
-        for candidate_box in _inventory_title_boxes(title_box):
-            candidate_text = await asyncio.to_thread(
-                _read_calibrated_inventory_title,
-                image_data,
-                candidate_box,
-            ) if image_data else ""
+        candidate_boxes = _inventory_title_boxes(title_box)
+        candidate_texts = await asyncio.gather(*(
+            asyncio.to_thread(_read_calibrated_inventory_title, image_data, candidate_box)
+            for candidate_box in candidate_boxes
+        )) if image_data else [""] * len(candidate_boxes)
+        ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
+        plausible_titles: list[tuple[str, str]] = []
+        seen_titles: set[str] = set()
+        for candidate_box, candidate_text in zip(candidate_boxes, candidate_texts):
             if not _inventory_title_candidate_is_plausible(candidate_text):
                 continue
+            normalized_title = _normalize_text(candidate_text)
+            if normalized_title in seen_titles:
+                continue
+            seen_titles.add(normalized_title)
             attempted_titles.append((candidate_text, candidate_box))
-            candidate_lookups = await _inventory_scanner_lookups(
-                candidate_text,
-                exclude_words,
-                candidate_limit=1,
-                category=default_category,
-                item_type=default_item_type,
+            plausible_titles.append((candidate_text, candidate_box))
+        match_started_at = time.perf_counter()
+        lookup_groups = await asyncio.gather(*(
+            _inventory_scanner_lookups(
+                candidate_text, exclude_words, candidate_limit=1,
+                category=default_category, item_type=default_item_type,
             )
+            for candidate_text, _ in plausible_titles
+        ))
+        for (candidate_text, candidate_box), candidate_lookups in zip(plausible_titles, lookup_groups):
             candidate_items = await _match_inventory_scanner_text(
                 candidate_text,
                 default_location,
@@ -1865,9 +1897,7 @@ async def _import_inventory_scanner_images(
             calibration = {"title_box": candidate_box, "fast_title": False}
         elif calibration is None:
             calibration = {"title_box": None, "fast_title": False}
-    ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
-    match_started_at = time.perf_counter()
-    match_ms = round((time.perf_counter() - match_started_at) * 1000)
+        match_ms = round((time.perf_counter() - match_started_at) * 1000)
     logging.info(
         "Inventory scanner scan_id=%s category=%r type=%r ocr=%r matches=%r attempts=%r queue_ms=%d ocr_ms=%d match_ms=%d",
         scan_id,
@@ -2163,7 +2193,6 @@ def _inventory_title_boxes(title_box: str | None) -> tuple[str, ...]:
     for candidate_box in (
         _DEFAULT_INVENTORY_TITLE_BOX,
         title_box,
-        *_INVENTORY_TITLE_FALLBACK_BOXES,
     ):
         if candidate_box and candidate_box not in boxes:
             boxes.append(candidate_box)
@@ -2621,6 +2650,7 @@ async def _match_inventory_scanner_text(
         for result, confidence in _inventory_scanner_accepted_matches(
             scanner_lookups.get(candidate, []) if scanner_lookups is not None else await _inventory_lookup_scored_matches(candidate, 5),
             min_score,
+            candidate,
         ):
             existing = matches.get(result.name)
             if existing and existing["confidence"] >= confidence:
@@ -2727,13 +2757,26 @@ def _inventory_catalog_item_type(name: str, category: str | None) -> str | None:
     return None
 
 
-def _inventory_scanner_accepted_matches(scored_matches: list[tuple[Any, float]], min_score: float) -> list[tuple[Any, float]]:
+def _inventory_scanner_accepted_matches(
+    scored_matches: list[tuple[Any, float]],
+    min_score: float,
+    candidate: str | None = None,
+) -> list[tuple[Any, float]]:
     accepted = sorted(
         [(result, confidence) for result, confidence in scored_matches if confidence >= min_score],
         key=lambda item: (-item[1], -len(item[0].name), item[0].name.lower()),
     )
     if not accepted:
         return []
+    if candidate:
+        candidate_words = _normalize_text(candidate).split()
+        result_words = _normalize_text(accepted[0][0].name).split()
+        if len(candidate_words) >= 3 and len(result_words) >= 3:
+            family_similarity = difflib.SequenceMatcher(
+                None, candidate_words[0], result_words[0]
+            ).ratio()
+            if family_similarity < 0.70:
+                return []
     if len(accepted) > 1 and accepted[0][1] - accepted[1][1] < 0.04:
         return []
     return [accepted[0]]
@@ -2838,9 +2881,9 @@ async def _inventory_scanner_lookups(
     async def lookup(candidate: str) -> tuple[str, list[tuple[Any, float]]]:
         async with semaphore:
             matches = (
-                await _inventory_lookup_scored_matches(candidate, 5, category)
+                await _inventory_lookup_scored_matches(candidate, 5, category, quick=True)
                 if category
-                else await _inventory_lookup_scored_matches(candidate, 5)
+                else await _inventory_lookup_scored_matches(candidate, 5, quick=True)
             )
             selected_type = _normalize_text(item_type or "")
             if selected_type:
@@ -2866,7 +2909,10 @@ async def _inventory_scanner_lookups(
 
 
 async def _inventory_lookup_scored_matches(
-    candidate: str, limit: int = 5, category: str | None = None
+    candidate: str,
+    limit: int = 5,
+    category: str | None = None,
+    quick: bool = False,
 ) -> list[tuple[Any, float]]:
     seen: set[str] = set()
     scored: list[tuple[Any, float]] = []
@@ -2880,6 +2926,8 @@ async def _inventory_lookup_scored_matches(
             return []
 
     queries = _inventory_lookup_queries(candidate)
+    if quick:
+        queries = queries[:2]
     result_groups = await asyncio.gather(*(lookup(query) for query in queries))
     for results in result_groups:
         for result in results:
@@ -3051,7 +3099,7 @@ def _inventory_scanner_line_is_metadata(line: str) -> bool:
 def _inventory_match_confidence(candidate: str, item_name: str) -> float:
     if _inventory_scanner_line_is_metadata(candidate):
         return 0
-    candidate_norm = _normalize_text(_strip_inventory_item_prefix(candidate))
+    candidate_norm = _normalize_text(_normalize_inventory_tooltip_name(candidate))
     item_norm = _normalize_text(_strip_inventory_item_prefix(item_name))
     if not candidate_norm or not item_norm:
         return 0
@@ -3456,6 +3504,10 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         r"\bsorguine\b": "Sanguine",
         r"\bsarguine\b": "Sanguine",
         r"\bcompensatora\b": "Compensator",
+        # The thin "III" in the Deadbolt title commonly collapses into "i" or
+        # "im" at screen-share resolution. Keep VI untouched so the two cannon
+        # variants remain distinguishable.
+        r"\b(?:deed|dead)bolti(?:m)?\s*cannon\b": "Deadbolt III Cannon",
     }
     for pattern, replacement in replacements.items():
         value = re.sub(pattern, replacement, value, flags=re.IGNORECASE)
