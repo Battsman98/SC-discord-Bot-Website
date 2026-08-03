@@ -664,6 +664,7 @@ async def health() -> dict[str, Any]:
     catalog = await state().sources.item_catalog_status()
     return {
         "status": "online",
+        "revision": os.getenv("RENDER_GIT_COMMIT", "local")[:12],
         "discord_auth_enabled": discord_auth_configured(settings),
         "inventory_scanner": {
             "workers": state().scanner_gate.worker_count,
@@ -2043,10 +2044,10 @@ async def export_my_inventory(
     if selected_categories:
         items = [item for item in items if str(item.get("category") or "").strip().casefold() in selected_categories]
 
-    average_prices: dict[str, float] = {}
+    price_comparisons: dict[str, dict[str, float]] = {}
     if selling and items:
         try:
-            average_prices = await state().sources.inventory_average_sell_prices([str(item["name"]) for item in items])
+            price_comparisons = await state().sources.inventory_sell_price_comparison([str(item["name"]) for item in items])
         except Exception:
             logging.exception("UEX inventory selling prices were unavailable during export")
 
@@ -2055,7 +2056,13 @@ async def export_my_inventory(
     sheet.title = "Station Inventory"
     headers = ["Location", "Category", "Item Type", "Size", "Name", "Quantity", "Quality", "Volume SCU", "Notes"]
     if selling:
-        headers.extend(["Average UEX Sell Price (aUEC)", "Estimated Sell Total (aUEC)"])
+        headers.extend([
+            "Average UEX Terminal Sell Price (aUEC)",
+            "Average UEX Player Seller Price (aUEC)",
+            "Selected Sell Price (aUEC)",
+            "Price Source",
+            "Estimated Sell Total (aUEC)",
+        ])
     sheet.append(headers)
     for cell in sheet[1]:
         cell.font = Font(bold=True)
@@ -2072,17 +2079,23 @@ async def export_my_inventory(
                 "",
             ]
         if selling:
-            normalized_name = " ".join(str(item["name"]).lower().replace("-", " ").split())
-            average_price = average_prices.get(normalized_name)
+            normalized_name = " ".join(re.sub(r"[^a-z0-9]+", " ", str(item["name"]).casefold()).split())
+            comparison = price_comparisons.get(normalized_name, {})
+            terminal_price = comparison.get("terminal_average")
+            player_price = comparison.get("player_average")
+            selected_price = player_price if player_price is not None else terminal_price
             row.extend([
-                average_price if average_price is not None else "",
-                average_price * float(item["quantity"]) if average_price is not None else "",
+                terminal_price if terminal_price is not None else "",
+                player_price if player_price is not None else "",
+                selected_price if selected_price is not None else "",
+                "UEX Player Marketplace" if player_price is not None else ("UEX Terminal Buyback" if terminal_price is not None else ""),
+                selected_price * float(item["quantity"]) if selected_price is not None else "",
             ])
         sheet.append(row)
     if selling:
         for row_number in range(2, sheet.max_row + 1):
-            sheet.cell(row=row_number, column=10).number_format = '#,##0.00'
-            sheet.cell(row=row_number, column=11).number_format = '#,##0.00'
+            for column_number in (10, 11, 12, 14):
+                sheet.cell(row=row_number, column=column_number).number_format = '#,##0.00'
     for column in sheet.columns:
         max_length = max(len(str(cell.value or "")) for cell in column)
         sheet.column_dimensions[column[0].column_letter].width = min(max(max_length + 2, 12), 48)
