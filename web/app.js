@@ -1640,7 +1640,7 @@ function chooseInventoryExportOptions(categories) {
     backdrop.innerHTML = `<section class="inventory-export-dialog" role="dialog" aria-modal="true" aria-labelledby="inventoryExportTitle">
       <h2 id="inventoryExportTitle">Export Inventory</h2>
       <label class="inventory-export-selling"><input type="checkbox" data-inventory-export-selling> <span>Prepare this Excel file for selling items</span></label>
-      <p class="inventory-export-help">Adds the current average UEX sell price and an estimated total for every matched item.</p>
+      <p class="inventory-export-help">Compares UEX terminal buyback averages with current player-seller marketplace averages, then estimates totals using the player price when available.</p>
       <fieldset>
         <legend>Categories to include</legend>
         <div class="inventory-export-category-actions"><button type="button" data-inventory-export-all>Select all</button><button type="button" data-inventory-export-none>Clear all</button></div>

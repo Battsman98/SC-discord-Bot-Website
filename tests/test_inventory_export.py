@@ -40,9 +40,9 @@ def test_inventory_export_filters_categories_blanks_notes_and_adds_sell_prices(m
             return items
 
     class Sources:
-        async def inventory_average_sell_prices(self, names):
+        async def inventory_sell_price_comparison(self, names):
             assert names == ["FS-9 LMG"]
-            return {"fs 9 lmg": 125.5}
+            return {"fs 9 lmg": {"terminal_average": 125.5, "player_average": 500}}
 
     monkeypatch.setattr(web, "state", lambda: SimpleNamespace(cache=Cache(), sources=Sources()))
     response = asyncio.run(
@@ -59,9 +59,18 @@ def test_inventory_export_filters_categories_blanks_notes_and_adds_sell_prices(m
     sheet = load_workbook(BytesIO(response.body), data_only=False).active
     headers = [cell.value for cell in sheet[1]]
     assert "Updated At" not in headers
-    assert headers[-2:] == ["Average UEX Sell Price (aUEC)", "Estimated Sell Total (aUEC)"]
+    assert headers[-5:] == [
+        "Average UEX Terminal Sell Price (aUEC)",
+        "Average UEX Player Seller Price (aUEC)",
+        "Selected Sell Price (aUEC)",
+        "Price Source",
+        "Estimated Sell Total (aUEC)",
+    ]
     assert sheet.max_row == 2
     assert sheet["E2"].value == "FS-9 LMG"
     assert sheet["I2"].value is None
     assert sheet["J2"].value == 125.5
-    assert sheet["K2"].value == 251
+    assert sheet["K2"].value == 500
+    assert sheet["L2"].value == 500
+    assert sheet["M2"].value == "UEX Player Marketplace"
+    assert sheet["N2"].value == 1000

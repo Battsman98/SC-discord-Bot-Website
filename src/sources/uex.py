@@ -1,3 +1,4 @@
+import difflib
 import json
 import re
 import time
@@ -36,6 +37,7 @@ class UEXSource:
         self._item_categories: list[dict] | None = None
         self._items_by_category: dict[int, list[dict]] = {}
         self._all_item_prices: list[dict] | None = None
+        self._all_marketplace_prices: list[dict] | None = None
         self._buyable_items: list[dict] | None = None
         self._terminals_by_id: dict[str, dict] | None = None
         self._terminals_loaded_at = 0.0
@@ -568,49 +570,91 @@ class UEXSource:
         await self._cache.set(cache_key, prices, self._settings.cache_ttl_seconds)
         return prices
 
-    async def inventory_average_sell_prices(self, names: list[str]) -> dict[str, float]:
-        """Average positive prices paid by UEX terminals for inventory items."""
-        wanted = {self._normalize(name) for name in names if self._normalize(name)}
+    async def _fetch_all_marketplace_prices(self) -> list[dict]:
+        if self._all_marketplace_prices is not None:
+            return self._all_marketplace_prices
+        cached = await self._cache.get("uex:marketplace-prices-averages-all:v1")
+        if isinstance(cached, list):
+            self._all_marketplace_prices = [row for row in cached if isinstance(row, dict)]
+            return self._all_marketplace_prices
+        payload = await self._fetch_json(f"{self.base_url}/marketplace_prices_averages_all")
+        rows = payload.get("data") if isinstance(payload, dict) else []
+        self._all_marketplace_prices = [row for row in rows if isinstance(row, dict)]
+        await self._cache.set("uex:marketplace-prices-averages-all:v1", self._all_marketplace_prices, 3600)
+        return self._all_marketplace_prices
+
+    async def inventory_sell_price_comparison(self, names: list[str]) -> dict[str, dict[str, float]]:
+        """Compare terminal buyback averages with active player seller averages."""
+        wanted = {self._price_name_key(name) for name in names if self._price_name_key(name)}
         if not wanted:
             return {}
 
-        item_names_by_id: dict[int, str] = {}
-        for category in await self._get_item_categories():
-            category_id = self._int_or_none(category.get("id"))
-            if category_id is None:
-                continue
-            for item in await self._fetch_items_by_category(category_id):
-                item_id = self._int_or_none(item.get("id"))
-                item_name = self._normalize(item.get("name"))
-                if item_id is not None and item_name in wanted:
-                    item_names_by_id[item_id] = item_name
+        terminal_samples: dict[str, list[float]] = {}
+        player_samples: dict[str, list[tuple[float, int]]] = {}
 
-        commodity_names_by_id = {
-            commodity_id: name
-            for commodity in await self._get_commodities()
-            if (commodity_id := self._int_or_none(commodity.get("id"))) is not None
-            and (name := self._normalize(commodity.get("name"))) in wanted
-        }
-        samples: dict[str, list[float]] = {name: [] for name in wanted}
-
-        def collect(rows: list[dict], names_by_id: dict[int, str], id_fields: tuple[str, ...]) -> None:
+        def collect_terminal(rows: list[dict]) -> None:
             for row in rows:
                 try:
                     price = float(row.get("price_sell") or 0)
                 except (TypeError, ValueError):
                     continue
-                if price <= 0:
-                    continue
-                row_name = self._normalize(row.get("item_name") or row.get("commodity_name") or row.get("name"))
-                if row_name not in wanted:
-                    row_id = next((self._int_or_none(row.get(field)) for field in id_fields if row.get(field) is not None), None)
-                    row_name = names_by_id.get(row_id) if row_id is not None else None
-                if row_name in samples:
-                    samples[row_name].append(price)
+                name = self._price_name_key(row.get("item_name") or row.get("commodity_name") or row.get("name"))
+                if name and price > 0:
+                    terminal_samples.setdefault(name, []).append(price)
 
-        collect(await self._fetch_all_item_prices(), item_names_by_id, ("id_item", "item_id"))
-        collect(await self._fetch_all_prices(), commodity_names_by_id, ("id_commodity", "commodity_id"))
-        return {name: sum(values) / len(values) for name, values in samples.items() if values}
+        collect_terminal(await self._fetch_all_item_prices())
+        collect_terminal(await self._fetch_all_prices())
+        for row in await self._fetch_all_marketplace_prices():
+            if str(row.get("operation") or "").casefold() != "sell":
+                continue
+            if str(row.get("currency") or "").upper() not in {"UEC", "AUEC"}:
+                continue
+            if str(row.get("unit") or "unit").casefold() != "unit":
+                continue
+            try:
+                price = float(row.get("price_avg") or 0)
+                listings = max(1, int(row.get("listings_count") or 1))
+            except (TypeError, ValueError):
+                continue
+            name = self._price_name_key(row.get("item_name"))
+            if name and price > 0:
+                player_samples.setdefault(name, []).append((price, listings))
+
+        available_names = set(terminal_samples) | set(player_samples)
+        comparisons: dict[str, dict[str, float]] = {}
+        for name in wanted:
+            matched_name = name if name in available_names else self._closest_price_name(name, available_names)
+            if matched_name is None:
+                continue
+            result: dict[str, float] = {}
+            terminal_values = terminal_samples.get(matched_name, [])
+            player_values = player_samples.get(matched_name, [])
+            if terminal_values:
+                result["terminal_average"] = sum(terminal_values) / len(terminal_values)
+            if player_values:
+                total_listings = sum(listings for _, listings in player_values)
+                result["player_average"] = sum(price * listings for price, listings in player_values) / total_listings
+            if result:
+                comparisons[name] = result
+        return comparisons
+
+    def _closest_price_name(self, wanted: str, candidates: set[str]) -> str | None:
+        matches = difflib.get_close_matches(wanted, candidates, n=2, cutoff=0.90)
+        if not matches:
+            return None
+        wanted_tokens = set(wanted.split())
+        match_tokens = set(matches[0].split())
+        if len(wanted_tokens & match_tokens) / max(len(wanted_tokens), len(match_tokens), 1) < 0.75:
+            return None
+        if len(matches) > 1:
+            best = difflib.SequenceMatcher(None, wanted, matches[0]).ratio()
+            runner_up = difflib.SequenceMatcher(None, wanted, matches[1]).ratio()
+            if best - runner_up < 0.03:
+                return None
+        return matches[0]
+
+    def _price_name_key(self, value: object) -> str:
+        return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").casefold()).split())
 
     async def _get_buyable_items(self) -> list[dict]:
         if self._buyable_items is not None:

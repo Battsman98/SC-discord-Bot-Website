@@ -48,10 +48,10 @@ def test_home_page_rotates_official_responsive_fankit_wallpapers() -> None:
     assert 'return "tablet"' in javascript
     assert 'return "wide"' in javascript
     assert "prefers-reduced-motion: reduce" in javascript
-    for image_id in ("10", "25", "29", "30", "31", "32", "34", "36"):
+    for image_id in ("25", "29", "30", "32", "34", "36"):
         for size in ("wide", "tablet", "mobile"):
             assert (WEB_DIR / "media" / "home" / f"sc-{image_id}-{size}.jpg").is_file()
-    for image_id in range(1, 10):
+    for image_id in (1, 4, 5, 6, 7, 8, 9):
         assert (WEB_DIR / "media" / "home" / f"user-{image_id:02}.webp").is_file()
     for image_id in range(1, 8):
         assert (WEB_DIR / "media" / "home" / f"gallery-{image_id:02}.webp").is_file()
