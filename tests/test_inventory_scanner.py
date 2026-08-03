@@ -347,6 +347,19 @@ def test_inventory_scanner_candidates_ignore_tooltip_stats() -> None:
     assert "Attachments: Optics (S2), Barrel (S2), Underbarrel (S3)" not in candidates
 
 
+def test_inventory_scanner_does_not_treat_long_catalog_names_as_metadata() -> None:
+    names = (
+        "Calva Racing Helmet Year of the Rat",
+        "Classic Dog",
+        "Day of the Vara '54 Coin",
+        "Year of the Rat Lantern Display",
+    )
+
+    for name in names:
+        assert not web_module._inventory_scanner_line_is_metadata(name)
+        assert web_module._inventory_match_confidence(name, name) == 1
+
+
 def test_inventory_scanner_ignores_grey_description_after_weapon_stats() -> None:
     text = """
     HG-2 Jaeger (2x Holographic)

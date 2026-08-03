@@ -2668,7 +2668,9 @@ async def _match_inventory_scanner_text(
             item.update(
                 {
                     "name": result.name,
-                    "category": result.category or item.get("category"),
+                    # Keep the website taxonomy selected by the user. Upstream
+                    # has additional labels such as Cargo and Usable.
+                    "category": category or result.category or item.get("category"),
                     "item_type": (
                         result.section
                         or _inventory_catalog_item_type(result.name, result.category or item.get("category"))
@@ -2936,9 +2938,39 @@ async def _inventory_lookup_scored_matches(
 
     async def lookup(query: str) -> list[Any]:
         try:
-            return await state().sources.lookup_inventory_items(
-                query, limit=limit, category=category
+            categorized = (
+                await state().sources.lookup_inventory_items(
+                    query, limit=limit, category=category
+                )
+                if category
+                else []
             )
+            if any(
+                max(
+                    _inventory_match_confidence(candidate, name)
+                    for name in (
+                        result.name,
+                        *getattr(result, "catalog_aliases", ()),
+                    )
+                )
+                >= 0.88
+                for result in categorized
+            ):
+                return categorized
+            # Source categories do not map one-to-one to the website taxonomy
+            # (for example Cargo -> Commodities and Usable -> Utility). Search
+            # the complete catalog too, then rely on confidence and ambiguity
+            # checks instead of silently hiding valid items.
+            complete = await state().sources.lookup_inventory_items(query, limit=limit)
+            combined: list[Any] = []
+            combined_names: set[str] = set()
+            for result in [*categorized, *complete]:
+                key = _normalize_text(getattr(result, "name", ""))
+                if not key or key in combined_names:
+                    continue
+                combined_names.add(key)
+                combined.append(result)
+            return combined[: limit * 2]
         except Exception:
             return []
 
@@ -3156,14 +3188,17 @@ def _inventory_scanner_line_is_metadata(line: str) -> bool:
         "size",
         "quality",
     )
-    if normalized.startswith(blocked_prefixes):
+    if any(
+        re.match(rf"^{re.escape(prefix)}(?:\b|\s|:)", normalized)
+        for prefix in blocked_prefixes
+    ):
         return True
     if re.fullmatch(r"\d+(?:\.\d+)?\s*(?:scu|uscu|q|rpm|m)", normalized):
         return True
     words = normalized.split()
     if len(words) > 10:
         return True
-    if len(words) >= 6 and sum(1 for word in words if word in {"the", "and", "to", "of", "for", "that", "with"}) >= 2:
+    if len(words) >= 9 and sum(1 for word in words if word in {"the", "and", "to", "of", "for", "that", "with"}) >= 3:
         return True
     return False
 
