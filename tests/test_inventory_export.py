@@ -59,6 +59,7 @@ def test_inventory_export_filters_categories_blanks_notes_and_adds_sell_prices(m
     sheet = load_workbook(BytesIO(response.body), data_only=False).active
     headers = [cell.value for cell in sheet[1]]
     assert "Updated At" not in headers
+    assert headers[:6] == ["Location", "Category", "Item Type", "Quantity", "Name", "Size"]
     assert headers[-5:] == [
         "Average UEX Terminal Sell Price (aUEC)",
         "Average UEX Player Seller Price (aUEC)",
@@ -67,7 +68,9 @@ def test_inventory_export_filters_categories_blanks_notes_and_adds_sell_prices(m
         "Estimated Sell Total (aUEC)",
     ]
     assert sheet.max_row == 2
+    assert sheet["D2"].value == 2
     assert sheet["E2"].value == "FS-9 LMG"
+    assert sheet["F2"].value is None
     assert sheet["I2"].value is None
     assert sheet["J2"].value == 125.5
     assert sheet["K2"].value == 500

@@ -2054,7 +2054,7 @@ async def export_my_inventory(
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Station Inventory"
-    headers = ["Location", "Category", "Item Type", "Size", "Name", "Quantity", "Quality", "Volume SCU", "Notes"]
+    headers = ["Location", "Category", "Item Type", "Quantity", "Name", "Size", "Quality", "Volume SCU", "Notes"]
     if selling:
         headers.extend([
             "Average UEX Terminal Sell Price (aUEC)",
@@ -2071,9 +2071,9 @@ async def export_my_inventory(
                 item["location"],
                 item["category"] or "",
                 item["item_type"] or "",
-                item["item_size"] or "",
-                item["name"],
                 item["quantity"],
+                item["name"],
+                item["item_size"] or "",
                 item["quality"] if item["quality"] is not None else "",
                 item["volume_scu"] if item["volume_scu"] is not None else "",
                 "",
