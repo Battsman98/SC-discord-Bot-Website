@@ -41,6 +41,7 @@ from src.config import Settings
 from src.security import SlidingWindowLimiter, install_secret_redaction
 from src.sources.base import ItemLocatorResult
 from src.sources.citizen_updates import CitizenUpdatesSource
+from src.sources.p4k_inventory import P4KInventoryCatalog
 from src.sources.registry import SourceRegistry, build_default_registry
 from src.sources.warbonds import WarbondTrackerSource
 from src.timers import (
@@ -67,6 +68,7 @@ from src.web_auth import (
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 WEB_DIR = ROOT_DIR / "web"
+P4K_INVENTORY_CATALOG = P4KInventoryCatalog(ROOT_DIR / "data" / "p4k_inventory_snapshot.json")
 COMMANDS_PATH = ROOT_DIR / "docs" / "commands.md"
 SHIP_LOANERS = {
     "600i explorer": ["Cyclone"],
@@ -2980,7 +2982,22 @@ async def _inventory_lookup_scored_matches(
     result_groups = await asyncio.gather(*(lookup(query) for query in queries))
     # Prefer supplements so their OCR aliases are retained when an incomplete
     # upstream result has the same canonical name.
-    result_groups.insert(0, _inventory_scanner_catalog_supplements(candidate))
+    supplements = _inventory_scanner_catalog_supplements(candidate)
+    result_groups.insert(0, supplements)
+    existing_results = [result for group in result_groups for result in group]
+    existing_is_confident = any(
+        max(
+            _inventory_match_confidence(candidate, name)
+            for name in (result.name, *getattr(result, "catalog_aliases", ()))
+        )
+        >= 0.88
+        for result in existing_results
+    )
+    # Data.p4k closes catalog/version gaps. Keep the richer Wiki result when
+    # it already matches confidently, and pay the P4K fuzzy-index cost only
+    # when the external catalog cannot resolve the OCR candidate.
+    if not existing_is_confident:
+        result_groups.append(P4K_INVENTORY_CATALOG.lookup(candidate, limit * 2))
     for results in result_groups:
         for result in results:
             key = _normalize_text(getattr(result, "name", ""))
