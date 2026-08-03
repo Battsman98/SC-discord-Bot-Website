@@ -40,10 +40,13 @@ class P4KInventoryCatalog:
             if not name:
                 continue
             aliases = tuple(str(value) for value in row.get("aliases") or [] if value)
+            subtype = str(row.get("subtype") or "").strip()
+            item_type = str(row.get("type") or "").strip()
+            section = item_type if subtype.casefold() in {"", "undefined"} else subtype
             result = ItemLocatorResult(
                 id=-1_000_000 - index,
                 name=name,
-                section=str(row.get("subtype") or row.get("type") or "") or None,
+                section=section or None,
                 category=None,
                 company_name=None,
                 size=str(row.get("size") or "") or None,

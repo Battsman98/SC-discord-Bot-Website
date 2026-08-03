@@ -1722,12 +1722,12 @@ async def inventory_catalog_suggestions(
     clean_query = " ".join(query.split())
     if len(clean_query) < 2:
         return []
-    wiki_results = await state().sources.lookup_inventory_items(
-        clean_query, limit=limit, category=(category or None)
-    )
+    # Manual autocomplete must remain instant even while the Wiki catalog is
+    # syncing or unavailable. Data.p4k is bundled and queried entirely in
+    # memory, so typing never depends on a remote request.
     p4k_results = P4K_INVENTORY_CATALOG.lookup(clean_query, limit * 2)
     merged: dict[str, Any] = {}
-    for result in [*wiki_results, *p4k_results]:
+    for result in p4k_results:
         key = _normalize_text(getattr(result, "name", ""))
         if key and key not in merged:
             merged[key] = result
