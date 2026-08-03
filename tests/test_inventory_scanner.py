@@ -439,6 +439,11 @@ def test_inventory_scanner_corrects_common_weapon_ocr_typos() -> None:
     assert _inventory_match_confidence("Deedbolticannon", "Deadbolt III Cannon") >= 0.88
 
 
+def test_inventory_scanner_corrects_saved_screen_share_title_distortions() -> None:
+    assert _normalize_inventory_tooltip_name("uoMCargo Pushie") == "Tumbril Cargo Plushie"
+    assert _normalize_inventory_tooltip_name("RediMake ltem Fabricator AA Support") == "RediMake Item Fabricator AA Support"
+
+
 def test_inventory_match_confidence_does_not_mix_attachment_families() -> None:
     assert _inventory_match_confidence("Stoic Suppressor2", "Sion Compensator") < 0.72
     assert _inventory_match_confidence("Stoic Suppressor3", "Sion Compensator") < 0.72

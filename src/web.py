@@ -2769,8 +2769,18 @@ def _inventory_scanner_accepted_matches(
     min_score: float,
     candidate: str | None = None,
 ) -> list[tuple[Any, float]]:
+    # A long tooltip title with a clearly separated catalog winner remains safe
+    # slightly below the live threshold. This recovers screen-share OCR damage
+    # without weakening short or ambiguous names.
+    ranked = sorted(scored_matches, key=lambda item: (-item[1], -len(item[0].name), item[0].name.lower()))
+    adaptive_floor = min_score
+    if candidate and ranked:
+        normalized_candidate = _normalize_text(_normalize_inventory_tooltip_name(candidate))
+        runner_up = ranked[1][1] if len(ranked) > 1 else 0
+        if len(normalized_candidate) >= 14 and ranked[0][1] >= 0.82 and ranked[0][1] - runner_up >= 0.05:
+            adaptive_floor = 0.82
     accepted = sorted(
-        [(result, confidence) for result, confidence in scored_matches if confidence >= min_score],
+        [(result, confidence) for result, confidence in scored_matches if confidence >= adaptive_floor],
         key=lambda item: (-item[1], -len(item[0].name), item[0].name.lower()),
     )
     if not accepted:
@@ -2782,6 +2792,14 @@ def _inventory_scanner_accepted_matches(
             family_similarity = difflib.SequenceMatcher(
                 None, candidate_words[0], result_words[0]
             ).ratio()
+            # CamelCase catalog families such as RediMake may be split by OCR
+            # normalization. Compare the joined leading token as well.
+            family_similarity = max(
+                family_similarity,
+                difflib.SequenceMatcher(
+                    None, "".join(candidate_words[:2]), result_words[0]
+                ).ratio(),
+            )
             if family_similarity < 0.70:
                 return []
     if len(accepted) > 1 and accepted[0][1] - accepted[1][1] < 0.04:
@@ -3026,6 +3044,8 @@ def _inventory_scanner_catalog_supplements(candidate: str) -> list[ItemLocatorRe
         (("xdl", "mark", "monocular", "rangefinder"), 'XDL "Mark I" Monocular Rangefinder', "Gadgets", "Utility", "Behring Applied Technology"),
         (("maxlift", "aa", "support", "tractor", "beam"), "MaxLift AA Support Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
         (("maxlift", "aa", "transport", "tractor", "beam"), "MaxLift AA Transport Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
+        (("tumbril", "cargo", "plushie"), "Tumbril Cargo Plushie", "Flair", "Other", "Tumbril Land Systems"),
+        (("redimake", "item", "fabricator", "aa", "support"), "RediMake Item Fabricator AA Support", "Crafter", "Other", "RediMake"),
     )
     results: list[ItemLocatorResult] = []
     compact = normalized.replace(" ", "")
@@ -3650,6 +3670,35 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         # "im" at screen-share resolution. Keep VI untouched so the two cannon
         # variants remain distinguishable.
         r"\b(?:deed|dead)bolti(?:m)?\s*cannon\b": "Deadbolt III Cannon",
+        # Stable one-second screen-share distortions from the permanent Medal
+        # corpus. Keep these anchored to full titles so unrelated catalog names
+        # cannot be silently coerced.
+        r"^csp[- ]*6a\s+bacoacx\s*epooe$": "CSP-68L Backpack Epoque",
+        r"^cr\s*het\s+aa\s+support$": "Chiron Helmet AA Support",
+        r"^vetse\s*heet\s+excutie$": "Venture Helmet Executive",
+        r"^getrcon\s+epoe$": "Geist Armor Core Epoque",
+        r"^tana\s*fot\s*heinet\s+murray\s+cup$": "Tailwind Flight Helmet Murray Cup",
+        r"^exhet\s*rd\s+alert$": "Arden-SL Helmet Red Alert",
+        r"^ae\s*les\s+red\s+aert$": "Arden-SL Legs Red Alert",
+        r"^aop4\s*as\s*re\s*alert$": "ADP-mk4 Arms Red Alert",
+        r"^eckpeck\s+red\s+alert$": "Arden-CL Backpack Red Alert",
+        r"^acopo\s+mono?cte$": "Jacopo Monocle",
+        r"^ploe\s+sueter\s+tannenbs$": "Piconalia Sweater Tannenbaum",
+        r"^p[u]?ner\s*ma[a]?\s*aa\s*suepot$": "Purifier Mask AA Support",
+        r"^teewee\s*boets\s*as[o0]\s*en$": "ThermoWeave Boots ASD Edition",
+        r"^c[h]?roe\s+one\s+hend\s+gear\s+strker$": "Chrome Dome Head Gear Striker",
+        r"^cser[e]?\s+acket$": "Calister Jacket",
+        r"^stheorit$": "StarHeart",
+        r"^oayssey\s+racg\s+heinet\s+aipha$": "Odyssey II Racing Helmet Alpha",
+        r"^neloi\s+boot\s*and\s*pants\s+striker$": "Navoi Boot and Pants Striker",
+        r"^bocat\s+bonber\s+cket\s+netsen$": "Bobcat Bomber Jacket Nelson",
+        r"^bcat\s+boner\s+icket\s+tarne$": "Bobcat Bomber Jacket Tarmac",
+        r"^deadbolt\s*m\s+cannon$": "Deadbolt III Cannon",
+        r"^torrenti\s*module$": "Torrent II Module",
+        r"^uo\s*m\s*cargo\s+pushie$": "Tumbril Cargo Plushie",
+        r"^uminala\s+s5\s*coin$": "Luminalia '55 Coin",
+        r"^abml\s*cargo\s+plushie$": "T.A.B.A. Cargo Plushie",
+        r"^redi\s*make\s+ltem\s+fabricator\s+aa\s+support$": "RediMake Item Fabricator AA Support",
     }
     for pattern, replacement in replacements.items():
         value = re.sub(pattern, replacement, value, flags=re.IGNORECASE)
