@@ -1382,7 +1382,7 @@ function renderInventoryItem(item) {
       </label>
       <label class="inventory-quantity-field">
       <span>Found/Crafted Qty</span>
-      <input data-inventory-quantity="${escapeAttribute(id)}" type="number" min="0" step="0.01" value="${escapeAttribute(item.quantity)}">
+      <input data-inventory-quantity="${escapeAttribute(id)}" type="number" min="0" step="1" value="${escapeAttribute(Math.round(Number(item.quantity) || 0))}">
       </label>
       <label class="inventory-quality-field">
       <span>Quality</span>
@@ -1460,7 +1460,7 @@ async function updateInventoryItem(id) {
       item_type: row.querySelector(`[data-inventory-type="${cssEscape(id)}"]`)?.value || "",
       item_size: row.querySelector(`[data-inventory-size="${cssEscape(id)}"]`)?.value || "",
       location: row.querySelector(`[data-inventory-location="${cssEscape(id)}"]`)?.value || "",
-      quantity: Number(row.querySelector(`[data-inventory-quantity="${cssEscape(id)}"]`)?.value || 0),
+      quantity: Math.round(Number(row.querySelector(`[data-inventory-quantity="${cssEscape(id)}"]`)?.value || 0)),
       quality: nullableNumber(row.querySelector(`[data-inventory-quality="${cssEscape(id)}"]`)?.value),
       volume_scu: nullableNumber(row.querySelector(`[data-inventory-volume="${cssEscape(id)}"]`)?.value),
       notes: row.querySelector(`[data-inventory-notes="${cssEscape(id)}"]`)?.value || "",
@@ -1474,7 +1474,7 @@ function cleanInventoryForm(data) {
     name: data.name,
     category: data.category || null,
     location: data.location,
-    quantity: Number(data.quantity || 1),
+    quantity: Math.max(0, Math.round(Number(data.quantity || 1))),
     quality: nullableNumber(data.quality),
     item_type: data.item_type || null,
     item_size: data.item_size || null,
@@ -1655,7 +1655,7 @@ function renderInventoryImportItems(payload, options = {}) {
       <label class="import-category-field"><span>Category</span>${inventoryCategorySelect("data-import-category", item.category || "")}</label>
       <label class="import-type-field"><span>Type</span>${inventoryTypeSelect("data-import-type", item.category || "", item.item_type || "")}</label>
       <label class="import-size-field"><span>Size</span><input data-import-size value="${escapeAttribute(item.item_size || "")}" placeholder="-"></label>
-      <label class="import-quantity-field"><span>Quantity</span><input data-import-quantity type="number" min="0" step="0.01" value="${escapeAttribute(item.quantity || 1)}"></label>
+      <label class="import-quantity-field"><span>Quantity</span><input data-import-quantity type="number" min="0" step="1" value="${escapeAttribute(Math.max(0, Math.round(Number(item.quantity) || 1)))}"></label>
       <label class="import-quality-field"><span>Quality</span><input data-import-quality type="number" min="0" step="0.01" value="${escapeAttribute(item.quality ?? "")}" placeholder="-"></label>
       <label class="import-scu-field"><span>SCU</span><input data-import-volume type="number" min="0" step="0.000001" value="${escapeAttribute(item.volume_scu ?? "")}" placeholder="-"></label>
       <label class="import-location-field"><span>Station / location</span><input data-import-location value="${escapeAttribute(item.location)}"></label>
@@ -2611,7 +2611,7 @@ function inventoryItemFromImportRow(row) {
     item_type: row.querySelector("[data-import-type]")?.value || null,
     item_size: row.querySelector("[data-import-size]")?.value || null,
     location: row.querySelector("[data-import-location]")?.value || "",
-    quantity: Number(row.querySelector("[data-import-quantity]")?.value || 1),
+    quantity: Math.max(0, Math.round(Number(row.querySelector("[data-import-quantity]")?.value || 1))),
     quality: nullableNumber(row.querySelector("[data-import-quality]")?.value),
     volume_scu: nullableNumber(row.querySelector("[data-import-volume]")?.value),
     notes: row.querySelector("[data-import-notes]")?.value || null,

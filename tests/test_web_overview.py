@@ -606,3 +606,8 @@ def test_station_inventory_is_compact_at_partial_desktop_widths() -> None:
     assert 'class="inventory-quantity-field"' in javascript
     assert 'class="inventory-quality-field"' in javascript
     assert 'class="inventory-scu-field"' in javascript
+    assert 'name="quantity" type="number" min="0" step="1"' in html
+    assert 'data-import-quantity type="number" min="0" step="1"' in javascript
+    assert "max-height: 520px" in css
+    assert "max-height: 440px" in css
+    assert "max-height: 360px" in css

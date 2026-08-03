@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.web import (  # noqa: E402
     _inventory_match_confidence,
+    _inventory_scanner_catalog_supplements,
     _inventory_scanner_text_candidates,
     _inventory_title_boxes,
     _inventory_title_candidate_is_plausible,
@@ -23,6 +24,9 @@ from src.web import (  # noqa: E402
 
 def _best_expected_match(text: str, sample: dict[str, object]) -> float:
     names = [str(sample["expected"]), *(str(value) for value in sample.get("aliases", []))]
+    for result in _inventory_scanner_catalog_supplements(text):
+        if result.name == sample["expected"]:
+            names.extend(result.catalog_aliases)
     candidates = _inventory_scanner_text_candidates(text, set()) or [text]
     return max(_inventory_match_confidence(candidate, name) for candidate in candidates for name in names)
 

@@ -29,5 +29,26 @@
       {"second": 59, "expected": "Pyro RYT Multi-Tool"},
       {"second": 81, "expected": "Pyro RYT Multi-Tool"}
     ]
+  },
+  {
+    "name": "nf4HYGOW5OK8dNzYt",
+    "url": "https://medal.tv/games/star-citizen/clips/nf4HYGOW5OK8dNzYt?invite=cr-MSxyYXksMjY4Nzc3NTUz",
+    "samples": [
+      {"second": 247, "expected": "TruHold Tractor Beam Attachment"},
+      {"second": 250, "expected": "Cambio SRT"},
+      {"second": 253, "expected": "MaxLift AA Support Tractor Beam"},
+      {"second": 256, "expected": "XDL \"Mark I\" Monocular Rangefinder"},
+      {"second": 260, "expected": "Cambio SRT"},
+      {"second": 264, "expected": "XDL \"Mark I\" Monocular Rangefinder"},
+      {"second": 267, "expected": "MaxLift Tractor Beam"},
+      {"second": 271, "expected": "Pyro RYT \"Bloodline\" Multi-Tool"},
+      {"second": 277, "expected": "Pyro RYT Multi-Tool"},
+      {"second": 280, "expected": "Pyro RYT \"microTech\" Multi-Tool"},
+      {"second": 284, "expected": "TruHold Tractor Beam Attachment"},
+      {"second": 288, "expected": "Pyro RYT Multi-Tool"},
+      {"second": 291, "expected": "XDL \"Mark I\" Monocular Rangefinder"},
+      {"second": 293, "expected": "Pyro RYT \"microTech\" Multi-Tool"},
+      {"second": 298, "expected": "MaxLift AA Transport Tractor Beam"}
+    ]
   }
 ]

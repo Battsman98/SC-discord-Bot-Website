@@ -592,6 +592,22 @@ def test_inventory_scanner_supplements_missing_multitool_variants() -> None:
     assert web_module._inventory_scanner_catalog_supplements("Pyro RYT Multi-Tool") == []
 
 
+def test_inventory_scanner_supplements_catalog_gaps_from_live_video() -> None:
+    examples = {
+        "xDLMarkMonocular Rangefinder": 'XDL "Mark I" Monocular Rangefinder',
+        "MaxLit AA SupportTractorBeam": "MaxLift AA Support Tractor Beam",
+        "MaxLiftAA Transport Tractor Beam": "MaxLift AA Transport Tractor Beam",
+        "Pyre RYT'microTechMult-Tol": 'Pyro RYT "microTech" Multi-Tool',
+        "Tractorbeam": "TruHold Tractor Beam Attachment",
+    }
+
+    for scanned, expected in examples.items():
+        results = web_module._inventory_scanner_catalog_supplements(scanned)
+        assert [item.name for item in results] == [expected]
+        names = (expected, *results[0].catalog_aliases)
+        assert max(web_module._inventory_match_confidence(scanned, name) for name in names) >= 0.88
+
+
 def test_inventory_title_ocr_uses_top_line_and_rejects_metadata_calibration() -> None:
     title = ([[0, 4], [100, 4], [100, 14], [0, 14]], "FS-9 LMG", 0.98)
     metadata = ([[0, 30], [100, 30], [100, 40], [0, 40]], "Volume: 8000 µSCU", 0.99)

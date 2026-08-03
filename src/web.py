@@ -39,9 +39,9 @@ from src.bot import (
 from src.cache import AUDIT_ACTION_TYPES, SQLiteCache
 from src.config import Settings
 from src.security import SlidingWindowLimiter, install_secret_redaction
-from src.sources.registry import SourceRegistry, build_default_registry
 from src.sources.base import ItemLocatorResult
 from src.sources.citizen_updates import CitizenUpdatesSource
+from src.sources.registry import SourceRegistry, build_default_registry
 from src.sources.warbonds import WarbondTrackerSource
 from src.timers import (
     calculate_countdown_end_unix,
@@ -289,7 +289,7 @@ class InventoryItemRequest(BaseModel):
     name: str = Field(min_length=1)
     category: str | None = None
     location: str = Field(min_length=1)
-    quantity: float = Field(default=1, ge=0)
+    quantity: int = Field(default=1, ge=0)
     quality: float | None = Field(default=None, ge=0)
     item_type: str | None = None
     item_size: str | None = None
@@ -2930,7 +2930,9 @@ async def _inventory_lookup_scored_matches(
     if quick:
         queries = queries[:2]
     result_groups = await asyncio.gather(*(lookup(query) for query in queries))
-    result_groups.append(_inventory_scanner_catalog_supplements(candidate))
+    # Prefer supplements so their OCR aliases are retained when an incomplete
+    # upstream result has the same canonical name.
+    result_groups.insert(0, _inventory_scanner_catalog_supplements(candidate))
     for results in result_groups:
         for result in results:
             key = _normalize_text(getattr(result, "name", ""))
@@ -2950,25 +2952,47 @@ async def _inventory_lookup_scored_matches(
 def _inventory_scanner_catalog_supplements(candidate: str) -> list[ItemLocatorResult]:
     """Supply confirmed variants missing from the upstream searchable item catalog."""
     normalized = _normalize_text(_normalize_inventory_tooltip_name(candidate))
-    variants = {
-        "bloodline": 'Pyro RYT "Bloodline" Multi-Tool',
-        "hurston": 'Pyro RYT "Hurston" Multi-Tool',
-    }
+    variants = (
+        (("bloodline",), 'Pyro RYT "Bloodline" Multi-Tool', "Multitool", "Utility", "Greycat Industrial"),
+        (("hurston",), 'Pyro RYT "Hurston" Multi-Tool', "Multitool", "Utility", "Greycat Industrial"),
+        (("microtech",), 'Pyro RYT "microTech" Multi-Tool', "Multitool", "Utility", "Greycat Industrial"),
+        (("xdl", "mark", "monocular", "rangefinder"), 'XDL "Mark I" Monocular Rangefinder', "Gadgets", "Utility", "Behring Applied Technology"),
+        (("maxlift", "aa", "support", "tractor", "beam"), "MaxLift AA Support Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
+        (("maxlift", "aa", "transport", "tractor", "beam"), "MaxLift AA Transport Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
+    )
     results: list[ItemLocatorResult] = []
-    for marker, name in variants.items():
-        if marker not in normalized:
+    compact = normalized.replace(" ", "")
+    if compact in {"tractorbeam", "xtractorbeam", "extractorbeam"}:
+        results.append(
+            ItemLocatorResult(
+                id=-9_999,
+                name="TruHold Tractor Beam Attachment",
+                section="Attachments",
+                category="Utility",
+                company_name="Greycat Industrial",
+                size=None,
+                wiki_url="https://starcitizen.tools/TruHold_Tractor_Beam_Attachment",
+                source_url="https://starcitizen.tools/TruHold_Tractor_Beam_Attachment",
+                source_name="Star Citizen Wiki",
+                purchases=[],
+                catalog_aliases=("Tractorbeam", "Tractor Beam"),
+            )
+        )
+    for markers, name, section, category, company in variants:
+        if not all(marker in compact for marker in markers):
             continue
-        slug = re.sub(r"[^a-z0-9]+", "_", marker).strip("_")
+        slug = re.sub(r"[^a-z0-9]+", "_", name.casefold()).strip("_")
+        wiki_title = name.replace(" ", "_").replace('"', "%22")
         results.append(
             ItemLocatorResult(
                 id=-(10_000 + len(results)),
                 name=name,
-                section="Multitool",
-                category="Utility",
-                company_name="Greycat Industrial",
+                section=section,
+                category=category,
+                company_name=company,
                 size=None,
-                wiki_url=f"https://starcitizen.tools/Pyro_RYT_%22{marker.title()}%22_Multi-Tool",
-                source_url=f"https://starcitizen.tools/Pyro_RYT_%22{marker.title()}%22_Multi-Tool",
+                wiki_url=f"https://starcitizen.tools/{wiki_title}",
+                source_url=f"https://starcitizen.tools/{wiki_title}",
                 source_name="Star Citizen Wiki",
                 purchases=[],
                 catalog_aliases=(f"pyro_ryt_{slug}_multitool",),
@@ -3525,7 +3549,15 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         r"\bmed\s+pen\b": "MedPen",
         r"\bchemozaly\b": "Hemozal",
         r"\bbloodino\b": "Bloodline",
+        r"\bpyro\s*ryt\b": "Pyro RYT",
+        r"\bryt\s*(bloodline|hurston|micro\s*tech)\b": r"RYT \1",
         r"\bmulti[- ]?tooi\b": "Multi-Tool",
+        r"\bmult[- ]?tooi\b": "Multi-Tool",
+        r"\bmuti[- ]?tool\b": "Multi-Tool",
+        r"\bmult[- ]?tol\b": "Multi-Tool",
+        r"\bmut[- ]?tool\b": "Multi-Tool",
+        r"\b(bloodline|hurston|micro\s*tech)[' ]+(?=multi[- ]?tool\b)": r"\1 ",
+        r"\bmax\s*(?:lit|ift)\b": "MaxLift",
         r"\bkilshot\b": "Killshot",
         r"\bkillshot\b": "Killshot",
         r"\brrie\b": "Rifle",
