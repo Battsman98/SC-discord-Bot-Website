@@ -14,6 +14,7 @@ from src.bot import (
     _format_interaction_options,
     _interaction_command_name,
     _message_embed_matches,
+    _message_records_deployment,
     _deployment_targets_for_files,
     _hub_role_permissions,
     admin_group,
@@ -29,6 +30,24 @@ def test_deployment_changelog_targets_match_changed_application() -> None:
         "discord-changelog",
         "website-changelog",
     }
+
+
+def test_deployment_history_entry_deduplicates_a_revision() -> None:
+    message = SimpleNamespace(
+        embeds=[
+            discord.Embed(
+                title="Website deployed",
+                description="Revision: `123456789abc`",
+            )
+        ]
+    )
+
+    assert _message_records_deployment(message, "123456789abcdef")
+    assert not _message_records_deployment(message, "fedcba987654321")
+    assert not _message_records_deployment(
+        SimpleNamespace(embeds=[discord.Embed(title="Discord channel updated", description="123456789abc")]),
+        "123456789abcdef",
+    )
 
 
 def test_interaction_command_name_handles_grouped_commands() -> None:

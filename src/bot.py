@@ -171,6 +171,14 @@ def _deployment_targets_for_files(files: list[str]) -> set[str]:
     return targets or {WEBSITE_CHANGELOG_CHANNEL_NAME, DISCORD_CHANGELOG_CHANNEL_NAME}
 
 
+def _message_records_deployment(message: object, revision: str) -> bool:
+    marker = revision[:12]
+    return any(
+        marker in (embed.description or "") and (embed.title or "").endswith(" deployed")
+        for embed in getattr(message, "embeds", [])
+    )
+
+
 def build_feedback_template_embed() -> discord.Embed:
     embed = discord.Embed(
         title="Example: Guide button does not display the selected information",
@@ -423,8 +431,8 @@ class GameAssistBot(commands.Bot):
             )
 
         topics = {
-            WEBSITE_CHANGELOG_CHANNEL_NAME: "Automatic website deployment history and manually recorded website changes.",
-            DISCORD_CHANGELOG_CHANNEL_NAME: "Automatic Discord channel, role, and server configuration changes.",
+            WEBSITE_CHANGELOG_CHANNEL_NAME: "Website deployment history from pushed revisions.",
+            DISCORD_CHANGELOG_CHANNEL_NAME: "Discord bot deployment history from pushed revisions.",
         }
         for name, topic in topics.items():
             channel = discord.utils.find(lambda item: item.name == name, guild.text_channels)
@@ -432,7 +440,11 @@ class GameAssistBot(commands.Bot):
                 channel = await guild.create_text_channel(
                     name, category=category, topic=topic, overwrites=overwrites, reason="Create audit changelog"
                 )
-            else:
+            elif (
+                channel.category_id != category.id
+                or channel.topic != topic
+                or channel.overwrites != overwrites
+            ):
                 await channel.edit(
                     category=category,
                     topic=topic,
@@ -470,6 +482,8 @@ class GameAssistBot(commands.Bot):
         summary = await self._deployment_change_summary(revision)
         targets = await self._deployment_targets(revision)
         for target in targets:
+            if await self._deployment_already_recorded(target, revision):
+                continue
             application = "Website" if target == WEBSITE_CHANGELOG_CHANNEL_NAME else "Discord bot"
             await self._send_changelog(
                 target,
@@ -477,6 +491,18 @@ class GameAssistBot(commands.Bot):
                 f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nApplication: `{application}`",
             )
         await self.cache.set(cache_key, revision, 315360000)
+
+    async def _deployment_already_recorded(self, channel_name: str, revision: str) -> bool:
+        channel = self.get_channel(self.changelog_channels.get(channel_name, 0))
+        if not isinstance(channel, discord.TextChannel):
+            return False
+        try:
+            async for message in channel.history(limit=100):
+                if _message_records_deployment(message, revision):
+                    return True
+        except (discord.Forbidden, discord.HTTPException):
+            logging.info("Could not inspect %s for an existing deployment entry", channel_name)
+        return False
 
     async def _deployment_targets(self, revision: str) -> set[str]:
         files = await self._git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", revision)
@@ -531,12 +557,9 @@ class GameAssistBot(commands.Bot):
         return "Application code and services were updated to the latest deployed revision."
 
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel) -> None:
-        if channel.name in {WEBSITE_CHANGELOG_CHANNEL_NAME, DISCORD_CHANGELOG_CHANNEL_NAME}:
-            return
-        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel created", f"A new Discord channel was added.\n\nName: `{channel.name}`\nType: `{channel.type}`")
+        return
 
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel) -> None:
-        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel deleted", f"A Discord channel was removed.\n\nName: `{channel.name}`\nType: `{channel.type}`")
         if self._is_discord_bot_hub_channel(channel):
             self._schedule_hub_recovery(
                 f"deleted channel {channel.name}", discord.AuditLogAction.channel_delete, channel.id
@@ -590,11 +613,6 @@ class GameAssistBot(commands.Bot):
             "Result": "Protected hub configuration and permanent messages restored",
         }
         await self.log_audit_event("Discord Bot Hub failsafe activated", fields, color=discord.Color.red())
-        await self._send_changelog(
-            DISCORD_CHANGELOG_CHANNEL_NAME,
-            "Discord Bot Hub restored",
-            "\n".join(f"**{name}:** {value}" for name, value in fields.items()),
-        )
 
     async def _restore_hub_components(self) -> None:
         await self._run_startup_step("restore Discord Bot Hub channels", self.ensure_visitor_access)
@@ -757,18 +775,21 @@ class GameAssistBot(commands.Bot):
         for label, old, new in (("Name", before.name, after.name), ("Category", before.category_id, after.category_id), ("Position", before.position, after.position)):
             if old != new:
                 changes.append(f"{label}: `{old}` → `{new}`")
-        if changes:
-            await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord channel updated", "Channel settings were changed.\n\n" + "\n".join(changes))
-        if self._is_discord_bot_hub_channel(before) or self._is_discord_bot_hub_channel(after):
+        protected_settings_changed = any(
+            getattr(before, attribute, None) != getattr(after, attribute, None)
+            for attribute in ("name", "category_id", "topic", "overwrites")
+        )
+        if protected_settings_changed and (
+            self._is_discord_bot_hub_channel(before) or self._is_discord_bot_hub_channel(after)
+        ):
             self._schedule_hub_recovery(
                 f"modified channel {before.name}", discord.AuditLogAction.channel_update, after.id
             )
 
     async def on_guild_role_create(self, role: discord.Role) -> None:
-        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role created", f"A new Discord role was added.\n\nRole: `{role.name}`")
+        return
 
     async def on_guild_role_delete(self, role: discord.Role) -> None:
-        await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role deleted", f"A Discord role was removed.\n\nRole: `{role.name}`")
         if role.name in HUB_PROTECTED_ROLE_NAMES or role.id in self.hub_role_ids.values():
             self._schedule_hub_recovery(
                 f"deleted protected role {role.name}", discord.AuditLogAction.role_delete, role.id
@@ -782,8 +803,6 @@ class GameAssistBot(commands.Bot):
             changes.append("Permissions changed")
         if before.color != after.color:
             changes.append(f"Color: `{before.color}` → `{after.color}`")
-        if changes:
-            await self._send_changelog(DISCORD_CHANGELOG_CHANNEL_NAME, "Discord role updated", "Role settings were changed.\n\n" + "\n".join(changes))
         if (
             before.name in HUB_PROTECTED_ROLE_NAMES
             or after.name in HUB_PROTECTED_ROLE_NAMES
@@ -850,7 +869,7 @@ class GameAssistBot(commands.Bot):
                 overwrites=category_overwrites,
                 reason="Create isolated Visitor bot access",
             )
-        else:
+        elif category.name != VISITOR_CATEGORY_NAME or category.overwrites != category_overwrites:
             await category.edit(
                 name=VISITOR_CATEGORY_NAME,
                 overwrites=category_overwrites,
@@ -877,7 +896,13 @@ class GameAssistBot(commands.Bot):
                         topic=VISITOR_CHANNEL_TOPICS.get(name),
                         reason="Visitor bot channel",
                     )
-            else:
+            elif (
+                existing.name != name
+                or existing.category_id != category.id
+                or not existing.permissions_synced
+                or isinstance(existing, discord.TextChannel)
+                and existing.topic != VISITOR_CHANNEL_TOPICS.get(name)
+            ):
                 changes = {
                     "name": name,
                     "category": category,
@@ -892,7 +917,12 @@ class GameAssistBot(commands.Bot):
         feedback = discord.utils.find(lambda item: item.name == "feedback-and-issues", category.channels)
         if feedback is None:
             feedback = self.get_channel(self.settings.feedback_forum_channel_id or 0)
-        if isinstance(feedback, discord.ForumChannel):
+        if isinstance(feedback, discord.ForumChannel) and (
+            feedback.name != "feedback-and-issues"
+            or feedback.category_id != category.id
+            or feedback.topic != FEEDBACK_FORUM_TOPIC
+            or not feedback.permissions_synced
+        ):
             await feedback.edit(
                 name="feedback-and-issues",
                 category=category,
@@ -910,7 +940,8 @@ class GameAssistBot(commands.Bot):
         for channel in guild.channels:
             if channel.id in allowed_ids:
                 continue
-            overwrite = channel.overwrites_for(role)
+            current_overwrite = channel.overwrites_for(role)
+            overwrite = discord.PermissionOverwrite.from_pair(*current_overwrite.pair())
             if overwrite.view_channel is not False:
                 overwrite.view_channel = False
                 await channel.set_permissions(role, overwrite=overwrite, reason="Isolate Visitor access")
@@ -1059,7 +1090,8 @@ class GameAssistBot(commands.Bot):
             channel = guild.get_channel(channel_id)
             if channel is None:
                 continue
-            overwrite = channel.overwrites_for(role)
+            current_overwrite = channel.overwrites_for(role)
+            overwrite = discord.PermissionOverwrite.from_pair(*current_overwrite.pair())
             overwrite.view_channel = True
             overwrite.send_messages = True
             overwrite.send_messages_in_threads = True
@@ -1067,7 +1099,8 @@ class GameAssistBot(commands.Bot):
             overwrite.embed_links = True
             overwrite.attach_files = True
             overwrite.use_application_commands = True
-            await channel.set_permissions(role, overwrite=overwrite, reason="Grant Bot Manager access")
+            if overwrite != current_overwrite:
+                await channel.set_permissions(role, overwrite=overwrite, reason="Grant Bot Manager access")
         logging.info("Bot Manager role %s is ready", role.id)
 
     async def ensure_feedback_forum(self) -> None:
