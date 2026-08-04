@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from src.postgres_compat import PostgresConnection
+
 
 AUDIT_ACTION_TYPES = {
     "admin", "audit", "authentication", "blueprints", "commands", "crashes", "inventory",
@@ -53,17 +55,19 @@ def audit_action_type(title: str, fields: dict[str, Any]) -> str:
 
 
 class SQLiteCache:
-    def __init__(self, connection: sqlite3.Connection) -> None:
+    def __init__(self, connection: Any) -> None:
         self._connection = connection
 
     @classmethod
     async def create(cls, database_path: str) -> "SQLiteCache":
-        path = Path(database_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        connection = sqlite3.connect(path)
-        connection.execute("PRAGMA journal_mode = WAL")
-        connection.execute("PRAGMA busy_timeout = 5000")
+        if database_path.startswith(("postgres://", "postgresql://")):
+            connection = PostgresConnection.connect(database_path)
+        else:
+            path = Path(database_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            connection = sqlite3.connect(path)
+            connection.execute("PRAGMA journal_mode = WAL")
+            connection.execute("PRAGMA busy_timeout = 5000")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS cache_entries (
