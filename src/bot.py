@@ -480,6 +480,7 @@ class GameAssistBot(commands.Bot):
             return
         if isinstance(previous_revision, str):
             await self._relocate_misclassified_deployment(previous_revision)
+        await self._relocate_recent_misclassified_deployments()
 
         summary = await self._deployment_change_summary(revision)
         targets = await self._deployment_targets(revision)
@@ -564,6 +565,22 @@ class GameAssistBot(commands.Bot):
                 f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nApplication: `Discord bot`",
             )
         await self.cache.set(marker_key, True, 315360000)
+
+    async def _relocate_recent_misclassified_deployments(self) -> None:
+        """Repair Discord-only revisions left in the website changelog."""
+        website_channel = self.get_channel(self.changelog_channels.get(WEBSITE_CHANGELOG_CHANNEL_NAME, 0))
+        if not isinstance(website_channel, discord.TextChannel):
+            return
+        try:
+            async for message in website_channel.history(limit=25):
+                for embed in message.embeds:
+                    if embed.title != "Website deployed":
+                        continue
+                    match = re.search(r"Revision:\s*`([0-9a-fA-F]{7,40})`", embed.description or "")
+                    if match:
+                        await self._relocate_misclassified_deployment(match.group(1))
+        except (discord.Forbidden, discord.HTTPException):
+            logging.info("Could not inspect recent website changelog entries for relocation")
 
     async def _git_lines(self, *arguments: str) -> list[str]:
         try:
