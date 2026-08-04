@@ -426,6 +426,7 @@ class GameAssistBot(commands.Bot):
         self.visitor_channels: dict[str, int] = {}
         self.visitor_category_id: int | None = None
         self.application_review_channel_id: int | None = None
+        self._membership_application_lock = asyncio.Lock()
         self.hub_role_ids: dict[str, int] = {}
         self.changelog_channels: dict[str, int] = {}
         self._exec_status_task: asyncio.Task | None = None
@@ -1217,6 +1218,11 @@ class GameAssistBot(commands.Bot):
             await self.cache.set(cache_key, message.id, 315360000)
 
     async def ensure_membership_applications(self) -> None:
+        """Serialize startup and recovery provisioning to prevent duplicate channels/messages."""
+        async with self._membership_application_lock:
+            await self._ensure_membership_applications()
+
+    async def _ensure_membership_applications(self) -> None:
         guild = self.get_guild(self.settings.discord_guild_id or 0)
         category = guild.get_channel(self.visitor_category_id or 0) if guild else None
         if guild is None or guild.me is None or not isinstance(category, discord.CategoryChannel):
