@@ -318,6 +318,10 @@ class InventoryTextImportRequest(BaseModel):
     exclude_words: str | None = None
 
 
+class LanguageMeasurementRequest(BaseModel):
+    language: str = Field(min_length=2, max_length=3, pattern="^[A-Za-z]{2,3}$")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = Settings.from_env(require_discord_token=False)
@@ -586,7 +590,9 @@ def _safe_crash_message(message: str) -> str:
 
 
 def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:
-    if method in {"HEAD", "OPTIONS"} or path in {"/api/health", "/api/me", "/api/activity"} or "/autocomplete/" in path:
+    if method in {"HEAD", "OPTIONS"} or path in {
+        "/api/health", "/api/me", "/api/activity", "/api/analytics/language",
+    } or "/autocomplete/" in path:
         return None
     if path.endswith("/facets"):
         return None
@@ -885,6 +891,19 @@ async def submit_feedback(
 
 @app.post("/api/activity", status_code=204)
 async def website_activity() -> None:
+    return None
+
+
+@app.post("/api/analytics/language", status_code=204)
+async def website_language_measurement(
+    payload: LanguageMeasurementRequest,
+    request: Request,
+) -> None:
+    visitor_id = request.cookies.get(VISITOR_COOKIE_NAME, "")
+    if re.fullmatch(r"[a-f0-9]{32}", visitor_id) is None:
+        return None
+    visitor_hash = hashlib.sha256(visitor_id.encode("ascii")).hexdigest()
+    await state().cache.record_website_language(visitor_hash, payload.language.lower())
     return None
 
 
