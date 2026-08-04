@@ -64,6 +64,7 @@ DISCORD_CHANGELOG_CHANNEL_NAME = "discord-changelog"
 CHANGELOG_GITHUB_REPOSITORY = "Battsman98/SC-discord-Bot-Website"
 VISITOR_CHANNEL_SPECS = {
     "bot-start-here": "text",
+    "member-applications": "text",
     "bot-commands": "text",
     "bot-status": "text",
     "ship-search": "text",
@@ -80,6 +81,7 @@ VISITOR_CHANNEL_SPECS = {
 }
 VISITOR_CHANNEL_TOPICS = {
     "bot-start-here": "Start here for Discord Bot Hub guidance and quick lookup commands.",
+    "member-applications": "Apply to become a full community member.",
     "bot-commands": "Permanent command directory for the Star Citizen Companion bot.",
     "bot-status": "Check bot availability and connected data-provider health.",
     "ship-search": "Search Star Citizen ships and vehicles with /ship.",
@@ -98,11 +100,15 @@ HUB_PROTECTED_ROLE_NAMES = {VISITOR_ROLE_NAME, BOT_MANAGER_ROLE_NAME}
 HUB_RECOVERY_COOLDOWN_SECONDS = 10
 HUB_PERMANENT_MESSAGE_PREFIXES = (
     "discord:visitor-welcome",
+    "discord:membership-application-panel",
     "discord:visitor-example",
     "discord:commands-reference-message",
     "discord:exec-status-message",
     "discord:cz-timers-message",
 )
+MEMBER_ROLE_NAME = "Member"
+APPLICATION_REVIEW_CHANNEL_NAME = "membership-application-reviews"
+APPLICATION_PENDING_CACHE_PREFIX = "discord:membership-application-pending"
 VISITOR_COMMAND_CHANNELS = {
     "status": "bot-status",
     "lookup": "bot-start-here",
@@ -306,10 +312,104 @@ def _allowed_command_channel_id(bot: "GameAssistBot", command_name: str) -> int 
     return allowed_channel_id
 
 
+class MembershipQuestionTwoView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label="Yes, I will follow the rules", style=discord.ButtonStyle.success)
+    async def accept_rules(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        bot = interaction.client
+        if not isinstance(bot, GameAssistBot) or not isinstance(interaction.user, discord.Member):
+            return
+        await bot.submit_membership_application(interaction)
+
+    @discord.ui.button(label="No", style=discord.ButtonStyle.danger)
+    async def decline_rules(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="Application not submitted",
+                description="Community members must agree to follow the server rules.",
+                color=discord.Color.red(),
+            ),
+            view=None,
+        )
+
+
+class MembershipQuestionOneView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label="Yes", style=discord.ButtonStyle.success)
+    async def become_member(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        embed = discord.Embed(
+            title="Membership application — Question 2 of 2",
+            description="**Will you follow the rules in place?**",
+            color=discord.Color.blurple(),
+        )
+        await interaction.response.edit_message(embed=embed, view=MembershipQuestionTwoView())
+
+    @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
+    async def stay_visitor(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="Application closed",
+                description="No problem — you can remain a visitor and apply later if you change your mind.",
+                color=discord.Color.greyple(),
+            ),
+            view=None,
+        )
+
+
+class MembershipApplicationPanelView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Apply for Membership",
+        style=discord.ButtonStyle.primary,
+        custom_id="membership_application:start",
+        emoji="📝",
+    )
+    async def start_application(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("Applications are only available inside the server.", ephemeral=True)
+            return
+        member_role = discord.utils.find(
+            lambda role: role.name.casefold() == MEMBER_ROLE_NAME.casefold(), interaction.user.roles
+        )
+        if member_role:
+            await interaction.response.send_message("You are already a community member.", ephemeral=True)
+            return
+        embed = discord.Embed(
+            title="Membership application — Question 1 of 2",
+            description="**Do you want to become a member of the community?**",
+            color=discord.Color.blurple(),
+        )
+        await interaction.response.send_message(embed=embed, view=MembershipQuestionOneView(), ephemeral=True)
+
+
+class MembershipReviewView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Approve", style=discord.ButtonStyle.success, custom_id="membership_application:approve")
+    async def approve(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        bot = interaction.client
+        if isinstance(bot, GameAssistBot):
+            await bot.review_membership_application(interaction, approved=True)
+
+    @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="membership_application:deny")
+    async def deny(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        bot = interaction.client
+        if isinstance(bot, GameAssistBot):
+            await bot.review_membership_application(interaction, approved=False)
+
+
 class GameAssistBot(commands.Bot):
     def __init__(self, settings: Settings, cache: SQLiteCache, sources: SourceRegistry) -> None:
         intents = discord.Intents.default()
         intents.message_content = False
+        intents.members = True
 
         super().__init__(
             command_prefix=settings.command_prefix,
@@ -325,6 +425,7 @@ class GameAssistBot(commands.Bot):
         self.inventory_channel_id: int = INVENTORY_CHANNEL_ID
         self.visitor_channels: dict[str, int] = {}
         self.visitor_category_id: int | None = None
+        self.application_review_channel_id: int | None = None
         self.hub_role_ids: dict[str, int] = {}
         self.changelog_channels: dict[str, int] = {}
         self._exec_status_task: asyncio.Task | None = None
@@ -339,6 +440,8 @@ class GameAssistBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         self.add_view(CZTimerDashboardView())
+        self.add_view(MembershipApplicationPanelView())
+        self.add_view(MembershipReviewView())
         self.tree.add_command(status_command)
         self.tree.add_command(lookup_command)
         self.tree.add_command(ship_command)
@@ -375,6 +478,7 @@ class GameAssistBot(commands.Bot):
         await self._run_startup_step("provision changelog channels", self.ensure_changelog_channels)
         await self._run_startup_step("record deployment changelog", self.record_deployment)
         await self._run_startup_step("provision Visitor hub", self.ensure_visitor_access)
+        await self._run_startup_step("provision membership applications", self.ensure_membership_applications)
         await self._run_startup_step("refresh Bot Manager channel access", self.ensure_bot_manager_role)
         await self._run_startup_step("prepare feedback forum", self.ensure_feedback_forum)
         await self._run_startup_step("verify inventory channel", self.ensure_inventory_search_channel)
@@ -394,6 +498,33 @@ class GameAssistBot(commands.Bot):
             await operation()
         except Exception:
             logging.exception("Discord startup step failed: %s", label)
+
+    async def on_member_join(self, member: discord.Member) -> None:
+        """Give new humans only the Visitor role after membership screening."""
+        if member.bot or member.guild.id != self.settings.discord_guild_id:
+            return
+        if member.pending:
+            return
+        await self._assign_new_visitor(member)
+
+    async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
+        if after.bot or after.guild.id != self.settings.discord_guild_id:
+            return
+        if before.pending and not after.pending:
+            await self._assign_new_visitor(after)
+
+    async def _assign_new_visitor(self, member: discord.Member) -> None:
+        role = discord.utils.find(
+            lambda item: item.name.casefold() == VISITOR_ROLE_NAME.casefold(),
+            member.guild.roles,
+        )
+        if role is None:
+            logging.error("Could not assign Visitor to %s: role is missing", member.id)
+            return
+        try:
+            await member.edit(roles=[role], reason="New member Visitor onboarding")
+        except (discord.Forbidden, discord.HTTPException):
+            logging.exception("Could not assign Visitor-only access to member %s", member.id)
 
     async def ensure_changelog_channels(self) -> None:
         """Ensure private website and Discord changelogs exist under Audit Log."""
@@ -671,6 +802,7 @@ class GameAssistBot(commands.Bot):
 
     async def _restore_hub_components(self) -> None:
         await self._run_startup_step("restore Discord Bot Hub channels", self.ensure_visitor_access)
+        await self._run_startup_step("restore membership applications", self.ensure_membership_applications)
         await self._run_startup_step("restore feedback forum", self.ensure_feedback_forum)
         await self._run_startup_step("restore command references", self.sync_commands_reference_message)
         await self._run_startup_step("restore command examples", self.sync_visitor_command_examples)
@@ -1083,6 +1215,198 @@ class GameAssistBot(commands.Bot):
         else:
             message = await channel.send(embed=embed)
             await self.cache.set(cache_key, message.id, 315360000)
+
+    async def ensure_membership_applications(self) -> None:
+        guild = self.get_guild(self.settings.discord_guild_id or 0)
+        category = guild.get_channel(self.visitor_category_id or 0) if guild else None
+        if guild is None or guild.me is None or not isinstance(category, discord.CategoryChannel):
+            logging.error("Could not resolve the Discord Bot Hub for membership applications")
+            return
+
+        member_role = discord.utils.find(
+            lambda role: role.name.casefold() == MEMBER_ROLE_NAME.casefold(), guild.roles
+        )
+        if member_role is None:
+            member_role = await guild.create_role(
+                name=MEMBER_ROLE_NAME,
+                reason="Create role for approved community membership applications",
+            )
+
+        application_channel = guild.get_channel(self.visitor_channels.get("member-applications", 0))
+        if not isinstance(application_channel, discord.TextChannel):
+            logging.error("Could not resolve the public membership application channel")
+            return
+        public_overwrite = application_channel.overwrites_for(guild.default_role)
+        public_overwrite.send_messages = False
+        public_overwrite.create_public_threads = False
+        await application_channel.set_permissions(
+            guild.default_role,
+            overwrite=public_overwrite,
+            reason="Keep the membership application panel read-only",
+        )
+        visitor_role = discord.utils.find(
+            lambda role: role.name.casefold() == VISITOR_ROLE_NAME.casefold(), guild.roles
+        )
+        if visitor_role:
+            visitor_overwrite = application_channel.overwrites_for(visitor_role)
+            visitor_overwrite.send_messages = False
+            visitor_overwrite.create_public_threads = False
+            await application_channel.set_permissions(
+                visitor_role,
+                overwrite=visitor_overwrite,
+                reason="Keep the Visitor membership application panel read-only",
+            )
+
+        owner = guild.owner
+        if owner is None:
+            logging.error("Could not resolve the server owner for application reviews")
+            return
+        review_overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            owner: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, read_message_history=True
+            ),
+            guild.me: discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, read_message_history=True,
+                embed_links=True, manage_messages=True,
+            ),
+        }
+        if visitor_role:
+            review_overwrites[visitor_role] = discord.PermissionOverwrite(view_channel=False)
+        review_channel = discord.utils.find(
+            lambda channel: channel.name == APPLICATION_REVIEW_CHANNEL_NAME,
+            guild.text_channels,
+        )
+        if review_channel is None:
+            review_channel = await guild.create_text_channel(
+                APPLICATION_REVIEW_CHANNEL_NAME,
+                category=category,
+                overwrites=review_overwrites,
+                topic="Private membership application queue — server owner review only.",
+                reason="Create private membership application review queue",
+            )
+        elif review_channel.category_id != category.id or review_channel.overwrites != review_overwrites:
+            await review_channel.edit(
+                category=category,
+                overwrites=review_overwrites,
+                sync_permissions=False,
+                reason="Restore owner-only membership application reviews",
+            )
+        self.application_review_channel_id = review_channel.id
+
+        cache_key = f"discord:membership-application-panel:{application_channel.id}"
+        message_id = await self.cache.get(cache_key)
+        panel = discord.Embed(
+            title="Apply for Community Membership",
+            description=(
+                "Visitors can apply here to join the main Discord community as a member. "
+                "Your answers and Discord identity will be sent privately to the server owner for review."
+            ),
+            color=discord.Color.from_rgb(54, 188, 232),
+        )
+        panel.add_field(name="1", value="Do you want to become a member of the community?", inline=False)
+        panel.add_field(name="2", value="Will you follow the rules in place?", inline=False)
+        panel.set_footer(text="Select Apply for Membership to begin. Your answers are private.")
+        message = None
+        if isinstance(message_id, int):
+            with suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                message = await application_channel.fetch_message(message_id)
+        if message:
+            await message.edit(embed=panel, view=MembershipApplicationPanelView())
+        else:
+            message = await application_channel.send(embed=panel, view=MembershipApplicationPanelView())
+            await self.cache.set(cache_key, message.id, 315360000)
+
+    async def submit_membership_application(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        applicant = interaction.user
+        if guild is None or not isinstance(applicant, discord.Member):
+            await interaction.response.edit_message(content="This application is unavailable.", embed=None, view=None)
+            return
+        pending_key = f"{APPLICATION_PENDING_CACHE_PREFIX}:{guild.id}:{applicant.id}"
+        if await self.cache.get(pending_key):
+            await interaction.response.edit_message(
+                embed=discord.Embed(
+                    title="Application already pending",
+                    description="Your application is already waiting for the server owner to review it.",
+                    color=discord.Color.gold(),
+                ),
+                view=None,
+            )
+            return
+        review_channel = guild.get_channel(self.application_review_channel_id or 0)
+        if not isinstance(review_channel, discord.TextChannel):
+            await interaction.response.edit_message(
+                embed=discord.Embed(title="Application unavailable", description="Please try again later.", color=discord.Color.red()),
+                view=None,
+            )
+            return
+        review_embed = discord.Embed(
+            title="New Membership Application",
+            description=f"{applicant.mention} has submitted a membership application.",
+            color=discord.Color.gold(),
+            timestamp=discord.utils.utcnow(),
+        )
+        review_embed.add_field(name="Applicant", value=f"{applicant} (`{applicant.id}`)", inline=False)
+        review_embed.add_field(name="Applicant ID", value=str(applicant.id), inline=False)
+        review_embed.add_field(name="1. Become a community member?", value="Yes", inline=False)
+        review_embed.add_field(name="2. Follow the rules?", value="Yes", inline=False)
+        review_embed.set_thumbnail(url=applicant.display_avatar.url)
+        review_message = await review_channel.send(embed=review_embed, view=MembershipReviewView())
+        await self.cache.set(pending_key, review_message.id, 315360000)
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="Application submitted",
+                description="Your application was sent privately to the server owner for review.",
+                color=discord.Color.green(),
+            ),
+            view=None,
+        )
+
+    async def review_membership_application(self, interaction: discord.Interaction, approved: bool) -> None:
+        guild = interaction.guild
+        if guild is None or interaction.user.id != guild.owner_id:
+            await interaction.response.send_message("Only the server owner can review applications.", ephemeral=True)
+            return
+        message = interaction.message
+        embed = message.embeds[0] if message and message.embeds else None
+        applicant_id_text = next(
+            (field.value for field in embed.fields if field.name == "Applicant ID"), None
+        ) if embed else None
+        if not applicant_id_text or not str(applicant_id_text).isdigit():
+            await interaction.response.send_message("The applicant could not be identified.", ephemeral=True)
+            return
+        applicant_id = int(applicant_id_text)
+        applicant = guild.get_member(applicant_id)
+        if applicant is None:
+            await interaction.response.send_message("That applicant is no longer in the server.", ephemeral=True)
+            return
+
+        if approved:
+            member_role = discord.utils.find(
+                lambda role: role.name.casefold() == MEMBER_ROLE_NAME.casefold(), guild.roles
+            )
+            visitor_role = discord.utils.find(
+                lambda role: role.name.casefold() == VISITOR_ROLE_NAME.casefold(), guild.roles
+            )
+            if member_role is None:
+                await interaction.response.send_message("The Member role is missing.", ephemeral=True)
+                return
+            updated_roles = [role for role in applicant.roles if role != visitor_role and not role.is_default()]
+            if member_role not in updated_roles:
+                updated_roles.append(member_role)
+            await applicant.edit(roles=updated_roles, reason=f"Membership application approved by {interaction.user}")
+
+        await self.cache.delete(f"{APPLICATION_PENDING_CACHE_PREFIX}:{guild.id}:{applicant_id}")
+        result = "Approved" if approved else "Denied"
+        embed.color = discord.Color.green() if approved else discord.Color.red()
+        embed.title = f"Membership Application — {result}"
+        embed.add_field(name="Reviewed by", value=interaction.user.mention, inline=False)
+        await interaction.response.edit_message(embed=embed, view=None)
+        with suppress(discord.Forbidden, discord.HTTPException):
+            await applicant.send(
+                f"Your membership application for **{guild.name}** was {result.lower()}."
+            )
 
     async def ensure_bot_manager_role(self) -> None:
         guild = self.get_guild(self.settings.discord_guild_id or 0)
