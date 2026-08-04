@@ -538,7 +538,9 @@ class GameAssistBot(commands.Bot):
         ]
 
     async def _relocate_misclassified_deployment(self, revision: str) -> None:
-        marker_key = f"changelog:deployment-relocated:{revision}"
+        # Version the marker whenever relocation classification changes so an
+        # entry previously marked under older logic is safely reconsidered.
+        marker_key = f"changelog:deployment-relocated:v2:{revision}"
         if await self.cache.get(marker_key):
             return
         targets = await self._deployment_targets(revision)
