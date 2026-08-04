@@ -709,7 +709,9 @@ class GameAssistBot(commands.Bot):
                     for embed in message.embeds
                 ):
                     try:
-                        await message.delete(reason="Move Discord-only deployment to the correct changelog")
+                        # PartialMessage.delete() does not accept an audit-log reason in
+                        # discord.py.  Supplying one prevents the cleanup from running.
+                        await message.delete()
                     except discord.HTTPException:
                         logging.info(
                             "Could not remove misclassified website changelog entry for %s",
