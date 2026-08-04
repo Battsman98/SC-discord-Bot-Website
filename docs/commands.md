@@ -275,6 +275,25 @@ Examples:
 /blueprint material:Tungsten
 ```
 
+## `/myblueprints`
+
+Lists blueprints saved to your account through the website Blueprint Scanner. The website and Discord bot use the same Discord user ID, so no additional linking step is required after signing in.
+
+Response visibility: private to the user.
+
+Options:
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `name` | No | Filters your saved collection by blueprint name or category. |
+
+Examples:
+
+```text
+/myblueprints
+/myblueprints name:Quantum Drive
+```
+
 ## `/trade routing`
 
 Finds Star Citizen circular trade route candidates using UEX data.

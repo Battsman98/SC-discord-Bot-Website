@@ -122,6 +122,7 @@ VISITOR_COMMAND_CHANNELS = {
     "industry refinery": "industry-operations",
     "industry brief": "industry-operations",
     "blueprint": "blueprints-and-missions",
+    "myblueprints": "blueprints-and-missions",
     "mission": "blueprints-and-missions",
     "item locator": "item-locator",
     "item search": "item-locator",
@@ -304,7 +305,7 @@ class GameAssistCommandTree(app_commands.CommandTree):
 
 def _allowed_command_channel_id(bot: "GameAssistBot", command_name: str) -> int | None:
     allowed_channel_id = bot.settings.command_channel_ids.get(command_name)
-    if allowed_channel_id is None and command_name == "mission":
+    if allowed_channel_id is None and command_name in {"mission", "myblueprints"}:
         allowed_channel_id = bot.settings.command_channel_ids.get("blueprint")
     if allowed_channel_id is None and command_name == "item search":
         allowed_channel_id = bot.settings.command_channel_ids.get("item locator")
@@ -472,6 +473,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(industry_group)
         self.tree.add_command(miningadd_command)
         self.tree.add_command(blueprint_command)
+        self.tree.add_command(my_blueprints_command)
         self.tree.add_command(mission_command)
         self.tree.add_command(item_group)
         self.tree.add_command(inventory_group)
@@ -2677,6 +2679,51 @@ async def blueprint_name_autocomplete(
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
 
 
+@app_commands.command(name="myblueprints", description="Look up blueprints saved by your website scanner.")
+@app_commands.describe(name="Optional blueprint name or category to filter your collection.")
+async def my_blueprints_command(
+    interaction: discord.Interaction,
+    name: str | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    blueprints = await bot.cache.user_blueprints(interaction.user.id)
+    query = (name or "").strip().casefold()
+    if query:
+        blueprints = [
+            item for item in blueprints
+            if query in str(item.get("name") or "").casefold()
+            or query in str(item.get("category") or "").casefold()
+        ]
+
+    if not blueprints:
+        message = "No saved blueprints matched that search." if query else (
+            "You have no saved blueprints yet. Sign in to the website with Discord and use the Blueprint Scanner to add some."
+        )
+        await interaction.response.send_message(message, ephemeral=True)
+        return
+
+    shown = blueprints[:40]
+    lines = [
+        f"**{discord.utils.escape_markdown(str(item['name']))}**"
+        + (f" — {discord.utils.escape_markdown(str(item['category']))}" if item.get("category") else "")
+        for item in shown
+    ]
+    description = "\n".join(lines)
+    if len(blueprints) > len(shown):
+        description += f"\n\n…and {len(blueprints) - len(shown)} more. Use `name` to narrow the list."
+    embed = discord.Embed(
+        title=f"My Blueprints ({len(blueprints)})",
+        description=description[:4096],
+        color=discord.Color.blurple(),
+    )
+    embed.set_footer(text="Synced with blueprints saved through the website scanner")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
 @app_commands.command(name="mission", description="Search Star Citizen missions and blueprint rewards.")
 @app_commands.describe(
     name="Mission name.",
@@ -4689,6 +4736,8 @@ def build_command_channel_directory_embed(settings: Settings) -> discord.Embed:
         blueprint_commands = channel_commands.setdefault(blueprint_channel, [])
         if "/mission" not in blueprint_commands:
             blueprint_commands.append("/mission")
+        if "/myblueprints" not in blueprint_commands:
+            blueprint_commands.append("/myblueprints")
     inventory_commands = channel_commands.setdefault(INVENTORY_CHANNEL_ID, [])
     if "/inventory search" not in inventory_commands:
         inventory_commands.append("/inventory search")

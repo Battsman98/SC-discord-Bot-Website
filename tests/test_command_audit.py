@@ -121,7 +121,7 @@ def test_command_channel_directory_groups_commands_by_channel() -> None:
 
     assert "<#111>: /ship" in embed.description
     assert "<#222>: /commodity, /trade routing" in embed.description
-    assert "<#333>: /blueprint, /mission" in embed.description
+    assert "<#333>: /blueprint, /mission, /myblueprints" in embed.description
     assert f"<#{INVENTORY_CHANNEL_ID}>: /inventory search" in embed.description
 
 
@@ -175,6 +175,7 @@ def test_mission_command_uses_blueprint_channel_by_default() -> None:
     )
 
     assert _allowed_command_channel_id(bot, "mission") == 2468
+    assert _allowed_command_channel_id(bot, "myblueprints") == 2468
 
 
 def test_visitor_hub_channel_replaces_legacy_command_channel() -> None:
