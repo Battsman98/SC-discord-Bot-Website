@@ -6,6 +6,7 @@ import time
 from contextlib import suppress
 from pathlib import Path
 
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -60,6 +61,7 @@ AUDIT_LOG_CATEGORY_ID = 1516295744603164732
 AUDIT_LOG_CATEGORY_NAME = "audit log"
 WEBSITE_CHANGELOG_CHANNEL_NAME = "website-changelog"
 DISCORD_CHANGELOG_CHANNEL_NAME = "discord-changelog"
+CHANGELOG_GITHUB_REPOSITORY = "Battsman98/SC-discord-Bot-Website"
 VISITOR_CHANNEL_SPECS = {
     "bot-start-here": "text",
     "bot-commands": "text",
@@ -506,7 +508,34 @@ class GameAssistBot(commands.Bot):
 
     async def _deployment_targets(self, revision: str) -> set[str]:
         files = await self._git_lines("diff-tree", "--no-commit-id", "--name-only", "-r", revision)
+        if not files:
+            files = await self._github_commit_files(revision)
         return _deployment_targets_for_files(files)
+
+    async def _github_commit_files(self, revision: str) -> list[str]:
+        """Resolve changed files when the deployed runtime has no local Git history."""
+        url = f"https://api.github.com/repos/{CHANGELOG_GITHUB_REPOSITORY}/commits/{revision}"
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "SCCompanion-Changelog",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        logging.info("GitHub commit lookup returned %s for %s", response.status, revision[:12])
+                        return []
+                    payload = await response.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            logging.info("GitHub commit lookup failed for deployment changelog")
+            return []
+        return [
+            str(item.get("filename"))
+            for item in payload.get("files", [])
+            if isinstance(item, dict) and item.get("filename")
+        ]
 
     async def _relocate_misclassified_deployment(self, revision: str) -> None:
         marker_key = f"changelog:deployment-relocated:{revision}"
@@ -525,12 +554,13 @@ class GameAssistBot(commands.Bot):
                 ):
                     await message.delete(reason="Move Discord-only deployment to the correct changelog")
                     break
-        summary = await self._deployment_change_summary(revision)
-        await self._send_changelog(
-            DISCORD_CHANGELOG_CHANNEL_NAME,
-            "Discord bot deployed",
-            f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nApplication: `Discord bot`",
-        )
+        if not await self._deployment_already_recorded(DISCORD_CHANGELOG_CHANNEL_NAME, revision):
+            summary = await self._deployment_change_summary(revision)
+            await self._send_changelog(
+                DISCORD_CHANGELOG_CHANNEL_NAME,
+                "Discord bot deployed",
+                f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nApplication: `Discord bot`",
+            )
         await self.cache.set(marker_key, True, 315360000)
 
     async def _git_lines(self, *arguments: str) -> list[str]:

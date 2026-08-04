@@ -30,6 +30,9 @@ def test_deployment_changelog_targets_match_changed_application() -> None:
         "discord-changelog",
         "website-changelog",
     }
+    # Unknown files remain a conservative both-target fallback, but production
+    # now queries GitHub before reaching it when Render omits local Git history.
+    assert _deployment_targets_for_files([]) == {"discord-changelog", "website-changelog"}
 
 
 def test_deployment_history_entry_deduplicates_a_revision() -> None:
