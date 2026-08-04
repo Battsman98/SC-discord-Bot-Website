@@ -2220,7 +2220,7 @@ async def commodity_system_autocomplete(
 
 @app_commands.command(name="mining", description="Find where to mine Star Citizen materials.")
 @app_commands.describe(
-    material="Mineable material name or code.",
+    material="Required material name, code, or rock signature (for example, 6400).",
     system="Optional star system filter.",
     planet="Optional planet, moon, lagrange point, or location filter.",
 )

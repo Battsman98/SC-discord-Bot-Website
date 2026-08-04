@@ -588,6 +588,26 @@ def test_find_mining_material_accepts_rock_signature() -> None:
     assert match["name"] == "Iron (Ore)"
 
 
+def test_find_mining_material_accepts_savrilium_cluster_signature() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {"savrilium": [3200]}
+    source._commodities = [
+        {
+            "name": "Savrilium (Ore)",
+            "code": "SAVR",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_inert": 0,
+        }
+    ]
+
+    match = asyncio.run(source._find_mining_material("6400"))
+
+    assert match is not None
+    assert match["name"] == "Savrilium (Ore)"
+
+
 def test_autocomplete_mining_materials_accepts_rock_signature() -> None:
     source = UEXSource.__new__(UEXSource)
     source._mining_signatures = {"iron": [4270]}
