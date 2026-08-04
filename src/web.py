@@ -180,6 +180,7 @@ class AppState:
     warbonds: WarbondTrackerSource
     item_catalog_task: asyncio.Task | None
     warbond_task: asyncio.Task | None
+    scanner_warmup_task: asyncio.Task | None
     scanner_gate: "InventoryScannerGate"
     request_limiter: SlidingWindowLimiter
 
@@ -322,8 +323,43 @@ class LanguageMeasurementRequest(BaseModel):
     language: str = Field(min_length=2, max_length=3, pattern="^[A-Za-z]{2,3}$")
 
 
+async def _warm_inventory_scanner(sources: SourceRegistry) -> None:
+    """Prepare OCR and catalog indexes without delaying web readiness."""
+    warmup_started = time.perf_counter()
+    try:
+        await asyncio.to_thread(_initialize_rapid_ocr_pool)
+        await asyncio.gather(*(
+            asyncio.to_thread(_warm_rapid_title_ocr)
+            for _ in range(_RAPID_TITLE_OCR_POOL_SIZE)
+        ))
+        from PIL import Image
+
+        warm_frame = Image.new("RGB", (1280, 720), "black")
+        warm_output = BytesIO()
+        warm_frame.save(warm_output, format="PNG")
+        warm_image_data = warm_output.getvalue()
+        await asyncio.gather(*(
+            asyncio.to_thread(
+                _read_calibrated_inventory_title,
+                warm_image_data,
+                _DEFAULT_INVENTORY_TITLE_BOX,
+            )
+            for _ in range(_RAPID_TITLE_OCR_POOL_SIZE)
+        ))
+        await sources.lookup_inventory_items("inventory scanner warmup", limit=1)
+        logging.info(
+            "Inventory scanner background warmup complete in %.3f seconds",
+            time.perf_counter() - warmup_started,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logging.exception("Inventory scanner background warmup failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    startup_started = time.perf_counter()
     settings = Settings.from_env(require_discord_token=False)
     install_secret_redaction()
     cache = await SQLiteCache.create(settings.database_path)
@@ -351,39 +387,26 @@ async def lifespan(app: FastAPI):
         _warbond_maintenance_loop(warbonds),
         name="warbond-maintenance",
     )
-    try:
-        await asyncio.to_thread(_initialize_rapid_ocr_pool)
-        await asyncio.gather(*(
-            asyncio.to_thread(_warm_rapid_title_ocr)
-            for _ in range(_RAPID_TITLE_OCR_POOL_SIZE)
-        ))
-        from PIL import Image
-        warm_frame = Image.new("RGB", (1280, 720), "black")
-        warm_output = BytesIO()
-        warm_frame.save(warm_output, format="PNG")
-        warm_image_data = warm_output.getvalue()
-        await asyncio.gather(*(
-            asyncio.to_thread(
-                _read_calibrated_inventory_title,
-                warm_image_data,
-                _DEFAULT_INVENTORY_TITLE_BOX,
-            )
-            for _ in range(_RAPID_TITLE_OCR_POOL_SIZE)
-        ))
-        # Build the local item-catalog indexes during startup instead of making
-        # the first scanner request pay the cold-load cost.
-        await sources.lookup_inventory_items("inventory scanner warmup", limit=1)
-    except Exception:
-        pass
+    app.state.game_assist.scanner_warmup_task = asyncio.create_task(
+        _warm_inventory_scanner(sources),
+        name="inventory-scanner-warmup",
+    )
+    logging.info(
+        "Web startup ready in %.3f seconds; inventory scanner warming in background",
+        time.perf_counter() - startup_started,
+    )
     try:
         yield
     finally:
         app.state.game_assist.item_catalog_task.cancel()
         app.state.game_assist.warbond_task.cancel()
+        app.state.game_assist.scanner_warmup_task.cancel()
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.item_catalog_task
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.warbond_task
+        with suppress(asyncio.CancelledError):
+            await app.state.game_assist.scanner_warmup_task
         await warbonds.close()
         await updates.close()
         await sources.close()

@@ -449,6 +449,9 @@ def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> 
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
+    assert "scanner_warmup_task = asyncio.create_task(" in python
+    assert "_warm_inventory_scanner(sources)" in python
+    assert "inventory scanner warming in background" in python
     assert "await asyncio.to_thread(_initialize_rapid_ocr_pool)" in python
     assert "await asyncio.to_thread(_read_image_text, data)" in python
     assert "candidate_limit=1," in python
