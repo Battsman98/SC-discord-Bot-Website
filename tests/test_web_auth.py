@@ -1,3 +1,9 @@
+import asyncio
+from types import SimpleNamespace
+
+from fastapi.responses import RedirectResponse
+
+from src import web
 from src.config import Settings
 from dataclasses import replace
 
@@ -88,3 +94,19 @@ def test_human_verification_requires_both_keys() -> None:
     assert human_verification_configured(
         replace(app_settings, turnstile_site_key="site", turnstile_secret_key="secret")
     ) is True
+
+
+def test_discord_login_still_works_without_optional_human_verification(monkeypatch) -> None:
+    monkeypatch.setattr(
+        web.app.state,
+        "game_assist",
+        SimpleNamespace(settings=settings()),
+        raising=False,
+    )
+
+    response = asyncio.run(web.discord_login())
+
+    assert isinstance(response, RedirectResponse)
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("https://discord.com/oauth2/authorize?")
+    assert "game_assist_oauth_state=" in response.headers["set-cookie"]

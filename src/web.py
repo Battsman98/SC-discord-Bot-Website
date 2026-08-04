@@ -908,7 +908,7 @@ async def discord_login() -> RedirectResponse | HTMLResponse:
     if not discord_auth_configured(settings):
         raise HTTPException(status_code=503, detail="Discord OAuth is not configured.")
     if not human_verification_configured(settings):
-        raise HTTPException(status_code=503, detail="Human verification is not configured.")
+        return _begin_discord_login(settings)
     site_key = html.escape(settings.turnstile_site_key, quote=True)
     return HTMLResponse(f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -924,15 +924,15 @@ h1{{margin-top:0}}button{{margin-top:20px;padding:11px 18px;background:#26a9df;c
 @app.post("/auth/discord/login")
 async def discord_login_verified(
     request: Request,
-    turnstile_response: str = Form(alias="cf-turnstile-response"),
+    turnstile_response: str | None = Form(default=None, alias="cf-turnstile-response"),
 ) -> RedirectResponse:
     settings = state().settings
     if not discord_auth_configured(settings):
         raise HTTPException(status_code=503, detail="Discord OAuth is not configured.")
     if not human_verification_configured(settings):
-        raise HTTPException(status_code=503, detail="Human verification is not configured.")
+        return _begin_discord_login(settings)
     client_ip = request.client.host if request.client else None
-    if not await verify_human(settings, turnstile_response, client_ip):
+    if not await verify_human(settings, turnstile_response or "", client_ip):
         raise HTTPException(status_code=400, detail="Human verification failed. Please go back and try again.")
     return _begin_discord_login(settings)
 
