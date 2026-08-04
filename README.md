@@ -71,6 +71,8 @@ The Discord Bot Hub is the sole public command area. On startup, known bot-manag
 
 The `@everyone` role can view and interact with the bot throughout `Discord Bot Hub`, including its text, thread, forum, and voice features. Individual slash commands remain restricted to their associated Hub channels.
 
+The Hub also contains a read-only `member-applications` embed with an Apply button. Visitors answer two private button-based questions, and completed applications are posted to `membership-application-reviews`, which only the server owner and bot can access. Approving an application replaces the applicant's `Visitor` role with `Member`; denying it leaves their roles unchanged.
+
 Set `UEX_API_TOKEN` to the bearer token from your registered UEX API application. The token is used only by the Python backend for documented `api.uexcorp.uk` requests and must not be exposed to browser JavaScript or committed to source control. Mining locations and signatures use the public Star Citizen Wiki API, which does not require a token.
 
 Set `EXEC_STATUS_CHANNEL_ID` in `.env` to have the bot keep a public Executive Hangar status message updated every 60 seconds.
@@ -102,7 +104,7 @@ WEB_SESSION_SECRET=replace-with-a-long-random-secret
 
 The website uses the same `DISCORD_GUILD_ID`, `EXEC_ADMIN_ROLE_IDS`, `BOT_ADMIN_ROLE_IDS`, and `BOT_ADMIN_USER_IDS` permission model as the bot. Users must be members of the configured Discord server. If no matching role IDs or user IDs are configured for a permission group, users with Discord's Manage Server permission can use those website actions.
 
-To require a server-verified human check before Discord sign-in or automatic Visitor joining, create a Cloudflare Turnstile widget for the website hostname and set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. When both values are present, every Discord OAuth login begins with the managed Turnstile challenge. The secret key remains server-side.
+Discord OAuth sign-in and automatic Visitor joining require a server-verified human check. Create a Cloudflare Turnstile widget for the website hostname and set `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`; sign-in fails closed when either key is absent. Every Discord OAuth login begins with the managed Turnstile challenge, and the secret key remains server-side. Ordinary Discord invite joins receive only the `Visitor` role after Discord membership screening is complete; enable the Server Members Intent for the bot in the Discord Developer Portal.
 
 ### Import RSI Hangar
 

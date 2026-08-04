@@ -886,7 +886,7 @@ async def discord_login() -> RedirectResponse | HTMLResponse:
     if not discord_auth_configured(settings):
         raise HTTPException(status_code=503, detail="Discord OAuth is not configured.")
     if not human_verification_configured(settings):
-        return _begin_discord_login(settings)
+        raise HTTPException(status_code=503, detail="Human verification is not configured.")
     site_key = html.escape(settings.turnstile_site_key, quote=True)
     return HTMLResponse(f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

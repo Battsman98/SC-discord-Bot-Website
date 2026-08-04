@@ -154,6 +154,25 @@ async def _join_guild_as_visitor(
         (role for role in roles if str(role.get("name") or "").strip().casefold() == VISITOR_ROLE_NAME.casefold()),
         None,
     )
+    if visitor_role is None:
+        raise HTTPException(status_code=503, detail="Visitor access is still being prepared. Try again shortly.")
+
+    async with session.put(
+        f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/members/{user_id}",
+        headers=headers,
+        json={"access_token": access_token, "roles": [str(visitor_role["id"])]},
+    ) as response:
+        if response.status not in {201, 204}:
+            raise HTTPException(status_code=403, detail="Discord could not add you as a Visitor.")
+
+    async with session.get(
+        f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/members/{user_id}",
+        headers=headers,
+    ) as response:
+        member = await response.json()
+        if response.status >= 400:
+            raise HTTPException(status_code=403, detail="Discord could not confirm Visitor access.")
+        return member
 
 
 def human_verification_configured(settings: Settings) -> bool:
@@ -183,25 +202,6 @@ async def verify_human(
                 return response.status < 400 and result.get("success") is True
     except (aiohttp.ClientError, TimeoutError, ValueError):
         return False
-    if visitor_role is None:
-        raise HTTPException(status_code=503, detail="Visitor access is still being prepared. Try again shortly.")
-
-    async with session.put(
-        f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/members/{user_id}",
-        headers=headers,
-        json={"access_token": access_token, "roles": [str(visitor_role["id"])]},
-    ) as response:
-        if response.status not in {201, 204}:
-            raise HTTPException(status_code=403, detail="Discord could not add you as a Visitor.")
-
-    async with session.get(
-        f"{DISCORD_API_BASE_URL}/guilds/{settings.discord_guild_id}/members/{user_id}",
-        headers=headers,
-    ) as response:
-        member = await response.json()
-        if response.status >= 400:
-            raise HTTPException(status_code=403, detail="Discord could not confirm Visitor access.")
-        return member
 
 
 async def _resolve_member_permissions(
