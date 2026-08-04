@@ -446,10 +446,23 @@ class UEXSource:
 
     async def _get_mining_material_names_for_signature(self, signature: int) -> set[str]:
         signatures = await self._get_mining_signature_map()
-        return {
+        matches = {
             material
             for material, values in signatures.items()
             if any(self._mining_signature_matches_cluster(signature, base_signature) for base_signature in values)
+        }
+        if matches:
+            return matches
+
+        return {
+            self._normalize(str(material.get("material_name") or ""))
+            for material in self._get_mining_fallbacks().values()
+            if isinstance(material, dict)
+            and any(
+                self._mining_signature_matches_cluster(signature, base_signature)
+                for value in material.get("rock_signatures") or []
+                if (base_signature := self._int_or_none(value)) is not None
+            )
         }
 
     def _mining_signature_matches_cluster(self, signature: int, base_signature: int) -> bool:
@@ -1895,17 +1908,10 @@ class UEXSource:
         commodity: dict,
         system_code: str | None = None,
     ) -> MiningLocationResult | None:
-        if getattr(self, "_mining_fallbacks", None) is None:
-            fallback_path = Path(__file__).resolve().parents[1] / "data" / "mining_locations.json"
-            try:
-                payload = json.loads(fallback_path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                payload = {}
-            materials = payload.get("materials") if isinstance(payload, dict) else None
-            self._mining_fallbacks = materials if isinstance(materials, dict) else {}
+        fallbacks = self._get_mining_fallbacks()
 
         code = str(commodity.get("code") or "").upper()
-        cached = self._mining_fallbacks.get(code)
+        cached = fallbacks.get(code)
         if not isinstance(cached, dict):
             return None
 
@@ -1946,6 +1952,17 @@ class UEXSource:
             rock_signatures=result.rock_signatures or [],
             location_groups=[group],
         )
+
+    def _get_mining_fallbacks(self) -> dict[str, dict]:
+        if getattr(self, "_mining_fallbacks", None) is None:
+            fallback_path = Path(__file__).resolve().parents[1] / "data" / "mining_locations.json"
+            try:
+                payload = json.loads(fallback_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                payload = {}
+            materials = payload.get("materials") if isinstance(payload, dict) else None
+            self._mining_fallbacks = materials if isinstance(materials, dict) else {}
+        return self._mining_fallbacks
 
     async def close(self) -> None:
         return None

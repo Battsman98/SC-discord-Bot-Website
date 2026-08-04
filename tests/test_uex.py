@@ -608,6 +608,32 @@ def test_find_mining_material_accepts_savrilium_cluster_signature() -> None:
     assert match["name"] == "Savrilium (Ore)"
 
 
+def test_find_mining_material_uses_bundled_signature_when_live_map_has_no_match() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {}
+    source._mining_fallbacks = {
+        "STIL": {
+            "material_name": "Stileron",
+            "rock_signatures": [3185],
+        }
+    }
+    source._commodities = [
+        {
+            "name": "Stileron (Raw)",
+            "code": "STIL",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_inert": 0,
+        }
+    ]
+
+    match = asyncio.run(source._find_mining_material("6370"))
+
+    assert match is not None
+    assert match["name"] == "Stileron (Raw)"
+
+
 def test_autocomplete_mining_materials_accepts_rock_signature() -> None:
     source = UEXSource.__new__(UEXSource)
     source._mining_signatures = {"iron": [4270]}
