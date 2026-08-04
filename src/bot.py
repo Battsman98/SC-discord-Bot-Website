@@ -313,6 +313,27 @@ def _allowed_command_channel_id(bot: "GameAssistBot", command_name: str) -> int 
     return allowed_channel_id
 
 
+class MembershipRSIHandleModal(discord.ui.Modal, title="Membership application — Question 3 of 3"):
+    rsi_handle = discord.ui.TextInput(
+        label="What is your RSI Handle?",
+        placeholder="Enter your Star Citizen RSI handle",
+        min_length=1,
+        max_length=32,
+        required=True,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        bot = interaction.client
+        if not isinstance(bot, GameAssistBot) or not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("This application is unavailable.", ephemeral=True)
+            return
+        rsi_handle = str(self.rsi_handle).strip()
+        if not rsi_handle:
+            await interaction.response.send_message("Enter a valid RSI handle and try again.", ephemeral=True)
+            return
+        await bot.submit_membership_application(interaction, rsi_handle)
+
+
 class MembershipQuestionTwoView(discord.ui.View):
     def __init__(self) -> None:
         super().__init__(timeout=300)
@@ -322,7 +343,7 @@ class MembershipQuestionTwoView(discord.ui.View):
         bot = interaction.client
         if not isinstance(bot, GameAssistBot) or not isinstance(interaction.user, discord.Member):
             return
-        await bot.submit_membership_application(interaction)
+        await interaction.response.send_modal(MembershipRSIHandleModal())
 
     @discord.ui.button(label="No", style=discord.ButtonStyle.danger)
     async def decline_rules(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -343,7 +364,7 @@ class MembershipQuestionOneView(discord.ui.View):
     @discord.ui.button(label="Yes", style=discord.ButtonStyle.success)
     async def become_member(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         embed = discord.Embed(
-            title="Membership application — Question 2 of 2",
+            title="Membership application — Question 2 of 3",
             description="**Will you follow the rules in place?**",
             color=discord.Color.blurple(),
         )
@@ -381,7 +402,7 @@ class MembershipApplicationPanelView(discord.ui.View):
             await interaction.response.send_message("You are already a community member.", ephemeral=True)
             return
         embed = discord.Embed(
-            title="Membership application — Question 1 of 2",
+            title="Membership application — Question 1 of 3",
             description="**Do you want to become a member of the community?**",
             color=discord.Color.blurple(),
         )
@@ -1312,6 +1333,7 @@ class GameAssistBot(commands.Bot):
         )
         panel.add_field(name="1", value="Do you want to become a member of the community?", inline=False)
         panel.add_field(name="2", value="Will you follow the rules in place?", inline=False)
+        panel.add_field(name="3", value="What is your RSI Handle?", inline=False)
         panel.set_footer(text="Select Apply for Membership to begin. Your answers are private.")
         message = None
         if isinstance(message_id, int):
@@ -1323,28 +1345,28 @@ class GameAssistBot(commands.Bot):
             message = await application_channel.send(embed=panel, view=MembershipApplicationPanelView())
             await self.cache.set(cache_key, message.id, 315360000)
 
-    async def submit_membership_application(self, interaction: discord.Interaction) -> None:
+    async def submit_membership_application(self, interaction: discord.Interaction, rsi_handle: str) -> None:
         guild = interaction.guild
         applicant = interaction.user
         if guild is None or not isinstance(applicant, discord.Member):
-            await interaction.response.edit_message(content="This application is unavailable.", embed=None, view=None)
+            await interaction.response.send_message("This application is unavailable.", ephemeral=True)
             return
         pending_key = f"{APPLICATION_PENDING_CACHE_PREFIX}:{guild.id}:{applicant.id}"
         if await self.cache.get(pending_key):
-            await interaction.response.edit_message(
+            await interaction.response.send_message(
                 embed=discord.Embed(
                     title="Application already pending",
                     description="Your application is already waiting for the server owner to review it.",
                     color=discord.Color.gold(),
                 ),
-                view=None,
+                ephemeral=True,
             )
             return
         review_channel = guild.get_channel(self.application_review_channel_id or 0)
         if not isinstance(review_channel, discord.TextChannel):
-            await interaction.response.edit_message(
+            await interaction.response.send_message(
                 embed=discord.Embed(title="Application unavailable", description="Please try again later.", color=discord.Color.red()),
-                view=None,
+                ephemeral=True,
             )
             return
         review_embed = discord.Embed(
@@ -1357,16 +1379,18 @@ class GameAssistBot(commands.Bot):
         review_embed.add_field(name="Applicant ID", value=str(applicant.id), inline=False)
         review_embed.add_field(name="1. Become a community member?", value="Yes", inline=False)
         review_embed.add_field(name="2. Follow the rules?", value="Yes", inline=False)
+        safe_rsi_handle = discord.utils.escape_markdown(discord.utils.escape_mentions(rsi_handle))
+        review_embed.add_field(name="3. RSI Handle", value=safe_rsi_handle, inline=False)
         review_embed.set_thumbnail(url=applicant.display_avatar.url)
         review_message = await review_channel.send(embed=review_embed, view=MembershipReviewView())
         await self.cache.set(pending_key, review_message.id, 315360000)
-        await interaction.response.edit_message(
+        await interaction.response.send_message(
             embed=discord.Embed(
                 title="Application submitted",
                 description="Your application was sent privately to the server owner for review.",
                 color=discord.Color.green(),
             ),
-            view=None,
+            ephemeral=True,
         )
 
     async def review_membership_application(self, interaction: discord.Interaction, approved: bool) -> None:
