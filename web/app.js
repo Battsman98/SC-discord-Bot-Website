@@ -3360,6 +3360,13 @@ function renderVisitorAnalytics(data) {
       <span>${Number(day.page_views || 0).toLocaleString()} views</span>
       <span>${Number(day.signed_in_users || 0).toLocaleString()} signed in</span>
     </div>`).join("") || `<p class="state">Analytics begin collecting after this deployment.</p>`}
+  </div>
+  <div class="visitor-daily">
+    <h3>Browser languages <small>(weekly samples, last 30 days)</small></h3>
+    ${(data.languages_last_30_days || []).map((item) => `<div class="visitor-day">
+      <span>${escapeHtml(String(item.language || "unknown").toUpperCase())}</span>
+      <span>${Number(item.samples || 0).toLocaleString()} samples</span>
+    </div>`).join("") || `<p class="state">Language measurements begin collecting after this deployment.</p>`}
   </div>`;
 }
 
@@ -3370,6 +3377,34 @@ function sendActivityHeartbeat() {
     credentials: "same-origin",
     keepalive: true,
   }).catch(() => {});
+}
+
+const languageMeasurementStorageKey = "sc-language-measured-at";
+const languageMeasurementIntervalMs = 7 * 24 * 60 * 60 * 1000;
+
+async function measureBrowserLanguage() {
+  let lastMeasured = 0;
+  try {
+    lastMeasured = Number(localStorage.getItem(languageMeasurementStorageKey) || 0);
+  } catch (_) {
+    return;
+  }
+  if (Date.now() - lastMeasured < languageMeasurementIntervalMs) return;
+  const language = String(navigator.languages?.[0] || navigator.language || "")
+    .split(/[-_]/, 1)[0]
+    .toLowerCase();
+  if (!/^[a-z]{2,3}$/.test(language)) return;
+  try {
+    const response = await fetch("/api/analytics/language", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language }),
+    });
+    if (response.ok) localStorage.setItem(languageMeasurementStorageKey, String(Date.now()));
+  } catch (_) {
+    // A future visit can retry without affecting the rest of the application.
+  }
 }
 
 function renderCrewSplit(data) {
@@ -3669,6 +3704,7 @@ persistentFieldObserver.observe(document.body, { childList: true, subtree: true 
 
 loadMe();
 sendActivityHeartbeat();
+void measureBrowserLanguage();
 setInterval(sendActivityHeartbeat, 60_000);
 document.addEventListener("visibilitychange", sendActivityHeartbeat);
 loadShipFacets();

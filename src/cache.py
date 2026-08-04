@@ -108,6 +108,17 @@ class SQLiteCache:
         )
         connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS website_language_samples (
+                week_start TEXT NOT NULL,
+                visitor_hash TEXT NOT NULL,
+                language_code TEXT NOT NULL,
+                sampled_at INTEGER NOT NULL,
+                PRIMARY KEY (week_start, visitor_hash)
+            )
+            """
+        )
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS user_blueprints (
                 user_id INTEGER NOT NULL,
                 blueprint_name TEXT NOT NULL,
@@ -390,6 +401,26 @@ class SQLiteCache:
         )
         self._connection.commit()
 
+    async def record_website_language(
+        self,
+        visitor_hash: str,
+        language_code: str,
+        now: int | None = None,
+    ) -> None:
+        timestamp = int(time.time()) if now is None else int(now)
+        sampled_date = datetime.fromtimestamp(timestamp, timezone.utc).date()
+        week_start = (sampled_date - timedelta(days=sampled_date.weekday())).isoformat()
+        self._connection.execute(
+            """
+            INSERT INTO website_language_samples (
+                week_start, visitor_hash, language_code, sampled_at
+            ) VALUES (?, ?, ?, ?)
+            ON CONFLICT(week_start, visitor_hash) DO NOTHING
+            """,
+            (week_start, visitor_hash, language_code, timestamp),
+        )
+        self._connection.commit()
+
     async def website_visitor_analytics(self, now: int | None = None) -> dict[str, Any]:
         timestamp = int(time.time()) if now is None else int(now)
         today = datetime.fromtimestamp(timestamp, timezone.utc).date()
@@ -432,6 +463,16 @@ class SQLiteCache:
             """,
             ((today - timedelta(days=13)).isoformat(),),
         ).fetchall()
+        language_rows = self._connection.execute(
+            """
+            SELECT language_code, COUNT(*)
+            FROM website_language_samples
+            WHERE sampled_at >= ?
+            GROUP BY language_code
+            ORDER BY COUNT(*) DESC, language_code ASC
+            """,
+            (timestamp - 30 * 24 * 60 * 60,),
+        ).fetchall()
         return {
             "timezone": "UTC",
             "active_now": {
@@ -442,6 +483,10 @@ class SQLiteCache:
             "today": totals(1),
             "last_7_days": totals(7),
             "last_30_days": totals(30),
+            "languages_last_30_days": [
+                {"language": row[0], "samples": int(row[1] or 0)}
+                for row in language_rows
+            ],
             "daily": [
                 {
                     "date": row[0],
