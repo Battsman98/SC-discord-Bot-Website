@@ -555,7 +555,13 @@ class GameAssistBot(commands.Bot):
                     embed.title == "Website deployed" and revision[:12] in (embed.description or "")
                     for embed in message.embeds
                 ):
-                    await message.delete(reason="Move Discord-only deployment to the correct changelog")
+                    try:
+                        await message.delete(reason="Move Discord-only deployment to the correct changelog")
+                    except discord.HTTPException:
+                        logging.info(
+                            "Could not remove misclassified website changelog entry for %s",
+                            revision[:12],
+                        )
                     break
         if not await self._deployment_already_recorded(DISCORD_CHANGELOG_CHANNEL_NAME, revision):
             summary = await self._deployment_change_summary(revision)
