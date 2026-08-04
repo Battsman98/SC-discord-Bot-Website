@@ -2,7 +2,13 @@ import asyncio
 from pathlib import Path
 
 from src.cache import SQLiteCache, audit_action_type
-from src.web import _safe_audit_query, _safe_crash_message, _website_audit_metadata
+from src.web import (
+    _safe_audit_query,
+    _safe_crash_message,
+    _website_audit_function,
+    _website_audit_metadata,
+    _website_audit_visitor,
+)
 from starlette.requests import Request
 
 
@@ -19,6 +25,32 @@ def test_website_actions_are_categorized_and_background_requests_are_skipped() -
     assert _website_audit_metadata("PUT", "/api/me/ships")[0] == "ships"
     assert _website_audit_metadata("GET", "/api/autocomplete/mining-materials") is None
     assert _website_audit_metadata("GET", "/api/health") is None
+    assert _website_audit_metadata("POST", "/api/me/feedback") == (
+        "other",
+        "Website Function Used",
+    )
+    assert _website_audit_metadata("GET", "/api/game-data/status") == (
+        "other",
+        "Website Function Used",
+    )
+    assert _website_audit_metadata("POST", "/api/activity") is None
+
+
+def test_website_audit_identifies_visitor_and_route_function() -> None:
+    class Route:
+        name = "submit_feedback"
+
+    request = Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/api/me/feedback",
+        "query_string": b"",
+        "headers": [(b"cookie", b"sc_companion_visitor=0123456789abcdef0123456789abcdef")],
+        "route": Route(),
+    })
+
+    assert _website_audit_visitor(request) == "3eb1bd439947"
+    assert _website_audit_function(request) == "submit_feedback"
 
 
 def test_audit_query_redacts_authentication_secrets() -> None:

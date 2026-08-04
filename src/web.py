@@ -552,9 +552,13 @@ async def audit_website_action(request: Request, call_next):
                 "User": _website_audit_user(user),
                 "Method": request.method,
                 "Path": request.url.path,
+                "Function": _website_audit_function(request),
                 "Status": response.status_code if response is not None else 500,
                 "Outcome": "Success" if response is not None and response.status_code < 400 else "Failed",
             }
+            visitor = _website_audit_visitor(request)
+            if visitor:
+                fields["Visitor"] = visitor
             safe_query = _safe_audit_query(request)
             if safe_query:
                 fields["Query"] = safe_query
@@ -582,7 +586,7 @@ def _safe_crash_message(message: str) -> str:
 
 
 def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:
-    if method in {"HEAD", "OPTIONS"} or path in {"/api/health", "/api/me"} or "/autocomplete/" in path:
+    if method in {"HEAD", "OPTIONS"} or path in {"/api/health", "/api/me", "/api/activity"} or "/autocomplete/" in path:
         return None
     if path.endswith("/facets"):
         return None
@@ -605,10 +609,15 @@ def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:
         ("/api/lookup", "other", "Website General Lookup"),
         ("/auth/", "authentication", "Website Authentication Action"),
     )
-    return next(
+    mapped = next(
         ((action_type, title) for prefix, action_type, title in mappings if path.startswith(prefix)),
         None,
     )
+    if mapped:
+        return mapped
+    if path.startswith("/api/"):
+        return "other", "Website Function Used"
+    return None
 
 
 def _website_has_explicit_audit(method: str, path: str) -> bool:
@@ -621,6 +630,19 @@ def _website_audit_user(user: Any) -> str:
     if user is None:
         return "Anonymous"
     return f"{user.display_name or user.username} ({user.id})"
+
+
+def _website_audit_visitor(request: Request) -> str | None:
+    visitor_id = request.cookies.get(VISITOR_COOKIE_NAME, "")
+    if re.fullmatch(r"[a-f0-9]{32}", visitor_id) is None:
+        return None
+    return hashlib.sha256(visitor_id.encode("ascii")).hexdigest()[:12]
+
+
+def _website_audit_function(request: Request) -> str:
+    route = request.scope.get("route")
+    route_name = getattr(route, "name", None)
+    return str(route_name or "unresolved")[:100]
 
 
 def _safe_audit_query(request: Request) -> str:
