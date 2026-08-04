@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from src.bot import (
+from src.shared import (
     CZ_TIMER_DEFINITIONS,
     CZ_TIMERS_CACHE_KEY,
     EXEC_OVERRIDE_CACHE_KEY,
