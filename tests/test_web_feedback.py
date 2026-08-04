@@ -83,6 +83,18 @@ def test_every_visitor_command_channel_has_a_response_example() -> None:
     assert set(VISITOR_COMMAND_CHANNELS.values()) <= set(examples)
     assert all(embed.title and "Example" in embed.title for embed in examples.values())
 
+    blueprint = examples["blueprints-and-missions"]
+    assert "/blueprint name: Atlas Quantum Drive" in blueprint.description
+    assert "select the `name` option" in blueprint.description
+    assert "/blueprint query:" not in blueprint.description
+
+    trade = examples["trade-tools"]
+    assert "investment: 500000" in trade.description
+    assert "budget:" not in trade.description
+
+    item = examples["item-locator"]
+    assert "/item locator name: FS-9 LMG" in item.description
+
 
 def test_bot_manager_role_name_is_stable_for_discord_and_website_access() -> None:
     assert BOT_MANAGER_ROLE_NAME == "Bot Manager"
