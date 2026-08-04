@@ -106,7 +106,8 @@ HUB_PERMANENT_MESSAGE_PREFIXES = (
     "discord:exec-status-message",
     "discord:cz-timers-message",
 )
-MEMBER_ROLE_NAME = "Member"
+MEMBER_ROLE_ID = 1409117152795168799
+MEMBER_ROLE_NAME = "Members"
 APPLICATION_REVIEW_CHANNEL_NAME = "membership-application-reviews"
 APPLICATION_PENDING_CACHE_PREFIX = "discord:membership-application-pending"
 VISITOR_COMMAND_CHANNELS = {
@@ -374,10 +375,9 @@ class MembershipApplicationPanelView(discord.ui.View):
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("Applications are only available inside the server.", ephemeral=True)
             return
-        member_role = discord.utils.find(
-            lambda role: role.name.casefold() == MEMBER_ROLE_NAME.casefold(), interaction.user.roles
-        )
-        if member_role:
+        member_role = interaction.guild.get_role(MEMBER_ROLE_ID) if interaction.guild else None
+        already_member = member_role is not None and member_role in interaction.user.roles
+        if already_member:
             await interaction.response.send_message("You are already a community member.", ephemeral=True)
             return
         embed = discord.Embed(
@@ -1229,14 +1229,14 @@ class GameAssistBot(commands.Bot):
             logging.error("Could not resolve the Discord Bot Hub for membership applications")
             return
 
-        member_role = discord.utils.find(
-            lambda role: role.name.casefold() == MEMBER_ROLE_NAME.casefold(), guild.roles
-        )
+        member_role = guild.get_role(MEMBER_ROLE_ID)
         if member_role is None:
-            member_role = await guild.create_role(
-                name=MEMBER_ROLE_NAME,
-                reason="Create role for approved community membership applications",
+            logging.error(
+                "Existing membership role %s (%s) is missing; application provisioning stopped",
+                MEMBER_ROLE_NAME,
+                MEMBER_ROLE_ID,
             )
+            return
 
         application_channel = guild.get_channel(self.visitor_channels.get("member-applications", 0))
         if not isinstance(application_channel, discord.TextChannel):
@@ -1389,14 +1389,12 @@ class GameAssistBot(commands.Bot):
             return
 
         if approved:
-            member_role = discord.utils.find(
-                lambda role: role.name.casefold() == MEMBER_ROLE_NAME.casefold(), guild.roles
-            )
+            member_role = guild.get_role(MEMBER_ROLE_ID)
             visitor_role = discord.utils.find(
                 lambda role: role.name.casefold() == VISITOR_ROLE_NAME.casefold(), guild.roles
             )
             if member_role is None:
-                await interaction.response.send_message("The Member role is missing.", ephemeral=True)
+                await interaction.response.send_message("The existing Members role is missing.", ephemeral=True)
                 return
             updated_roles = [role for role in applicant.roles if role != visitor_role and not role.is_default()]
             if member_role not in updated_roles:
