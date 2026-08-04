@@ -347,14 +347,16 @@ async def _warm_inventory_scanner(sources: SourceRegistry) -> None:
             for _ in range(_RAPID_TITLE_OCR_POOL_SIZE)
         ))
         await sources.lookup_inventory_items("inventory scanner warmup", limit=1)
-        logging.info(
+        logging.getLogger("uvicorn.error").info(
             "Inventory scanner background warmup complete in %.3f seconds",
             time.perf_counter() - warmup_started,
         )
     except asyncio.CancelledError:
         raise
     except Exception:
-        logging.exception("Inventory scanner background warmup failed")
+        logging.getLogger("uvicorn.error").exception(
+            "Inventory scanner background warmup failed"
+        )
 
 
 @asynccontextmanager
@@ -391,7 +393,7 @@ async def lifespan(app: FastAPI):
         _warm_inventory_scanner(sources),
         name="inventory-scanner-warmup",
     )
-    logging.info(
+    logging.getLogger("uvicorn.error").info(
         "Web startup ready in %.3f seconds; inventory scanner warming in background",
         time.perf_counter() - startup_started,
     )
