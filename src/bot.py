@@ -168,7 +168,7 @@ def _hub_category_overwrites(
 def _deployment_targets_for_files(files: list[str]) -> set[str]:
     normalized = {name.replace("\\", "/").lower() for name in files}
     website = any(
-        name.startswith(("web/", "docs/")) or name in {"src/web.py", "src/web_auth.py"}
+        name.startswith("web/") or name in {"src/web.py", "src/web_auth.py"}
         for name in normalized
     )
     discord_bot = "src/bot.py" in normalized or "src/timers.py" in normalized

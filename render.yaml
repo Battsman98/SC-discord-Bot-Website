@@ -19,7 +19,6 @@ services:
     buildFilter:
       paths:
         - web/**
-        - docs/**
         - data/**
         - src/web.py
         - src/web_auth.py
@@ -84,7 +83,6 @@ services:
     autoDeployTrigger: commit
     buildFilter:
       paths:
-        - docs/**
         - data/**
         - src/bot.py
         - src/cache.py

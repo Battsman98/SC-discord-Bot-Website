@@ -24,7 +24,7 @@ from src.bot import (
 
 
 def test_deployment_changelog_targets_match_changed_application() -> None:
-    assert _deployment_targets_for_files(["src/bot.py", "README.md"]) == {"discord-changelog"}
+    assert _deployment_targets_for_files(["src/bot.py", "docs/commands.md"]) == {"discord-changelog"}
     assert _deployment_targets_for_files(["src/web.py", "web/app.js"]) == {"website-changelog"}
     assert _deployment_targets_for_files(["src/bot.py", "web/app.js"]) == {
         "discord-changelog",
