@@ -165,7 +165,7 @@ def test_hub_roles_have_scoped_permissions() -> None:
 
 def test_inventory_search_command_is_registered() -> None:
     assert inventory_group.get_command("search") is not None
-    assert INVENTORY_CHANNEL_ID == 1528623944947597383
+    assert INVENTORY_CHANNEL_ID == 1533075934603772004
 
 
 def test_mission_command_uses_blueprint_channel_by_default() -> None:

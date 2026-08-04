@@ -51,7 +51,7 @@ CZ_TIMER_DEFINITIONS = {
     "red_keycard": ("Red Keycards", 30 * 60),
     "timer_door": ("Timer Doors", 20 * 60),
 }
-INVENTORY_CHANNEL_ID = 1528623944947597383
+INVENTORY_CHANNEL_ID = 1533075934603772004
 FEEDBACK_TEMPLATE_CACHE_PREFIX = "discord:feedback-template-thread"
 VISITOR_ROLE_NAME = "Visitor"
 BOT_MANAGER_ROLE_NAME = "Bot Manager"
