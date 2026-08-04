@@ -63,7 +63,7 @@ Commands not listed in `COMMAND_CHANNEL_IDS` can be used in any channel.
 
 Set `AUDIT_LOG_CHANNEL_ID` in `.env` to post a remote audit view of command usage, blocked command attempts, and manual changes such as Executive Hangar corrections, CZ timer updates, and community mining location additions.
 
-On startup, the bot also creates private `website-changelog` and `discord-changelog` channels under the `audit log` category (`1516295744603164732`). Only pushed deployments are recorded there. Deployments are classified from their changed files: website-only work is posted to `website-changelog`, Discord bot work to `discord-changelog`, and genuinely mixed releases to both. Each revision is announced at most once even if the service restarts, and each entry includes the commit subject as a brief description. Bot Managers can read these channels; only the bot can post. Changelog posts are silent and do not mention an owner, role, or `@everyone`.
+On startup, the bot also creates private `website-changelog` and `discord-changelog` channels under the `audit log` category (`1516295744603164732`). Discord worker deployments are recorded automatically. Because website-only commits no longer restart the Discord worker, they are not announced by this startup hook. Each recorded revision is announced at most once even if the worker restarts, and each entry includes the commit subject as a brief description. Bot Managers can read these channels; only the bot can post. Changelog posts are silent and do not mention an owner, role, or `@everyone`.
 
 Every command-focused channel in the Discord Bot Hub also receives a durable example embed showing the command syntax and representative response data. These examples are refreshed on startup without duplicating posts. In the Executive Hangar and Contested Zone channels, the example appears first and the live auto-updating dashboard is posted directly below it. The bot automatically removes a duplicate legacy `Visitor Bot Hub`, preserving unique channels by moving them into `Discord Bot Hub` and deleting only duplicate managed channels.
 
@@ -210,11 +210,11 @@ sudo journalctl -u game-assist-bot -f
 
 ## Render Deployment
 
-The included `render.yaml` deploys the website and Discord bot together as one
-Starter web service. A 1 GB persistent disk stores the shared SQLite database at
-`/var/data/bot.sqlite3`. Keeping both processes in one service is required while
-the project uses SQLite because a Render disk cannot be shared between separate
-services.
+The included `render.yaml` deploys three independent resources: a Starter web
+service, a Starter Discord background worker, and a small managed PostgreSQL
+database shared over Render's private network. Build filters keep website-only
+changes from restarting the bot and bot-only changes from restarting the site.
+Changes to shared application or persistence code intentionally deploy both.
 
 1. Push this repository to GitHub.
 2. In Render, select **New > Blueprint** and connect the repository.
@@ -230,12 +230,22 @@ services.
 
 5. Add that exact HTTPS callback URL under **OAuth2 > Redirects** in the Discord
    Developer Portal.
-6. Deploy the Blueprint, then verify `/api/health` and sign in through Discord.
+6. Before deploying the application services, copy the existing SQLite data and
+   initialize the PostgreSQL schema with:
 
-The first deployment starts with a new database. To preserve existing hangar,
-blueprint, inventory, timer, and audit data, copy `data/bot.sqlite3` to the
-mounted Render disk before using the production site. Do not run the local bot
-and the Render bot with the same token at the same time after cutover.
+   ```text
+   python scripts/migrate_sqlite_to_postgres.py data/bot.sqlite3 "postgresql://..."
+   ```
+
+   Use the database's external connection string only for this one-time local
+   migration. Do not commit it.
+7. Deploy the Blueprint, then verify `/api/health`, Discord bot availability,
+   and website sign-in independently.
+
+The migration preserves hangar, blueprint, inventory, timer, audit, and website
+analytics data. Do not run the local bot and Render worker with the same token at
+the same time after cutover. The old SQLite file is not deleted and remains a
+rollback copy.
 
 ## GitHub Notes
 

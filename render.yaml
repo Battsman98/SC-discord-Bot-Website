@@ -1,22 +1,44 @@
+databases:
+  - name: star-citizen-game-assist-db
+    plan: basic-256mb
+    region: oregon
+    databaseName: game_assist
+    user: game_assist
+    diskSizeGB: 1
+
 services:
   - type: web
     name: star-citizen-game-assist
     runtime: python
-    plan: starter
+    plan: standard
     region: oregon
     buildCommand: pip install -r requirements.txt
-    startCommand: python scripts/run_render.py
+    startCommand: python -m uvicorn src.web:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers --forwarded-allow-ips=*
     healthCheckPath: /api/health
     autoDeployTrigger: commit
-    disk:
-      name: game-assist-data
-      mountPath: /var/data
-      sizeGB: 1
+    buildFilter:
+      paths:
+        - web/**
+        - docs/**
+        - data/**
+        - src/web.py
+        - src/web_auth.py
+        - src/cache.py
+        - src/config.py
+        - src/postgres_compat.py
+        - src/security.py
+        - src/shared.py
+        - src/timers.py
+        - src/sources/**
+        - requirements.txt
+        - render.yaml
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
       - key: DATABASE_PATH
-        value: /var/data/bot.sqlite3
+        fromDatabase:
+          name: star-citizen-game-assist-db
+          property: connectionString
       - key: DISCORD_TOKEN
         sync: false
       - key: UEX_API_TOKEN
@@ -27,8 +49,6 @@ services:
         sync: false
       - key: DISCORD_REDIRECT_URI
         sync: false
-      - key: DISCORD_GUILD_ID
-        sync: false
       - key: WEB_SESSION_SECRET
         generateValue: true
       - key: WEB_ADMIN_TOKEN
@@ -36,6 +56,58 @@ services:
       - key: TURNSTILE_SITE_KEY
         sync: false
       - key: TURNSTILE_SECRET_KEY
+        sync: false
+      - key: FEEDBACK_FORUM_CHANNEL_ID
+        value: "1533026212463775754"
+      - key: HTTP_TIMEOUT_SECONDS
+        value: "15"
+      - key: CACHE_TTL_SECONDS
+        value: "300"
+      - key: INVENTORY_SCANNER_WORKERS
+        value: "2"
+      - key: INVENTORY_SCANNER_CAPACITY
+        value: "4"
+      - key: MAX_UPLOAD_BYTES
+        value: "10485760"
+      - key: WEB_RATE_LIMIT_PER_MINUTE
+        value: "120"
+      - key: TRUSTED_ORIGINS
+        value: "https://star-citizen-game-assist.onrender.com"
+
+  - type: worker
+    name: star-citizen-game-assist-discord
+    runtime: python
+    plan: starter
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m src.bot
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - docs/**
+        - data/**
+        - src/bot.py
+        - src/cache.py
+        - src/config.py
+        - src/postgres_compat.py
+        - src/security.py
+        - src/shared.py
+        - src/timers.py
+        - src/sources/**
+        - requirements.txt
+        - render.yaml
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DATABASE_PATH
+        fromDatabase:
+          name: star-citizen-game-assist-db
+          property: connectionString
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: UEX_API_TOKEN
+        sync: false
+      - key: DISCORD_GUILD_ID
         sync: false
       - key: COMMANDS_CHANNEL_ID
         sync: false
@@ -61,17 +133,5 @@ services:
         value: "15"
       - key: CACHE_TTL_SECONDS
         value: "300"
-      - key: MAINTENANCE_RESTART_SECONDS
-        value: "86400"
-      - key: INVENTORY_SCANNER_WORKERS
-        value: "2"
-      - key: INVENTORY_SCANNER_CAPACITY
-        value: "4"
-      - key: MAX_UPLOAD_BYTES
-        value: "10485760"
-      - key: WEB_RATE_LIMIT_PER_MINUTE
-        value: "120"
       - key: DISCORD_RATE_LIMIT_PER_10_SECONDS
         value: "8"
-      - key: TRUSTED_ORIGINS
-        value: "https://star-citizen-game-assist.onrender.com"
