@@ -15,6 +15,7 @@ const outputs = {
   blueprintImport: document.querySelector("#blueprintImportOutput"),
   savedBlueprints: document.querySelector("#savedBlueprintsOutput"),
   items: document.querySelector("#itemsOutput"),
+  lootItems: document.querySelector("#lootItemsOutput"),
   inventory: document.querySelector("#inventoryOutput"),
   inventoryImport: document.querySelector("#inventoryImportOutput"),
   exec: document.querySelector("#execOutput"),
@@ -325,6 +326,7 @@ setupInventoryScannerOverlay();
 setupStaticInventorySelects();
 setupInventoryCatalogAutocomplete();
 setupInventorySearchEnterKey();
+setupLootItemAutocomplete();
 
 function initToolMenus() {
   document.querySelectorAll(".tab-panel").forEach((tab) => {
@@ -446,6 +448,11 @@ async function handleForm(action, form) {
       setLoading(outputs.items);
       const params = queryParams(data, ["query", "category", "section", "size"]);
       renderCards(outputs.items, await api(`/api/items?${params}`), renderItem);
+    }
+    if (action === "lootItems") {
+      setLoading(outputs.lootItems);
+      const result = await api(`/api/loot/items?query=${encodeURIComponent(data.query)}`);
+      renderCards(outputs.lootItems, [result], renderLootItem);
     }
     if (action === "inventorySearch") {
       await loadInventory();
@@ -724,6 +731,66 @@ function renderItem(item) {
     ["Purchases", item.purchases?.map((purchase) => `${money(purchase.price)} at ${escapeHtml(purchase.terminal_name)}`).join("<br>")],
     ["Source", link(item.source_url, item.source_name)],
   ]);
+}
+
+function renderLootItem(item) {
+  const pricing = [
+    item.marketplace_sell_average !== null && item.marketplace_sell_average !== undefined
+      ? `Player marketplace average: ${money(item.marketplace_sell_average)}`
+      : null,
+    item.terminal_sell_average !== null && item.terminal_sell_average !== undefined
+      ? `Terminal sell average: ${money(item.terminal_sell_average)}`
+      : null,
+  ].filter(Boolean).join("<br>") || "No current UEX price average found.";
+  return card(item.name, [
+    ["Lootable", "Yes — game catalog flag"],
+    ["Type", item.classification],
+    ["Category", item.category],
+    ["Manufacturer", item.manufacturer],
+    ["Size", item.size],
+    ["Rarity", item.rarity],
+    ["Game version", item.game_version],
+    ["UEX pricing", pricing],
+    ["Locations", "Exact loot locations require verified community reports."],
+    ["Links", `${link(item.wiki_url, "Star Citizen Wiki")} · ${link(item.uex_url, "Live prices on UEX")}`],
+  ], item.description ? `<p class="result-source">${escapeHtml(item.description)}</p>` : "");
+}
+
+function setupLootItemAutocomplete() {
+  const form = document.querySelector('form[data-action="lootItems"]');
+  const input = form?.querySelector('[name="query"]');
+  const datalist = document.querySelector("#lootItemSuggestions");
+  const status = form?.querySelector("[data-loot-autocomplete-status]");
+  if (!form || !input || !datalist) return;
+  let timer = null;
+  let requestNumber = 0;
+  const load = async () => {
+    const query = input.value.trim();
+    if (query.length < 2) {
+      datalist.replaceChildren();
+      if (status) status.textContent = "Type at least two characters for suggestions.";
+      return;
+    }
+    const currentRequest = ++requestNumber;
+    try {
+      const names = await api(`/api/autocomplete/loot-items?query=${encodeURIComponent(query)}`);
+      if (currentRequest !== requestNumber) return;
+      datalist.replaceChildren(...names.map((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        return option;
+      }));
+      if (status) status.textContent = names.length
+        ? `${names.length} lootable match${names.length === 1 ? "" : "es"}. Select one or keep typing.`
+        : "No lootable matches yet.";
+    } catch (error) {
+      if (status) status.textContent = `Suggestions unavailable: ${error.message}`;
+    }
+  };
+  input.addEventListener("input", () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(load, 180);
+  });
 }
 
 function renderTrade(route, request = {}) {
@@ -3633,6 +3700,7 @@ function outputForAction(action) {
   if (action === "blueprints") return outputs.crafting;
   if (action === "missions") return outputs.missions;
   if (action === "items") return outputs.items;
+  if (action === "lootItems") return outputs.lootItems;
   if (action.startsWith("inventory")) return outputs.inventory;
   return outputs.exec;
 }

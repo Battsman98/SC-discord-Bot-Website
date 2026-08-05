@@ -26,6 +26,19 @@ def test_inventory_export_offers_categories_and_uex_selling_prices() -> None:
     assert ".inventory-export-dialog" in css
 
 
+def test_items_page_includes_lootable_finder_with_autocomplete_and_uex_links() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert 'data-action="lootItems"' in html
+    assert 'list="lootItemSuggestions"' in html
+    assert 'id="lootItemsOutput"' in html
+    assert 'setupLootItemAutocomplete();' in javascript
+    assert '/api/autocomplete/loot-items?query=' in javascript
+    assert '/api/loot/items?query=' in javascript
+    assert 'Live prices on UEX' in javascript
+
+
 def test_site_uses_gunmetal_and_amber_palette() -> None:
     css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
 

@@ -358,6 +358,20 @@
         </div>
         <button type="submit">Find Items</button>
       </form>
+      <form class="panel form wide" data-action="lootItems">
+        <h2>Lootable Item Finder</h2>
+        <p class="form-note">Search items marked lootable in the current Star Citizen Wiki catalog. Results include cached UEX marketplace pricing and direct source links.</p>
+        <div class="field-row">
+          <label class="form-field">
+            <span>Lootable item</span>
+            <input name="query" list="lootItemSuggestions" autocomplete="off" placeholder='FS-9 "Blacklist" LMG, ADP-mk4' minlength="2" required>
+            <datalist id="lootItemSuggestions"></datalist>
+            <small data-loot-autocomplete-status>Type at least two characters for suggestions.</small>
+          </label>
+        </div>
+        <button type="submit">Find Lootable Item</button>
+      </form>
+      <div id="lootItemsOutput" class="results"></div>
       <div id="itemsOutput" class="results"></div>
     </section>
 

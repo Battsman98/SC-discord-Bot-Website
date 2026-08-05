@@ -370,7 +370,7 @@ Finds items marked lootable in the current Star Citizen Wiki API catalog and add
 
 The Wiki catalog and UEX marketplace-price snapshot refresh together once every 24 hours and are served from the local database/cache between refreshes.
 
-The response is public and the command can only be used in Discord channel `1533075933441822830`.
+The response is private to the requester and the command can only be used in Discord channel `1533075933441822830`.
 
 | Option | Required | Description |
 |---|---:|---|

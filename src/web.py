@@ -632,6 +632,7 @@ def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:
         ("/api/blueprints", "blueprints", "Website Blueprint Search"),
         ("/api/missions", "blueprints", "Website Mission Search"),
         ("/api/items", "items", "Website Item Search"),
+        ("/api/loot/items", "items", "Website Lootable Item Search"),
         ("/api/exec", "timers", "Website Executive Timer Action"),
         ("/api/cz", "timers", "Website CZ Timer Action"),
         ("/api/commands", "commands", "Website Commands Viewed"),
@@ -4037,6 +4038,19 @@ async def item(item_id: int) -> dict[str, Any]:
     if result is None:
         not_found(f"No item found for id {item_id}.")
     return encode(result)
+
+
+@app.get("/api/loot/items")
+async def loot_item(query: str = Query(min_length=2, max_length=160)) -> dict[str, Any]:
+    result = await state().sources.lookup_loot_item(query)
+    if result is None:
+        not_found(f"No lootable item found for {query}.")
+    return encode(result)
+
+
+@app.get("/api/autocomplete/loot-items")
+async def autocomplete_loot_items(query: str = "") -> list[str]:
+    return await state().sources.autocomplete_loot_items(query)
 
 
 @app.get("/api/autocomplete/items")

@@ -3075,7 +3075,7 @@ async def loot_search_command(interaction: discord.Interaction, name: str) -> No
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
-    await interaction.response.defer(thinking=True)
+    await interaction.response.defer(thinking=True, ephemeral=True)
     result = await bot.sources.lookup_loot_item(name)
     if result is None:
         await interaction.followup.send(
@@ -3083,7 +3083,7 @@ async def loot_search_command(interaction: discord.Interaction, name: str) -> No
             ephemeral=True,
         )
         return
-    await interaction.followup.send(embed=build_loot_item_embed(result))
+    await interaction.followup.send(embed=build_loot_item_embed(result), ephemeral=True)
 
 
 @loot_search_command.autocomplete("name")
@@ -4597,6 +4597,11 @@ def build_loot_command_example_embed() -> discord.Embed:
             "The Wiki lootable flag does not identify an exact crate. Until community locations are verified, "
             "the result clearly says that no exact location is confirmed."
         ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Privacy",
+        value="Command results are visible only to the person who requested them.",
         inline=False,
     )
     embed.add_field(
