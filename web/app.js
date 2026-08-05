@@ -3781,7 +3781,6 @@ function stateMessage(message) {
 }
 
 function errorMessage(message) {
-  notifyPotentialHotfix();
   return `<div class="error">${escapeHtml(message)}</div>`;
 }
 
