@@ -64,6 +64,25 @@ def test_lookup_loot_item_requires_lootable_flag_and_builds_links() -> None:
     assert result.uex_url.endswith("/items/info/name/adp-mk4-arms-justified/")
 
 
+def test_loot_autocomplete_handles_word_order_and_compact_model_names() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+    source._cache = SimpleNamespace(
+        item_catalog_rows=lambda: None,
+    )
+
+    async def rows() -> list[dict]:
+        return [
+            {"item_name": 'FS-9 "Blacklist" LMG', "is_lootable": 1},
+            {"item_name": "FS-9 Evergreen LMG", "is_lootable": 0},
+            {"item_name": "ADP-mk4 Arms Justified", "is_lootable": 1},
+        ]
+
+    source._cache.item_catalog_rows = rows
+
+    assert asyncio.run(source.autocomplete_loot_items("blacklist fs9")) == ['FS-9 "Blacklist" LMG']
+    assert asyncio.run(source.autocomplete_loot_items("mk4 justified")) == ["ADP-mk4 Arms Justified"]
+
+
 def test_parse_item_result_maps_fs9_to_personal_weapon_primary() -> None:
     source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
 

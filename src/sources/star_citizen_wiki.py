@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import replace
+import re
 import time
 from urllib.parse import quote
 
@@ -329,15 +330,32 @@ class StarCitizenWikiSource:
         )
 
     async def autocomplete_loot_items(self, query: str, limit: int = 25) -> list[str]:
-        await self._load_local_item_catalog()
         rows = await self._cache.item_catalog_rows()
-        normalized = self._normalize_name(query)
-        names = [
-            str(row["item_name"])
-            for row in rows
-            if row.get("is_lootable") and (not normalized or normalized in self._normalize_name(row.get("item_name")))
-        ]
-        return names[:limit]
+        normalized = self._loot_autocomplete_text(query)
+        query_tokens = set(normalized.split())
+        matches: list[tuple[tuple, str]] = []
+        for row in rows:
+            if not row.get("is_lootable"):
+                continue
+            name = str(row["item_name"])
+            normalized_name = self._loot_autocomplete_text(name)
+            name_tokens = set(normalized_name.split())
+            if normalized and normalized not in normalized_name and not query_tokens.issubset(name_tokens):
+                continue
+            rank = (
+                0 if normalized_name.startswith(normalized) else 1,
+                0 if normalized and normalized in normalized_name else 1,
+                len(name_tokens - query_tokens),
+                normalized_name,
+            )
+            matches.append((rank, name))
+        matches.sort(key=lambda item: item[0])
+        return [name for _, name in matches[:limit]]
+
+    def _loot_autocomplete_text(self, value: object) -> str:
+        normalized = self._normalize_name(value)
+        normalized = " ".join(re.sub(r"[^a-z0-9]+", " ", normalized).split())
+        return re.sub(r"(?<=[a-z])(?=\d)|(?<=\d)(?=[a-z])", " ", normalized)
 
     def _local_item_rank(self, query: str, query_trigrams: set[str], name: str) -> tuple:
         normalized_name = self._normalize_name(name)
