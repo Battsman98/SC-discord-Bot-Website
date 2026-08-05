@@ -230,12 +230,16 @@ document.querySelector("[data-action-button='importRsiPledges']").addEventListen
 document.querySelector("#rsiPledgeImport").addEventListener("change", importRsiPledgeFiles);
 document.querySelector("#blueprintImageImport").addEventListener("change", importBlueprintImages);
 document.querySelector("[data-action-button='matchBlueprintText']").addEventListener("click", importBlueprintText);
-document.querySelector("[data-action-button='captureBlueprintScreen']").addEventListener("click", captureBlueprintScreen);
-window.addEventListener("beforeunload", () => stopInventoryScanner(false));
-window.addEventListener("pagehide", () => stopInventoryScanner(false));
+document.querySelector("[data-action-button='startBlueprintScanner']").addEventListener("click", startBlueprintScanner);
+document.querySelector("[data-action-button='scanBlueprintFrame']").addEventListener("click", scanBlueprintFrame);
+document.querySelector("[data-action-button='stopBlueprintScanner']").addEventListener("click", stopBlueprintScanner);
+window.addEventListener("beforeunload", () => { stopInventoryScanner(false); stopBlueprintScanner(); });
+window.addEventListener("pagehide", () => { stopInventoryScanner(false); stopBlueprintScanner(); });
 
 let currentUser = { authenticated: false };
 let savedBlueprintNames = new Set();
+let blueprintScannerStream = null;
+const blueprintScannerCrop = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
 let inventoryMaterialTotals = new Map();
 let savedShipTypes = new Map();
 let inventoryScannerStream = null;
@@ -2866,6 +2870,109 @@ async function importBlueprintImages(event) {
   await submitBlueprintImages(files);
 }
 
+async function startBlueprintScanner() {
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    outputs.blueprintImport.innerHTML = errorMessage("Screen sharing is not available in this browser.");
+    return;
+  }
+  stopBlueprintScanner();
+  try {
+    blueprintScannerStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    const video = document.querySelector("#blueprintScannerVideo");
+    video.srcObject = blueprintScannerStream;
+    await new Promise((resolve) => { video.onloadedmetadata = resolve; });
+    await video.play();
+    blueprintScannerStream.getTracks().forEach((track) => {
+      track.addEventListener("ended", stopBlueprintScanner, { once: true });
+    });
+    document.querySelector("#blueprintScannerPreview")?.classList.add("active");
+    setBlueprintScannerControls(true);
+    drawBlueprintScannerOverlay();
+    setBlueprintScannerStatus("Window shared. Open your blueprint list, align it inside the highlighted area, then choose Scan Frame.");
+  } catch (error) {
+    setBlueprintScannerStatus(error.message || "Window sharing was cancelled.");
+    stopBlueprintScanner();
+  }
+}
+
+function stopBlueprintScanner() {
+  blueprintScannerStream?.getTracks().forEach((track) => track.stop());
+  blueprintScannerStream = null;
+  const video = document.querySelector("#blueprintScannerVideo");
+  if (video) video.srcObject = null;
+  document.querySelector("#blueprintScannerPreview")?.classList.remove("active");
+  setBlueprintScannerControls(false);
+}
+
+function setBlueprintScannerControls(active) {
+  const scan = document.querySelector("[data-action-button='scanBlueprintFrame']");
+  const stop = document.querySelector("[data-action-button='stopBlueprintScanner']");
+  if (scan) scan.disabled = !active;
+  if (stop) stop.disabled = !active;
+}
+
+function setBlueprintScannerStatus(message) {
+  const status = document.querySelector("#blueprintScannerStatus");
+  if (status) status.textContent = message;
+}
+
+function drawBlueprintScannerOverlay() {
+  const video = document.querySelector("#blueprintScannerVideo");
+  const canvas = document.querySelector("#blueprintScannerOverlay");
+  if (!video || !canvas) return;
+  const rect = video.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(rect.width));
+  canvas.height = Math.max(1, Math.round(rect.height));
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "rgba(2, 8, 16, 0.55)";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const box = {
+    x: blueprintScannerCrop.x * canvas.width,
+    y: blueprintScannerCrop.y * canvas.height,
+    width: blueprintScannerCrop.width * canvas.width,
+    height: blueprintScannerCrop.height * canvas.height,
+  };
+  context.clearRect(box.x, box.y, box.width, box.height);
+  context.strokeStyle = "#65e6ff";
+  context.lineWidth = 3;
+  context.strokeRect(box.x, box.y, box.width, box.height);
+}
+
+async function scanBlueprintFrame() {
+  if (!blueprintScannerStream) {
+    setBlueprintScannerStatus("Share the Star Citizen window first.");
+    return;
+  }
+  const video = document.querySelector("#blueprintScannerVideo");
+  if (!video?.videoWidth || !video.videoHeight) return;
+  setBlueprintScannerStatus("Reading the highlighted blueprint area...");
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(video.videoWidth * blueprintScannerCrop.width);
+  canvas.height = Math.round(video.videoHeight * blueprintScannerCrop.height);
+  canvas.getContext("2d").drawImage(
+    video,
+    video.videoWidth * blueprintScannerCrop.x,
+    video.videoHeight * blueprintScannerCrop.y,
+    canvas.width,
+    canvas.height,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
+  );
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) {
+    setBlueprintScannerStatus("Could not capture this frame. Try sharing the window again.");
+    return;
+  }
+  const payload = await submitBlueprintImages([new File([blob], "blueprint-scan.png", { type: "image/png" })]);
+  const count = payload?.matches?.length || 0;
+  setBlueprintScannerStatus(count
+    ? `Found ${count} possible blueprint${count === 1 ? "" : "s"}. Review and save the matches below.`
+    : "No confident blueprint match yet. Adjust the game list and scan another frame.");
+}
+
 async function captureBlueprintScreen() {
   if (!navigator.mediaDevices?.getDisplayMedia) {
     outputs.blueprintImport.innerHTML = errorMessage("Screen capture is not available in this browser.");
@@ -2903,8 +3010,10 @@ async function submitBlueprintImages(files) {
     if (!response.ok) throw new Error(payload.detail || `Request failed with ${response.status}`);
     if (payload.ocr_text) document.querySelector("#blueprintOcrText").value = payload.ocr_text;
     renderBlueprintImportMatches(payload);
+    return payload;
   } catch (error) {
     outputs.blueprintImport.innerHTML = errorMessage(error.message);
+    return null;
   }
 }
 

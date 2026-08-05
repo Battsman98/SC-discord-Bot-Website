@@ -1,4 +1,5 @@
 import aiohttp
+import re
 
 from src.cache import SQLiteCache
 from src.config import Settings
@@ -7,6 +8,7 @@ from src.sources.base import (
     CommodityResult,
     GameInfoSource,
     ItemLocatorResult,
+    LootItemResult,
     LookupResult,
     MissionResult,
     MiningLocationResult,
@@ -118,13 +120,54 @@ class SourceRegistry:
 
         return matches
 
-    async def inventory_sell_price_comparison(self, names: list[str]) -> dict[str, dict[str, float]]:
+    async def inventory_sell_price_comparison(self, names: list[str]) -> dict[str, dict[str, object]]:
         """Return UEX terminal and player-market averages keyed by normalized item name."""
         for source in self._sources:
             lookup = getattr(source, "inventory_sell_price_comparison", None)
             if lookup is not None:
                 return await lookup(names)
         return {}
+
+    async def lookup_loot_item(self, query: str) -> LootItemResult | None:
+        result = None
+        for source in self._sources:
+            lookup = getattr(source, "lookup_loot_item", None)
+            if lookup is not None:
+                result = await lookup(query)
+                if result is not None:
+                    break
+        if result is None:
+            return None
+        prices = await self.inventory_sell_price_comparison([result.name])
+        price_key = " ".join(re.sub(r"[^a-z0-9]+", " ", result.name.casefold()).split())
+        price_key = re.sub(r"\bl6x\b", "16x", price_key)
+        price = prices.get(price_key, {})
+        return LootItemResult(
+            **{
+                **result.__dict__,
+                "terminal_sell_average": price.get("terminal_average"),
+                "marketplace_sell_average": price.get("player_average"),
+                "uex_url": price.get("uex_url") or result.uex_url,
+            }
+        )
+
+    async def autocomplete_loot_items(self, query: str, limit: int = 25) -> list[str]:
+        for source in self._sources:
+            autocomplete = getattr(source, "autocomplete_loot_items", None)
+            if autocomplete is not None:
+                return await autocomplete(query, limit)
+        return []
+
+    async def refresh_loot_data(self) -> dict:
+        """Refresh Wiki loot items and UEX marketplace prices in one daily cycle."""
+        status = await self.validate_item_catalog()
+        marketplace_count = 0
+        for source in self._sources:
+            refresh = getattr(source, "refresh_marketplace_prices", None)
+            if refresh is not None:
+                marketplace_count = len(await refresh())
+                break
+        return {**status, "marketplace_price_count": marketplace_count}
 
     async def lookup_mining_material(
         self,

@@ -8,8 +8,10 @@ from src.config import Settings
 from src.bot import (
     build_inventory_search_embed,
     build_command_channel_directory_embed,
+    build_loot_command_example_embed,
     GameAssistBot,
     INVENTORY_CHANNEL_ID,
+    LOOT_CHANNEL_ID,
     _allowed_command_channel_id,
     _format_interaction_options,
     _interaction_command_name,
@@ -24,7 +26,7 @@ from src.bot import (
 
 
 def test_deployment_changelog_targets_match_changed_application() -> None:
-    assert _deployment_targets_for_files(["src/bot.py", "README.md"]) == {"discord-changelog"}
+    assert _deployment_targets_for_files(["src/bot.py", "docs/commands.md"]) == {"discord-changelog"}
     assert _deployment_targets_for_files(["src/web.py", "web/app.js"]) == {"website-changelog"}
     assert _deployment_targets_for_files(["src/bot.py", "web/app.js"]) == {
         "discord-changelog",
@@ -121,7 +123,7 @@ def test_command_channel_directory_groups_commands_by_channel() -> None:
 
     assert "<#111>: /ship" in embed.description
     assert "<#222>: /commodity, /trade routing" in embed.description
-    assert "<#333>: /blueprint, /mission" in embed.description
+    assert "<#333>: /blueprint, /mission, /myblueprints" in embed.description
     assert f"<#{INVENTORY_CHANNEL_ID}>: /inventory search" in embed.description
 
 
@@ -165,7 +167,7 @@ def test_hub_roles_have_scoped_permissions() -> None:
 
 def test_inventory_search_command_is_registered() -> None:
     assert inventory_group.get_command("search") is not None
-    assert INVENTORY_CHANNEL_ID == 1528623944947597383
+    assert INVENTORY_CHANNEL_ID == 1533075934603772004
 
 
 def test_mission_command_uses_blueprint_channel_by_default() -> None:
@@ -175,6 +177,27 @@ def test_mission_command_uses_blueprint_channel_by_default() -> None:
     )
 
     assert _allowed_command_channel_id(bot, "mission") == 2468
+    assert _allowed_command_channel_id(bot, "myblueprints") == 2468
+
+
+def test_loot_search_is_locked_to_requested_channel() -> None:
+    bot = SimpleNamespace(
+        settings=SimpleNamespace(command_channel_ids={}),
+        inventory_channel_id=INVENTORY_CHANNEL_ID,
+    )
+
+    assert LOOT_CHANNEL_ID == 1533075933441822830
+    assert _allowed_command_channel_id(bot, "loot search") == LOOT_CHANNEL_ID
+
+
+def test_loot_example_embed_documents_command_prices_and_confidence() -> None:
+    embed = build_loot_command_example_embed()
+    values = "\n".join(field.value for field in embed.fields)
+
+    assert embed.title == "Example /loot search Response"
+    assert "/loot search name:ADP-mk4 Arms Justified" in embed.description
+    assert "Live prices on UEX" in values
+    assert "no exact location is confirmed" in values
 
 
 def test_visitor_hub_channel_replaces_legacy_command_channel() -> None:

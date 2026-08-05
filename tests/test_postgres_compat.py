@@ -1,3 +1,6 @@
+import sys
+from types import SimpleNamespace
+
 from src.postgres_compat import PostgresConnection, _translate_sql
 
 
@@ -44,3 +47,19 @@ def test_insert_cursor_exposes_postgres_returning_id():
     assert cursor.lastrowid == 42
     assert raw.calls[0][1] == (7, "Ore")
     assert raw.calls[0][0].rstrip().endswith("RETURNING id")
+
+
+def test_connect_uses_autocommit_to_isolate_failed_cache_operations(monkeypatch):
+    raw = FakeConnection()
+    calls = []
+
+    def connect(database_url, **kwargs):
+        calls.append((database_url, kwargs))
+        return raw
+
+    monkeypatch.setitem(sys.modules, "psycopg", SimpleNamespace(connect=connect))
+
+    connection = PostgresConnection.connect("postgresql://example/cache")
+
+    assert connection._connection is raw
+    assert calls == [("postgresql://example/cache", {"autocommit": True})]

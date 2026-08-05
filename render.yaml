@@ -12,14 +12,13 @@ services:
     runtime: python
     plan: standard
     region: oregon
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements-web.txt
     startCommand: python -m uvicorn src.web:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers --forwarded-allow-ips=*
     healthCheckPath: /api/health
     autoDeployTrigger: commit
     buildFilter:
       paths:
         - web/**
-        - docs/**
         - data/**
         - src/web.py
         - src/web_auth.py
@@ -30,7 +29,8 @@ services:
         - src/shared.py
         - src/timers.py
         - src/sources/**
-        - requirements.txt
+        - requirements-common.txt
+        - requirements-web.txt
         - render.yaml
     envVars:
       - key: PYTHON_VERSION
@@ -79,7 +79,7 @@ services:
     runtime: python
     plan: starter
     region: oregon
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements-bot.txt
     startCommand: python -m src.bot
     autoDeployTrigger: commit
     buildFilter:
@@ -94,7 +94,8 @@ services:
         - src/shared.py
         - src/timers.py
         - src/sources/**
-        - requirements.txt
+        - requirements-bot.txt
+        - requirements-common.txt
         - render.yaml
     envVars:
       - key: PYTHON_VERSION

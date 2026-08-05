@@ -191,6 +191,24 @@ class ItemLocatorResult:
 
 
 @dataclass(frozen=True)
+class LootItemResult:
+    uuid: str
+    name: str
+    classification: str | None
+    category: str | None
+    manufacturer: str | None
+    size: str | None
+    rarity: str | None
+    game_version: str | None
+    description: str | None
+    image_url: str | None
+    wiki_url: str
+    uex_url: str
+    terminal_sell_average: float | None = None
+    marketplace_sell_average: float | None = None
+
+
+@dataclass(frozen=True)
 class TradeRouteLeg:
     commodity_name: str
     buy_price: int | float

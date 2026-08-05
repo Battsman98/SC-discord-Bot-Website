@@ -1,0 +1,8 @@
+-r requirements-common.txt
+
+fastapi>=0.111,<1
+openpyxl>=3.1,<4
+pillow>=10,<12
+python-multipart>=0.0.9,<1
+rapidocr-onnxruntime>=1.2,<2
+uvicorn[standard]>=0.30,<1

@@ -282,14 +282,23 @@
         <button type="submit">Search Blueprints</button>
       </form>
       <article class="panel blueprint-import">
-        <h2>Blueprint Import</h2>
+        <h2>Blueprint Scanner</h2>
+        <p class="form-note">Share the Star Citizen window and place the blueprint list inside the highlighted area. The exact scan window can be calibrated later without changing saved data or Discord lookup.</p>
         <div class="import-actions">
-          <button type="button" data-action-button="captureBlueprintScreen">Capture Screen</button>
+          <button type="button" data-action-button="startBlueprintScanner">Share Window</button>
+          <button type="button" data-action-button="scanBlueprintFrame" disabled>Scan Frame</button>
+          <button type="button" data-action-button="stopBlueprintScanner" disabled>Stop</button>
           <label class="button-link">
             Upload Screenshots
             <input id="blueprintImageImport" type="file" accept="image/*" multiple hidden>
           </label>
         </div>
+        <div id="blueprintScannerPreview" class="scanner-preview blueprint-scanner-preview">
+          <video id="blueprintScannerVideo" playsinline muted></video>
+          <canvas id="blueprintScannerOverlay" aria-label="Blueprint scan area"></canvas>
+          <p class="scanner-empty">Share the Star Citizen window to prepare the scanner.</p>
+        </div>
+        <p id="blueprintScannerStatus" class="form-note" aria-live="polite">Scanner framework ready. The temporary scan area uses the center of the shared window.</p>
         <textarea id="blueprintOcrText" placeholder="Paste OCR text or copied blueprint names here"></textarea>
         <button type="button" data-action-button="matchBlueprintText">Find Blueprints</button>
         <div id="blueprintImportOutput" class="results compact"></div>

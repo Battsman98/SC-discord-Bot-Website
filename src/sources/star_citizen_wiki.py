@@ -8,14 +8,14 @@ from bs4 import BeautifulSoup
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import ItemLocatorResult, LookupResult, ShipPledge, ShipPurchase, ShipResult
+from src.sources.base import ItemLocatorResult, LootItemResult, LookupResult, ShipPledge, ShipPurchase, ShipResult
 
 
 class StarCitizenWikiSource:
     name = "Star Citizen Wiki"
     base_url = "https://api.star-citizen.wiki"
     item_catalog_page_delay_seconds = 3.1
-    item_catalog_schema_version = 4
+    item_catalog_schema_version = 5
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -162,6 +162,7 @@ class StarCitizenWikiSource:
                     "game_version": version,
                     "source_updated_at": self._string_or_none(source_row.get("updated_at")),
                     "class_name": self._string_or_none(source_row.get("class_name")),
+                    "is_lootable": bool(source_row.get("is_lootable")),
                 }
             if page < last_page:
                 await asyncio.sleep(self.item_catalog_page_delay_seconds)
@@ -292,6 +293,51 @@ class StarCitizenWikiSource:
             ),
         )
         return [self._local_items[index] for index in ranked[:limit]]
+
+    async def lookup_loot_item(self, query: str) -> LootItemResult | None:
+        normalized = " ".join(str(query or "").strip().split())
+        if not normalized:
+            return None
+        payload = await self._fetch_json(
+            f"{self.base_url}/api/items?filter[name]={quote(normalized)}&page[size]=25"
+        )
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        candidates = [row for row in (rows or []) if isinstance(row, dict) and row.get("is_lootable")]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda row: self._inventory_item_match_rank(normalized, str(row.get("name") or "")))
+        row = candidates[0]
+        manufacturer = row.get("manufacturer") if isinstance(row.get("manufacturer"), dict) else {}
+        descriptions = row.get("description") if isinstance(row.get("description"), dict) else {}
+        images = row.get("images") if isinstance(row.get("images"), list) else []
+        image = images[0] if images and isinstance(images[0], dict) else {}
+        slug = str(row.get("slug") or "").strip()
+        name = str(row.get("name") or normalized)
+        return LootItemResult(
+            uuid=str(row.get("uuid") or ""),
+            name=name,
+            classification=self._string_or_none(row.get("classification_label") or row.get("classification")),
+            category=self._string_or_none(row.get("sub_type_label") or row.get("type_label")),
+            manufacturer=self._string_or_none(manufacturer.get("name")),
+            size=self._string_or_none(row.get("size")),
+            rarity=self._string_or_none(row.get("rarity")),
+            game_version=self._string_or_none(row.get("version")),
+            description=self._string_or_none(descriptions.get("en_EN") or descriptions.get("en_US")),
+            image_url=self._string_or_none(image.get("thumbnail_url") or image.get("original_url")),
+            wiki_url=str(row.get("web_url") or f"https://starcitizen.tools/{quote(name.replace(' ', '_'))}"),
+            uex_url=f"https://uexcorp.space/items/info/name/{slug}/" if slug else "https://uexcorp.space/items",
+        )
+
+    async def autocomplete_loot_items(self, query: str, limit: int = 25) -> list[str]:
+        await self._load_local_item_catalog()
+        rows = await self._cache.item_catalog_rows()
+        normalized = self._normalize_name(query)
+        names = [
+            str(row["item_name"])
+            for row in rows
+            if row.get("is_lootable") and (not normalized or normalized in self._normalize_name(row.get("item_name")))
+        ]
+        return names[:limit]
 
     def _local_item_rank(self, query: str, query_trigrams: set[str], name: str) -> tuple:
         normalized_name = self._normalize_name(name)

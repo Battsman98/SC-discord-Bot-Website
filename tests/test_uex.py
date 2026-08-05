@@ -4,6 +4,21 @@ from unittest.mock import AsyncMock
 from src.sources.uex import UEXSource
 
 
+def test_marketplace_refresh_saves_one_daily_snapshot() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._all_marketplace_prices = [{"old": True}]
+    source._cache = AsyncMock()
+    source._fetch_json = AsyncMock(return_value={"data": [{"item_name": "FS-9 Blacklist", "price_avg": 1600000}]})
+
+    rows = asyncio.run(source.refresh_marketplace_prices())
+
+    assert rows == [{"item_name": "FS-9 Blacklist", "price_avg": 1600000}]
+    source._cache.set.assert_awaited_once_with(
+        "uex:marketplace-prices-averages-all:v1", rows, 86400
+    )
+    assert source._all_marketplace_prices == rows
+
+
 def test_inventory_sell_price_comparison_combines_terminal_and_weighted_player_prices(monkeypatch) -> None:
     source = UEXSource.__new__(UEXSource)
 
@@ -23,7 +38,7 @@ def test_inventory_sell_price_comparison_combines_terminal_and_weighted_player_p
 
     async def marketplace_prices():
         return [
-            {"item_name": "FS-9 LMG", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 1000, "listings_count": 3},
+            {"item_name": "FS-9 LMG", "item_slug": "fs-9-lmg-abc1", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 1000, "listings_count": 3},
             {"item_name": "FS-9 LMG", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 2000, "listings_count": 1},
             {"item_name": "Gold", "operation": "buy", "currency": "UEC", "unit": "unit", "price_avg": 9999, "listings_count": 5},
             {"item_name": "Omarof (16x Telescopic)", "operation": "sell", "currency": "UEC", "unit": "unit", "price_avg": 75000, "listings_count": 2},
@@ -36,7 +51,7 @@ def test_inventory_sell_price_comparison_combines_terminal_and_weighted_player_p
     prices = asyncio.run(source.inventory_sell_price_comparison(["FS-9 LMG", "Gold", "Omarof(l6x Telescopic)", "Unknown"]))
 
     assert prices == {
-        "fs 9 lmg": {"terminal_average": 120.0, "player_average": 1250.0},
+        "fs 9 lmg": {"terminal_average": 120.0, "player_average": 1250.0, "uex_url": "https://uexcorp.space/items/info?name=fs-9-lmg-abc1"},
         "gold": {"terminal_average": 60.0},
         "omarof 16x telescopic": {"player_average": 75000.0},
     }
@@ -586,6 +601,52 @@ def test_find_mining_material_accepts_rock_signature() -> None:
 
     assert match is not None
     assert match["name"] == "Iron (Ore)"
+
+
+def test_find_mining_material_accepts_savrilium_cluster_signature() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {"savrilium": [3200]}
+    source._commodities = [
+        {
+            "name": "Savrilium (Ore)",
+            "code": "SAVR",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_inert": 0,
+        }
+    ]
+
+    match = asyncio.run(source._find_mining_material("6400"))
+
+    assert match is not None
+    assert match["name"] == "Savrilium (Ore)"
+
+
+def test_find_mining_material_uses_bundled_signature_when_live_map_has_no_match() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {}
+    source._mining_fallbacks = {
+        "STIL": {
+            "material_name": "Stileron",
+            "rock_signatures": [3185],
+        }
+    }
+    source._commodities = [
+        {
+            "name": "Stileron (Raw)",
+            "code": "STIL",
+            "is_available": 1,
+            "is_visible": 1,
+            "is_raw": 1,
+            "is_inert": 0,
+        }
+    ]
+
+    match = asyncio.run(source._find_mining_material("6370"))
+
+    assert match is not None
+    assert match["name"] == "Stileron (Raw)"
 
 
 def test_autocomplete_mining_materials_accepts_rock_signature() -> None:

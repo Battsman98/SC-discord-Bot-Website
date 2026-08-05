@@ -61,7 +61,11 @@ class PostgresConnection:
             raise RuntimeError(
                 "PostgreSQL requires psycopg. Install the production requirements first."
             ) from error
-        return cls(psycopg.connect(database_url))
+        # Most cache reads intentionally run outside an explicit transaction,
+        # matching sqlite3's behavior in this application.  Autocommit keeps a
+        # failed standalone statement from poisoning the shared connection
+        # until a later, unrelated operation happens to call rollback().
+        return cls(psycopg.connect(database_url, autocommit=True))
 
     def execute(self, sql: str, parameters: Iterable[Any] = ()) -> PostgresCursor:
         pragma = re.fullmatch(r"\s*PRAGMA\s+table_info\((\w+)\)\s*", sql, re.IGNORECASE)
