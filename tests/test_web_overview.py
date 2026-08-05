@@ -366,6 +366,18 @@ def test_ship_search_filters_stay_compact_at_partial_desktop_widths() -> None:
     assert "@media (max-width: 680px) {\n  .ship-search-form .field-row {\n    grid-template-columns: 1fr;" in css
 
 
+def test_rsi_hangar_import_shows_page_scan_progress() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert "function showRsiImportProgress(progress)" in javascript
+    assert "Page ${page} of ${totalPages}" in javascript
+    assert 'role="progressbar"' in javascript
+    assert 'direction === "from-game-assist-rsi-progress"' in javascript
+    assert ".rsi-import-progress-track" in css
+    assert "rsi-connector-extension-v0.4.6.zip" in javascript
+
+
 def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 

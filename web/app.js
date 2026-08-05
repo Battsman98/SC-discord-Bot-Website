@@ -1018,7 +1018,7 @@ async function importRsiPledgesFromBrowser() {
     const connected = await rsiConnect({ action: "connect" }, 1200);
     if (connected.code !== 200) throw new Error("RSI browser connector is not available.");
     outputs.savedShips.innerHTML = stateMessage("Reading ships and vehicles from RSI...");
-    const response = await rsiConnect({ action: "importHangar" }, 60000);
+    const response = await rsiConnect({ action: "importHangar" }, 60000, showRsiImportProgress);
     if (response.code !== 200) throw new Error(response.error || "RSI hangar import failed.");
     const candidates = Array.isArray(response.candidates) ? response.candidates : [];
     if (!candidates.length) throw new Error("No ships or vehicles were found. Make sure you are signed into RSI in this browser.");
@@ -1045,7 +1045,7 @@ function connectorInstallPrompt(message) {
       <p>${escapeHtml(message)} Install the local importer once, then click Import RSI Hangar again.</p>
     </div>
     <div class="connector-actions">
-      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.5.zip">Download connector v0.4.5</a>
+      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.6.zip">Download connector v0.4.6</a>
       <button type="button" data-open-extension-help>Install steps</button>
       <button type="button" data-import-rsi-files>Use saved HTML</button>
     </div>
@@ -1074,7 +1074,21 @@ function showRsiImportResult(result) {
   </div>`;
 }
 
-function rsiConnect(message, timeoutMs) {
+function showRsiImportProgress(progress) {
+  const page = Math.max(1, Number(progress?.page) || 1);
+  const totalPages = Math.max(page, Number(progress?.totalPages) || page);
+  const percent = Math.min(100, Math.round((page / totalPages) * 100));
+  const candidates = Math.max(0, Number(progress?.candidates) || 0);
+  outputs.savedShips.innerHTML = `<div class="rsi-import-progress" role="status" aria-live="polite">
+    <div><strong>Scanning RSI hangar</strong><span>Page ${page} of ${totalPages}</span></div>
+    <div class="rsi-import-progress-track" role="progressbar" aria-label="RSI hangar pages scanned" aria-valuemin="0" aria-valuemax="${totalPages}" aria-valuenow="${page}">
+      <span style="width: ${percent}%"></span>
+    </div>
+    <small>${candidates} ship or vehicle candidate${candidates === 1 ? "" : "s"} found</small>
+  </div>`;
+}
+
+function rsiConnect(message, timeoutMs, onProgress) {
   return new Promise((resolve, reject) => {
     const requestId = Math.random().toString(36).slice(2);
     const timer = setTimeout(() => {
@@ -1082,8 +1096,13 @@ function rsiConnect(message, timeoutMs) {
       reject(new Error("RSI browser connector did not respond."));
     }, timeoutMs);
     function onMessage(event) {
-      if (event.source !== window || event.data?.direction !== "from-game-assist-rsi-connect") return;
+      if (event.source !== window) return;
       if (event.data.requestId !== requestId) return;
+      if (event.data?.direction === "from-game-assist-rsi-progress") {
+        onProgress?.(event.data.progress || {});
+        return;
+      }
+      if (event.data?.direction !== "from-game-assist-rsi-connect") return;
       clearTimeout(timer);
       window.removeEventListener("message", onMessage);
       try {

@@ -76,11 +76,20 @@ function pledgePageHasNext(pageHTML, page) {
   return pageHTML.includes(`page=${page + 1}`) || pageHTML.includes(`>${page + 1}<`);
 }
 
-async function importHangar() {
+function pledgePageCount(pageHTML) {
+  let count = 1;
+  for (const match of String(pageHTML || "").matchAll(/[?&]page=(\d{1,3})/gi)) {
+    count = Math.max(count, Number(match[1]) || 1);
+  }
+  return Math.min(25, count);
+}
+
+async function importHangar(reportProgress = () => {}) {
   const candidates = new Set();
   let finalURL = "";
   let firstPageHTML = "";
-  for (let page = 1; page <= 25; page += 1) {
+  let totalPages = 1;
+  for (let page = 1; page <= totalPages && page <= 25; page += 1) {
     const suffix = page > 1 ? `?page=${page}` : "";
     const response = await rsiHTMLGet(`https://robertsspaceindustries.com/account/pledges${suffix}`);
     finalURL = response.url || finalURL;
@@ -89,7 +98,11 @@ async function importHangar() {
       return { code: response.code, error: "RSI did not return the pledge page. Confirm that you are signed in." };
     }
     for (const name of extractShipCandidates(response.payload)) candidates.add(name);
-    if (!pledgePageHasNext(response.payload, page)) break;
+    const hasNext = pledgePageHasNext(response.payload, page);
+    totalPages = Math.max(totalPages, pledgePageCount(response.payload), hasNext ? page + 1 : page);
+    totalPages = Math.min(25, totalPages);
+    reportProgress({ page, totalPages, candidates: candidates.size });
+    if (!hasNext) break;
   }
   if (!candidates.size) {
     const signedOut = /(?:sign in|log in|login)/i.test(finalURL) || /(?:sign in|log in to your account)/i.test(firstPageHTML);
@@ -122,7 +135,19 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
     sendResponse(JSON.stringify({ code: 403, error: "Website origin is not allowed." }));
     return false;
   }
-  handleMessage(rawMessage).then((response) => {
+  let requestId = "";
+  try {
+    requestId = String(JSON.parse(rawMessage || "{}").requestId || "");
+  } catch (_error) {}
+  const reportProgress = (progress) => {
+    if (!sender.tab?.id || !requestId) return;
+    chrome.tabs.sendMessage(sender.tab.id, {
+      direction: "from-game-assist-rsi-progress",
+      requestId,
+      progress,
+    }).catch(() => {});
+  };
+  handleMessage(rawMessage, reportProgress).then((response) => {
     sendResponse(JSON.stringify(response));
   }).catch((error) => {
     sendResponse(JSON.stringify({ code: 500, error: String(error?.message || error) }));
@@ -130,13 +155,13 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
   return true;
 });
 
-async function handleMessage(rawMessage) {
+async function handleMessage(rawMessage, reportProgress = () => {}) {
   const message = JSON.parse(rawMessage || "{}");
   if (message.action === "connect") {
-    return { code: 200, version: "0.4.5", scope: "ships-and-vehicles-only" };
+    return { code: 200, version: "0.4.6", scope: "ships-and-vehicles-only" };
   }
   if (message.action === "importHangar") {
-    return await importHangar();
+    return await importHangar(reportProgress);
   }
   return { code: 400, error: "Unknown action." };
 }

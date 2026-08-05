@@ -1930,6 +1930,43 @@ body.hangar-modal-open {
   justify-items: end;
 }
 
+.rsi-import-progress {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 8px;
+  background: var(--panel-tint);
+}
+
+.rsi-import-progress > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rsi-import-progress > div:first-child span,
+.rsi-import-progress small {
+  color: var(--muted);
+}
+
+.rsi-import-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  background: var(--control);
+}
+
+.rsi-import-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 12px var(--glow);
+  transition: width 180ms ease;
+}
+
 .hangar-actions button,
 .manage-actions button {
   min-height: 32px;

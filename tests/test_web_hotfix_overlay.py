@@ -33,7 +33,7 @@ def test_only_user_request_failures_trigger_hotfix_animation() -> None:
     application = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     overlay = (WEB_DIR / "hotfix-overlay.js").read_text(encoding="utf-8")
 
-    assert 'src="/assets/app.js?v=20260805-hangar-errors-v1"' in html
+    assert 'src="/assets/app.js?v=20260805-hangar-errors-v1-rsi-progress-v1"' in html
     assert 'function errorMessage(message) {\n  return `<div class="error">' in application
     assert 'function errorMessage(message) {\n  notifyPotentialHotfix();' not in application
     assert 'if (connectorCompleted)' in application
