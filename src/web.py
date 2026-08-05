@@ -1103,62 +1103,65 @@ async def my_ships(user=Depends(require_user)) -> list[dict[str, Any]]:
     ships = await state().cache.user_ships(user.id)
     repaired = False
     for ship in ships:
-        display_name = _ship_display_name(str(ship.get("name") or ""))
-        display_loaner_for = _ship_display_name(str(ship.get("loaner_for") or "")) if ship.get("loaner_for") else None
-        cleaned_notes = _clean_redundant_loaner_note(
-            ship.get("notes"),
-            display_loaner_for,
-        ) if ship.get("ownership_type") == "loaner" else ship.get("notes")
-        if display_name and (
-            display_name != ship.get("name")
-            or display_loaner_for != ship.get("loaner_for")
-            or cleaned_notes != ship.get("notes")
-        ):
+        try:
+            display_name = _ship_display_name(str(ship.get("name") or ""))
+            display_loaner_for = _ship_display_name(str(ship.get("loaner_for") or "")) if ship.get("loaner_for") else None
+            cleaned_notes = _clean_redundant_loaner_note(
+                ship.get("notes"),
+                display_loaner_for,
+            ) if ship.get("ownership_type") == "loaner" else ship.get("notes")
+            if display_name and (
+                display_name != ship.get("name")
+                or display_loaner_for != ship.get("loaner_for")
+                or cleaned_notes != ship.get("notes")
+            ):
+                await state().cache.save_user_ship(
+                    user.id,
+                    display_name,
+                    str(ship.get("ownership_type") or "in_game"),
+                    ship.get("manufacturer"),
+                    ship.get("role"),
+                    ship.get("source_name"),
+                    ship.get("source_url"),
+                    ship.get("image_url"),
+                    cleaned_notes,
+                    display_loaner_for,
+                )
+                if display_name != ship.get("name"):
+                    await state().cache.delete_user_ship(user.id, str(ship.get("name")))
+                ship["name"] = display_name
+                ship["loaner_for"] = display_loaner_for
+                ship["notes"] = cleaned_notes
+                repaired = True
+            if not _ship_image_needs_refresh(ship.get("image_url")) and ship.get("manufacturer") and _has_ship_basic_info(ship.get("role")):
+                if ship.get("ownership_type") == "pledged":
+                    repaired = await _sync_auto_loaners(user.id, str(ship.get("name") or ""), "pledged") or repaired
+                continue
+            detail = await state().sources.lookup_ship(str(ship.get("name") or ""))
+            if ship.get("ownership_type") == "pledged":
+                repaired = await _sync_auto_loaners(
+                    user.id,
+                    str(ship.get("name") or ""),
+                    "pledged",
+                    detail.status if detail else None,
+                ) or repaired
+            if detail is None:
+                continue
             await state().cache.save_user_ship(
                 user.id,
-                display_name,
+                _ship_display_name(detail.name),
                 str(ship.get("ownership_type") or "in_game"),
-                ship.get("manufacturer"),
-                ship.get("role"),
-                ship.get("source_name"),
-                ship.get("source_url"),
-                ship.get("image_url"),
-                cleaned_notes,
-                display_loaner_for,
+                detail.manufacturer or ship.get("manufacturer"),
+                _ship_basic_info(detail) or ship.get("role"),
+                detail.source_name or ship.get("source_name"),
+                detail.source_url or ship.get("source_url"),
+                detail.image_url,
+                ship.get("notes"),
+                _ship_display_name(str(ship.get("loaner_for") or "")) if ship.get("loaner_for") else None,
             )
-            if display_name != ship.get("name"):
-                await state().cache.delete_user_ship(user.id, str(ship.get("name")))
-            ship["name"] = display_name
-            ship["loaner_for"] = display_loaner_for
-            ship["notes"] = cleaned_notes
             repaired = True
-        if not _ship_image_needs_refresh(ship.get("image_url")) and ship.get("manufacturer") and _has_ship_basic_info(ship.get("role")):
-            if ship.get("ownership_type") == "pledged":
-                repaired = await _sync_auto_loaners(user.id, str(ship.get("name") or ""), "pledged") or repaired
-            continue
-        detail = await state().sources.lookup_ship(str(ship.get("name") or ""))
-        if ship.get("ownership_type") == "pledged":
-            repaired = await _sync_auto_loaners(
-                user.id,
-                str(ship.get("name") or ""),
-                "pledged",
-                detail.status if detail else None,
-            ) or repaired
-        if detail is None:
-            continue
-        await state().cache.save_user_ship(
-            user.id,
-            _ship_display_name(detail.name),
-            str(ship.get("ownership_type") or "in_game"),
-            detail.manufacturer or ship.get("manufacturer"),
-            _ship_basic_info(detail) or ship.get("role"),
-            detail.source_name or ship.get("source_name"),
-            detail.source_url or ship.get("source_url"),
-            detail.image_url,
-            ship.get("notes"),
-            _ship_display_name(str(ship.get("loaner_for") or "")) if ship.get("loaner_for") else None,
-        )
-        repaired = True
+        except Exception:
+            logging.exception("Could not enrich saved ship %r for user %s", ship.get("name"), user.id)
     return await state().cache.user_ships(user.id) if repaired else ships
 
 
@@ -1219,7 +1222,12 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
     if not candidates:
         raise HTTPException(status_code=400, detail="No ship or vehicle candidates were supplied.")
     for candidate in sorted(candidates, key=str.lower):
-        detail = await _resolve_imported_ship(candidate)
+        try:
+            detail = await _resolve_imported_ship(candidate)
+        except Exception:
+            logging.exception("Could not resolve RSI hangar candidate %r for user %s", candidate, user.id)
+            skipped.append(candidate)
+            continue
         if detail is None:
             skipped.append(candidate)
             continue
@@ -1236,7 +1244,10 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
             None,
             None,
         )
-        await _sync_auto_loaners(user.id, display_name, "pledged", detail.status)
+        try:
+            await _sync_auto_loaners(user.id, display_name, "pledged", detail.status)
+        except Exception:
+            logging.exception("Could not sync loaners for imported ship %r for user %s", display_name, user.id)
         imported.append(display_name)
     # Candidate-based imports come from the extension's complete paginated scan.
     # Saved HTML uploads remain additive because users may upload only some pages.

@@ -1013,6 +1013,7 @@ async function importRsiPledgesFromBrowser() {
     return;
   }
   outputs.savedShips.innerHTML = stateMessage("Connecting to RSI through your browser...");
+  let connectorCompleted = false;
   try {
     const connected = await rsiConnect({ action: "connect" }, 1200);
     if (connected.code !== 200) throw new Error("RSI browser connector is not available.");
@@ -1021,14 +1022,19 @@ async function importRsiPledgesFromBrowser() {
     if (response.code !== 200) throw new Error(response.error || "RSI hangar import failed.");
     const candidates = Array.isArray(response.candidates) ? response.candidates : [];
     if (!candidates.length) throw new Error("No ships or vehicles were found. Make sure you are signed into RSI in this browser.");
+    connectorCompleted = true;
     outputs.savedShips.innerHTML = stateMessage("Updating pledged ships...");
     const result = await api("/api/me/ships/import/rsi", { method: "POST", body: { candidates } });
     await loadSavedShips({ quiet: true });
     showRsiImportResult(result);
   } catch (error) {
-    notifyPotentialHotfix();
-    outputs.savedShips.innerHTML = connectorInstallPrompt(error.message);
-    bindConnectorPromptButtons(outputs.savedShips);
+    if (connectorCompleted) {
+      outputs.savedShips.innerHTML = errorMessage(error.message);
+    } else {
+      notifyPotentialHotfix();
+      outputs.savedShips.innerHTML = connectorInstallPrompt(error.message);
+      bindConnectorPromptButtons(outputs.savedShips);
+    }
   }
 }
 
