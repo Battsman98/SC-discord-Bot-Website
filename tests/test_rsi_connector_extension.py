@@ -9,9 +9,14 @@ def test_rsi_connector_reports_paginated_scan_progress() -> None:
     content = (EXTENSION_DIR / "content.js").read_text(encoding="utf-8")
     manifest = (EXTENSION_DIR / "manifest.json").read_text(encoding="utf-8")
 
-    assert '"version": "0.4.7"' in manifest
+    assert '"version": "0.4.8"' in manifest
     assert "function pledgePageCount(pageHTML)" in background
-    assert "js-pledge-name" in background
+    assert "return [...extractTypedItemShips(pageHTML)]" in background
+    assert "js-pledge-name" not in background
+    assert "shipLinks" not in background
+    assert "containedShips" not in background
+    assert "(?:Standalone Ship|Game Package|Package)" not in background
+    assert "(?:ship|vehicle)" in background
     assert "Promise.all(remainingPages.map" in background
     assert "AbortSignal.timeout(20000)" in background
     assert "reportProgress({ page: completedPages, totalPages, candidates: candidates.size })" in background

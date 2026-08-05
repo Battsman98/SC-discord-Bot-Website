@@ -1,8 +1,10 @@
 import asyncio
 from types import SimpleNamespace
 
+import src.web as web_module
 from src.cache import SQLiteCache
 from src.web import (
+    RsiPledgeImportRequest,
     SHIP_LOANERS,
     _blueprint_match_confidence,
     _blueprint_text_candidates,
@@ -14,6 +16,7 @@ from src.web import (
     _ship_display_name,
     _ship_image_needs_refresh,
     _ship_is_in_concept,
+    import_rsi_pledges,
 )
 
 
@@ -195,6 +198,43 @@ def test_rsi_sync_protects_canonical_and_display_ship_names() -> None:
     assert "aegis reclaimer" in protected
     assert "reclaimer" in protected
     assert "moth" not in protected
+
+
+def test_failed_rsi_import_does_not_delete_existing_pledged_ships(monkeypatch) -> None:
+    class Cache:
+        deleted: list[str] = []
+
+        async def user_ships(self, _user_id):
+            return [{"name": "Carrack", "ownership_type": "pledged"}]
+
+        async def delete_user_ship(self, _user_id, ship_name):
+            self.deleted.append(ship_name)
+
+        async def delete_user_loaners_for_ship(self, _user_id, _ship_name):
+            pass
+
+    class Sources:
+        async def lookup_ship(self, _name):
+            return None
+
+        async def search_ships(self, **_kwargs):
+            return []
+
+    cache = Cache()
+    monkeypatch.setattr(
+        web_module,
+        "state",
+        lambda: SimpleNamespace(cache=cache, sources=Sources()),
+    )
+
+    result = asyncio.run(import_rsi_pledges(
+        RsiPledgeImportRequest(candidates=["Foundation Festival Guide Reward"]),
+        SimpleNamespace(id=42),
+    ))
+
+    assert result["status"] == "no_recognized_ships"
+    assert result["complete"] is False
+    assert cache.deleted == []
 
 
 def test_blueprint_text_candidates_clean_ocr_lines() -> None:

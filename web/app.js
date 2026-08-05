@@ -1045,7 +1045,7 @@ function connectorInstallPrompt(message) {
       <p>${escapeHtml(message)} Install the local importer once, then click Import RSI Hangar again.</p>
     </div>
     <div class="connector-actions">
-      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.7.zip">Download connector v0.4.7</a>
+      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.8.zip">Download connector v0.4.8</a>
       <button type="button" data-open-extension-help>Install steps</button>
       <button type="button" data-import-rsi-files>Use saved HTML</button>
     </div>
@@ -1066,8 +1066,10 @@ function showRsiImportResult(result) {
     result.skipped.length ? `${result.skipped.length} item${result.skipped.length === 1 ? "" : "s"} skipped` : "",
     result.removed?.length ? `${result.removed.length} stale pledged ship${result.removed.length === 1 ? "" : "s"} removed` : "",
   ].filter(Boolean).join(". ");
-  const summary = `<div class="state rsi-import-summary">
+  const summaryClass = result.imported.length ? "state" : "error";
+  const summary = `<div class="${summaryClass} rsi-import-summary">
     <strong>${escapeHtml(details || "Pledged ship update complete.")}</strong>
+    ${result.imported.length ? "" : "<p>No recognized ships were saved, and the existing hangar was left unchanged.</p>"}
     ${result.imported.length ? `<p>Updated: ${escapeHtml(result.imported.join(", "))}</p>` : ""}
     ${result.skipped.length ? `<p>Skipped: ${escapeHtml(result.skipped.slice(0, 20).join(", "))}</p>` : ""}
     ${result.removed?.length ? `<p>Removed because no longer present in RSI: ${escapeHtml(result.removed.join(", "))}</p>` : ""}

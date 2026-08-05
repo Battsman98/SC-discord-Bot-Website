@@ -1264,7 +1264,8 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
         imported.append(display_name)
     # Candidate-based imports come from the extension's complete paginated scan.
     # Saved HTML uploads remain additive because users may upload only some pages.
-    if request.candidates:
+    import_complete = bool(imported) and not skipped
+    if request.candidates and import_complete:
         protected_names = _rsi_import_protected_names(candidates, imported)
         existing_ships = await state().cache.user_ships(user.id)
         for ship in existing_ships:
@@ -1280,7 +1281,8 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
             except Exception:
                 logging.exception("Could not remove stale pledged ship %r for user %s", ship_name, user.id)
     return {
-        "status": "imported",
+        "status": "imported" if imported else "no_recognized_ships",
+        "complete": import_complete,
         "candidates": sorted(candidates, key=str.lower),
         "imported": sorted(set(imported), key=str.lower),
         "skipped": sorted(set(skipped), key=str.lower),
