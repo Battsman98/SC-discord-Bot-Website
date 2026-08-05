@@ -1024,7 +1024,7 @@ async function importRsiPledgesFromBrowser() {
     if (!candidates.length) throw new Error("No ships or vehicles were found. Make sure you are signed into RSI in this browser.");
     connectorCompleted = true;
     outputs.savedShips.innerHTML = stateMessage("Updating pledged ships...");
-    const result = await api("/api/me/ships/import/rsi", { method: "POST", body: { candidates } });
+    const result = await api("/api/me/ships/import/rsi", { method: "POST", body: { candidates, authoritative: true } });
     await loadSavedShips({ quiet: true });
     showRsiImportResult(result);
   } catch (error) {

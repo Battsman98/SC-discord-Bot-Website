@@ -237,6 +237,57 @@ def test_failed_rsi_import_does_not_delete_existing_pledged_ships(monkeypatch) -
     assert cache.deleted == []
 
 
+def test_authoritative_rsi_import_removes_absent_pledged_ships(monkeypatch) -> None:
+    class Cache:
+        deleted: list[str] = []
+
+        async def save_user_ship(self, *_args):
+            pass
+
+        async def user_ships(self, _user_id):
+            return [{"name": "Carrack", "ownership_type": "pledged"}]
+
+        async def delete_user_ship(self, _user_id, ship_name):
+            self.deleted.append(ship_name)
+
+        async def delete_user_loaners_for_ship(self, _user_id, _ship_name):
+            pass
+
+    detail = SimpleNamespace(
+        name="Aurora MR",
+        manufacturer="RSI",
+        career=None,
+        role=None,
+        vehicle_type=None,
+        size=None,
+        status="flight-ready",
+        cargo_capacity=0,
+        source_name="Test",
+        source_url="https://example.test/aurora",
+        image_url=None,
+    )
+
+    async def resolve(_candidate):
+        return detail
+
+    cache = Cache()
+    monkeypatch.setattr(web_module, "_resolve_imported_ship", resolve)
+    monkeypatch.setattr(
+        web_module,
+        "state",
+        lambda: SimpleNamespace(cache=cache),
+    )
+
+    result = asyncio.run(import_rsi_pledges(
+        RsiPledgeImportRequest(candidates=["Aurora MR"], authoritative=True),
+        SimpleNamespace(id=42),
+    ))
+
+    assert result["complete"] is True
+    assert result["removed"] == ["Carrack"]
+    assert cache.deleted == ["Carrack"]
+
+
 def test_blueprint_text_candidates_clean_ocr_lines() -> None:
     text = "Owned\nAtlas Quantum Drive\n  VK-00 Quantum Drive  \nBlueprints"
 

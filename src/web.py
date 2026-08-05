@@ -287,6 +287,7 @@ class ShipOwnershipRequest(BaseModel):
 class RsiPledgeImportRequest(BaseModel):
     pages: list[str] = Field(default_factory=list)
     candidates: list[str] = Field(default_factory=list)
+    authoritative: bool = False
 
 
 class InventoryItemRequest(BaseModel):
@@ -1264,7 +1265,7 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
         imported.append(display_name)
     # Candidate-based imports come from the extension's complete paginated scan.
     # Saved HTML uploads remain additive because users may upload only some pages.
-    import_complete = bool(imported) and not skipped
+    import_complete = bool(imported) and request.authoritative
     if request.candidates and import_complete:
         protected_names = _rsi_import_protected_names(candidates, imported)
         existing_ships = await state().cache.user_ships(user.id)
