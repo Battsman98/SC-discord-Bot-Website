@@ -6,7 +6,8 @@ async function rsiHTMLGet(url) {
       "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "accept-language": "en-US,en;q=0.9",
       "cache-control": "max-age=0"
-    }
+    },
+    signal: AbortSignal.timeout(20000)
   });
   return { code: response.status, payload: await response.text(), url: response.url };
 }
@@ -48,6 +49,13 @@ function extractTypedItemShips(pageHTML) {
 function extractShipCandidates(pageHTML) {
   const candidates = new Set();
   for (const name of extractTypedItemShips(pageHTML)) candidates.add(name);
+  for (const tag of pageHTML.match(/<input\b[^>]*>/gi) || []) {
+    const className = tag.match(/\bclass=["']([^"']*)["']/i)?.[1] || "";
+    if (!/\bjs-pledge-name\b/i.test(className)) continue;
+    const value = tag.match(/\bvalue=["']([^"']+)["']/i)?.[1];
+    const cleaned = cleanShipName(htmlText(value));
+    if (cleaned) candidates.add(cleaned);
+  }
   const titled = /["'](?:name|title|label)["']\s*:\s*["']((?:Standalone Ship|Game Package|Package)\s*(?:[-:]|\s)[^"']{2,120})["']/gi;
   for (const match of pageHTML.matchAll(titled)) {
     const cleaned = cleanShipName(match[1]);
@@ -72,10 +80,6 @@ function extractShipCandidates(pageHTML) {
   return [...candidates];
 }
 
-function pledgePageHasNext(pageHTML, page) {
-  return pageHTML.includes(`page=${page + 1}`) || pageHTML.includes(`>${page + 1}<`);
-}
-
 function pledgePageCount(pageHTML) {
   let count = 1;
   for (const match of String(pageHTML || "").matchAll(/[?&]page=(\d{1,3})/gi)) {
@@ -88,21 +92,40 @@ async function importHangar(reportProgress = () => {}) {
   const candidates = new Set();
   let finalURL = "";
   let firstPageHTML = "";
-  let totalPages = 1;
-  for (let page = 1; page <= totalPages && page <= 25; page += 1) {
-    const suffix = page > 1 ? `?page=${page}` : "";
-    const response = await rsiHTMLGet(`https://robertsspaceindustries.com/account/pledges${suffix}`);
-    finalURL = response.url || finalURL;
-    if (page === 1) firstPageHTML = response.payload;
-    if (response.code !== 200) {
-      return { code: response.code, error: "RSI did not return the pledge page. Confirm that you are signed in." };
+  let response;
+  try {
+    response = await rsiHTMLGet("https://robertsspaceindustries.com/account/pledges");
+  } catch (_error) {
+    return { code: 504, error: "RSI pledge page 1 timed out. Reload RSI and try again." };
+  }
+  finalURL = response.url || finalURL;
+  firstPageHTML = response.payload;
+  if (response.code !== 200) {
+    return { code: response.code, error: "RSI did not return pledge page 1. Confirm that you are signed in." };
+  }
+  for (const name of extractShipCandidates(response.payload)) candidates.add(name);
+  const totalPages = Math.max(1, pledgePageCount(response.payload));
+  reportProgress({ page: 1, totalPages, candidates: candidates.size });
+
+  let completedPages = 1;
+  const remainingPages = Array.from({ length: totalPages - 1 }, (_, index) => index + 2);
+  const pageResults = await Promise.all(remainingPages.map(async (page) => {
+    try {
+      const pageResponse = await rsiHTMLGet(`https://robertsspaceindustries.com/account/pledges?page=${page}`);
+      if (pageResponse.code !== 200) {
+        return { page, error: `RSI returned ${pageResponse.code} for pledge page ${page}.` };
+      }
+      for (const name of extractShipCandidates(pageResponse.payload)) candidates.add(name);
+      completedPages += 1;
+      reportProgress({ page: completedPages, totalPages, candidates: candidates.size });
+      return { page };
+    } catch (_error) {
+      return { page, error: `RSI pledge page ${page} timed out.` };
     }
-    for (const name of extractShipCandidates(response.payload)) candidates.add(name);
-    const hasNext = pledgePageHasNext(response.payload, page);
-    totalPages = Math.max(totalPages, pledgePageCount(response.payload), hasNext ? page + 1 : page);
-    totalPages = Math.min(25, totalPages);
-    reportProgress({ page, totalPages, candidates: candidates.size });
-    if (!hasNext) break;
+  }));
+  const failedPage = pageResults.find((result) => result.error);
+  if (failedPage) {
+    return { code: 504, error: `${failedPage.error} Reload RSI and try again.` };
   }
   if (!candidates.size) {
     const signedOut = /(?:sign in|log in|login)/i.test(finalURL) || /(?:sign in|log in to your account)/i.test(firstPageHTML);
@@ -158,7 +181,7 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
 async function handleMessage(rawMessage, reportProgress = () => {}) {
   const message = JSON.parse(rawMessage || "{}");
   if (message.action === "connect") {
-    return { code: 200, version: "0.4.6", scope: "ships-and-vehicles-only" };
+    return { code: 200, version: "0.4.7", scope: "ships-and-vehicles-only" };
   }
   if (message.action === "importHangar") {
     return await importHangar(reportProgress);
