@@ -34,6 +34,36 @@ def test_parse_result_returns_none_for_no_results() -> None:
     assert result is None
 
 
+def test_lookup_loot_item_requires_lootable_flag_and_builds_links() -> None:
+    source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
+
+    async def fetch_json(url: str) -> dict:
+        assert "ADP-mk4%20Arms%20Justified" in url
+        return {"data": [{
+            "uuid": "e0d55691-c8cf-4865-9003-b6f69c81278c",
+            "slug": "adp-mk4-arms-justified",
+            "name": "ADP-mk4 Arms Justified",
+            "is_lootable": True,
+            "classification_label": "Arms",
+            "sub_type_label": "Heavy",
+            "manufacturer": {"name": "Clark Defense Systems"},
+            "size": 1,
+            "rarity": "Common",
+            "version": "4.9.0-LIVE.12232306",
+            "description": {"en_EN": "Heavy combat armor."},
+            "images": [{"thumbnail_url": "https://example.test/armor.png"}],
+            "web_url": "https://api.star-citizen.wiki/items/adp-mk4-arms-justified",
+        }]}
+
+    source._fetch_json = fetch_json
+    result = asyncio.run(source.lookup_loot_item("ADP-mk4 Arms Justified"))
+
+    assert result is not None
+    assert result.name == "ADP-mk4 Arms Justified"
+    assert result.manufacturer == "Clark Defense Systems"
+    assert result.uex_url.endswith("/items/info/name/adp-mk4-arms-justified/")
+
+
 def test_parse_item_result_maps_fs9_to_personal_weapon_primary() -> None:
     source = StarCitizenWikiSource.__new__(StarCitizenWikiSource)
 

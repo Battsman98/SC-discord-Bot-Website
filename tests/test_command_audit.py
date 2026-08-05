@@ -8,8 +8,10 @@ from src.config import Settings
 from src.bot import (
     build_inventory_search_embed,
     build_command_channel_directory_embed,
+    build_loot_command_example_embed,
     GameAssistBot,
     INVENTORY_CHANNEL_ID,
+    LOOT_CHANNEL_ID,
     _allowed_command_channel_id,
     _format_interaction_options,
     _interaction_command_name,
@@ -176,6 +178,26 @@ def test_mission_command_uses_blueprint_channel_by_default() -> None:
 
     assert _allowed_command_channel_id(bot, "mission") == 2468
     assert _allowed_command_channel_id(bot, "myblueprints") == 2468
+
+
+def test_loot_search_is_locked_to_requested_channel() -> None:
+    bot = SimpleNamespace(
+        settings=SimpleNamespace(command_channel_ids={}),
+        inventory_channel_id=INVENTORY_CHANNEL_ID,
+    )
+
+    assert LOOT_CHANNEL_ID == 1533075933441822830
+    assert _allowed_command_channel_id(bot, "loot search") == LOOT_CHANNEL_ID
+
+
+def test_loot_example_embed_documents_command_prices_and_confidence() -> None:
+    embed = build_loot_command_example_embed()
+    values = "\n".join(field.value for field in embed.fields)
+
+    assert embed.title == "Example /loot search Response"
+    assert "/loot search name:ADP-mk4 Arms Justified" in embed.description
+    assert "Live prices on UEX" in values
+    assert "no exact location is confirmed" in values
 
 
 def test_visitor_hub_channel_replaces_legacy_command_channel() -> None:

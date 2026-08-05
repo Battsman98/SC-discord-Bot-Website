@@ -210,6 +210,7 @@ class SQLiteCache:
                 game_version TEXT,
                 source_updated_at TEXT,
                 class_name TEXT,
+                is_lootable INTEGER,
                 verified_at INTEGER NOT NULL
             )
             """
@@ -234,6 +235,7 @@ class SQLiteCache:
         cls._ensure_column(connection, "user_inventory_items", "item_size", "TEXT")
         cls._ensure_column(connection, "user_inventory_items", "volume_scu", "REAL")
         cls._ensure_column(connection, "item_catalog", "class_name", "TEXT")
+        cls._ensure_column(connection, "item_catalog", "is_lootable", "INTEGER")
         cls._ensure_column(connection, "audit_events", "action_type", "TEXT NOT NULL DEFAULT 'other'")
         cls._backfill_audit_action_types(connection)
         connection.commit()
@@ -875,7 +877,7 @@ class SQLiteCache:
             """
             SELECT item_uuid, stable_id, item_name, normalized_name, category, item_type,
                    company_name, item_size, source_url, source_name, game_version,
-                   source_updated_at, class_name, verified_at
+                   source_updated_at, class_name, is_lootable, verified_at
             FROM item_catalog
             ORDER BY item_name COLLATE NOCASE
             """
@@ -883,7 +885,7 @@ class SQLiteCache:
         columns = (
             "item_uuid", "stable_id", "item_name", "normalized_name", "category", "item_type",
             "company_name", "item_size", "source_url", "source_name", "game_version",
-            "source_updated_at", "class_name", "verified_at",
+            "source_updated_at", "class_name", "is_lootable", "verified_at",
         )
         return [dict(zip(columns, row)) for row in rows]
 
@@ -925,7 +927,7 @@ class SQLiteCache:
                 row.get("category"), row.get("item_type"), row.get("company_name"),
                 row.get("item_size"), row["source_url"], row.get("source_name") or "Star Citizen Wiki",
                 row.get("game_version"), row.get("source_updated_at"), now,
-                row.get("class_name"),
+                row.get("class_name"), 1 if row.get("is_lootable") else 0,
             )
             for row in rows
         ]
@@ -937,8 +939,8 @@ class SQLiteCache:
                 INSERT INTO item_catalog (
                     item_uuid, stable_id, item_name, normalized_name, category, item_type,
                     company_name, item_size, source_url, source_name, game_version,
-                    source_updated_at, verified_at, class_name
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    source_updated_at, verified_at, class_name, is_lootable
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values,
             )

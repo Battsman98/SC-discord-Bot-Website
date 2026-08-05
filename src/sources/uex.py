@@ -593,10 +593,23 @@ class UEXSource:
         payload = await self._fetch_json(f"{self.base_url}/marketplace_prices_averages_all")
         rows = payload.get("data") if isinstance(payload, dict) else []
         self._all_marketplace_prices = [row for row in rows if isinstance(row, dict)]
-        await self._cache.set("uex:marketplace-prices-averages-all:v1", self._all_marketplace_prices, 3600)
+        await self._cache.set("uex:marketplace-prices-averages-all:v1", self._all_marketplace_prices, 86400)
         return self._all_marketplace_prices
 
-    async def inventory_sell_price_comparison(self, names: list[str]) -> dict[str, dict[str, float]]:
+    async def refresh_marketplace_prices(self) -> list[dict]:
+        """Refresh the local marketplace snapshot during the shared daily loot sync."""
+        payload = await self._fetch_json(f"{self.base_url}/marketplace_prices_averages_all")
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            raise RuntimeError("UEX marketplace price refresh returned malformed data.")
+        refreshed = [row for row in rows if isinstance(row, dict)]
+        if not refreshed:
+            raise RuntimeError("UEX marketplace price refresh returned no prices.")
+        await self._cache.set("uex:marketplace-prices-averages-all:v1", refreshed, 86400)
+        self._all_marketplace_prices = refreshed
+        return refreshed
+
+    async def inventory_sell_price_comparison(self, names: list[str]) -> dict[str, dict[str, object]]:
         """Compare terminal buyback averages with active player seller averages."""
         wanted = {self._price_name_key(name) for name in names if self._price_name_key(name)}
         if not wanted:
@@ -604,6 +617,7 @@ class UEXSource:
 
         terminal_samples: dict[str, list[float]] = {}
         player_samples: dict[str, list[tuple[float, int]]] = {}
+        marketplace_links: dict[str, str] = {}
 
         def collect_terminal(rows: list[dict]) -> None:
             for row in rows:
@@ -632,14 +646,17 @@ class UEXSource:
             name = self._price_name_key(row.get("item_name"))
             if name and price > 0:
                 player_samples.setdefault(name, []).append((price, listings))
+                item_slug = str(row.get("item_slug") or "").strip()
+                if item_slug:
+                    marketplace_links[name] = f"https://uexcorp.space/items/info?name={quote(item_slug)}"
 
         available_names = set(terminal_samples) | set(player_samples)
-        comparisons: dict[str, dict[str, float]] = {}
+        comparisons: dict[str, dict[str, object]] = {}
         for name in wanted:
             matched_name = name if name in available_names else self._closest_price_name(name, available_names)
             if matched_name is None:
                 continue
-            result: dict[str, float] = {}
+            result: dict[str, object] = {}
             terminal_values = terminal_samples.get(matched_name, [])
             player_values = player_samples.get(matched_name, [])
             if terminal_values:
@@ -647,6 +664,8 @@ class UEXSource:
             if player_values:
                 total_listings = sum(listings for _, listings in player_values)
                 result["player_average"] = sum(price * listings for price, listings in player_values) / total_listings
+            if matched_name in marketplace_links:
+                result["uex_url"] = marketplace_links[matched_name]
             if result:
                 comparisons[name] = result
         return comparisons

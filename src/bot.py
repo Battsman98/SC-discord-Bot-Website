@@ -22,6 +22,7 @@ from src.sources.base import (
     CommodityResult,
     ItemLocatorResult,
     ItemPurchaseLocation,
+    LootItemResult,
     MiningLocationResult,
     MiningSystemLocations,
     MissionResult,
@@ -52,6 +53,7 @@ CZ_TIMER_DEFINITIONS = {
     "timer_door": ("Timer Doors", 20 * 60),
 }
 INVENTORY_CHANNEL_ID = 1533075934603772004
+LOOT_CHANNEL_ID = 1533075933441822830
 FEEDBACK_TEMPLATE_CACHE_PREFIX = "discord:feedback-template-thread"
 VISITOR_ROLE_NAME = "Visitor"
 BOT_MANAGER_ROLE_NAME = "Bot Manager"
@@ -311,6 +313,8 @@ def _allowed_command_channel_id(bot: "GameAssistBot", command_name: str) -> int 
         allowed_channel_id = bot.settings.command_channel_ids.get("item locator")
     if command_name == "inventory search" and bot.inventory_channel_id:
         allowed_channel_id = bot.inventory_channel_id
+    if command_name == "loot search":
+        allowed_channel_id = LOOT_CHANNEL_ID
     return allowed_channel_id
 
 
@@ -454,6 +458,7 @@ class GameAssistBot(commands.Bot):
         self._exec_status_task: asyncio.Task | None = None
         self._cz_timers_task: asyncio.Task | None = None
         self._hub_recovery_task: asyncio.Task | None = None
+        self._item_catalog_task: asyncio.Task | None = None
         self._hub_last_recovery_monotonic = 0.0
         self._hub_incident_count = 0
         self._hub_pending_incident: tuple[str, discord.AuditLogAction | None, int | None] | None = None
@@ -476,6 +481,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(my_blueprints_command)
         self.tree.add_command(mission_command)
         self.tree.add_command(item_group)
+        self.tree.add_command(loot_group)
         self.tree.add_command(inventory_group)
         self.tree.add_command(exec_command)
         self.tree.add_command(execset_command)
@@ -508,6 +514,7 @@ class GameAssistBot(commands.Bot):
         await self._run_startup_step("verify inventory channel", self.ensure_inventory_search_channel)
         await self._run_startup_step("sync command references", self.sync_commands_reference_message)
         await self._run_startup_step("sync Visitor command examples", self.sync_visitor_command_examples)
+        await self._run_startup_step("sync loot command example", self.sync_loot_command_example)
         await self._run_startup_step("sync Executive Hangar status", self.sync_exec_status_message)
         await self._run_startup_step("sync contested-zone timers", self.sync_cz_timers_message)
         self._commands_reference_synced = True
@@ -516,6 +523,24 @@ class GameAssistBot(commands.Bot):
             self._exec_status_task = asyncio.create_task(self._exec_status_loop())
         if (self.settings.cz_timers_channel_id or self.visitor_channels.get("contested-zone-timers")) and self._cz_timers_task is None:
             self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
+        if self._item_catalog_task is None:
+            self._item_catalog_task = asyncio.create_task(self._item_catalog_sync_loop())
+
+    async def _item_catalog_sync_loop(self) -> None:
+        while not self.is_closed():
+            try:
+                if not await self.cache.get("loot:data:daily-sync:v1"):
+                    status = await self.sources.refresh_loot_data()
+                    await self.cache.set("loot:data:daily-sync:v1", True, 86400)
+                    logging.info(
+                        "Daily loot data status=%s items=%s marketplace_prices=%s",
+                        status.get("status"),
+                        status.get("item_count"),
+                        status.get("marketplace_price_count"),
+                    )
+            except Exception:
+                logging.exception("Star Citizen item catalog synchronization failed")
+            await asyncio.sleep(60 * 60)
 
     async def _run_startup_step(self, label: str, operation) -> None:
         try:
@@ -1943,6 +1968,30 @@ class GameAssistBot(commands.Bot):
             await self.cache.set(cache_key, message.id, 315360000)
             await self._ensure_timer_dashboard_below_example(channel_name, channel)
 
+    async def sync_loot_command_example(self) -> None:
+        channel = self.get_channel(LOOT_CHANNEL_ID)
+        if channel is None:
+            with suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                channel = await self.fetch_channel(LOOT_CHANNEL_ID)
+        if not isinstance(channel, discord.TextChannel):
+            logging.warning("Loot command channel %s could not be resolved", LOOT_CHANNEL_ID)
+            return
+        embed = build_loot_command_example_embed()
+        cache_key = f"discord:loot-example:{channel.id}"
+        message_id = await self.cache.get(cache_key)
+        message = None
+        if isinstance(message_id, int):
+            with suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                message = await channel.fetch_message(message_id)
+        if message is None:
+            message = await self.find_recent_embed_message(channel, embed.title or "")
+        if message:
+            await message.edit(content=None, embed=embed)
+        else:
+            message = await channel.send(embed=embed, silent=True)
+        await self.cache.set(cache_key, message.id, 315360000)
+        await self.delete_recent_duplicate_embed_messages(channel, embed.title or "", message.id)
+
     async def _ensure_timer_dashboard_below_example(
         self,
         channel_name: str,
@@ -3015,6 +3064,37 @@ class BlueprintSelectView(discord.ui.View):
 
 
 item_group = app_commands.Group(name="item", description="Item lookup tools.")
+
+loot_group = app_commands.Group(name="loot", description="Lootable item lookup tools.")
+
+
+@loot_group.command(name="search", description="Find a lootable Star Citizen item and its UEX value.")
+@app_commands.describe(name="Lootable item name, such as ADP-mk4 Arms Justified.")
+async def loot_search_command(interaction: discord.Interaction, name: str) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True)
+    result = await bot.sources.lookup_loot_item(name)
+    if result is None:
+        await interaction.followup.send(
+            f"No lootable item matching `{name}` was found in the current Star Citizen Wiki catalog.",
+            ephemeral=True,
+        )
+        return
+    await interaction.followup.send(embed=build_loot_item_embed(result))
+
+
+@loot_search_command.autocomplete("name")
+async def loot_search_autocomplete(
+    interaction: discord.Interaction, current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+    names = await bot.sources.autocomplete_loot_items(current)
+    return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
 
 
 @item_group.command(name="locator", description="Find in-game buyable Star Citizen items.")
@@ -4439,6 +4519,99 @@ def build_item_locator_embed(
     return embed
 
 
+def build_loot_item_embed(result: LootItemResult) -> discord.Embed:
+    details = [
+        _line("Lootable", "Yes — game catalog flag"),
+        _line("Type", result.classification),
+        _line("Category", result.category),
+        _line("Manufacturer", result.manufacturer),
+        _line("Size", _item_size_label(result.size)),
+        _line("Rarity", result.rarity),
+        _line("Game Version", result.game_version),
+    ]
+    description = "\n".join(line for line in details if line)
+    if result.description:
+        summary = " ".join(result.description.split())
+        description = f"{description}\n\n{summary[:700]}" if description else summary[:700]
+    embed = discord.Embed(
+        title=result.name,
+        description=description,
+        url=result.wiki_url,
+        color=discord.Color.gold(),
+    )
+    prices = []
+    if result.marketplace_sell_average:
+        prices.append(f"Player marketplace average: {_format_currency(result.marketplace_sell_average, 'aUEC')}")
+    if result.terminal_sell_average:
+        prices.append(f"Terminal sell average: {_format_currency(result.terminal_sell_average, 'aUEC')}")
+    embed.add_field(
+        name="UEX Pricing",
+        value="\n".join(prices) if prices else "No current UEX price average found.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Locations",
+        value="Exact loot locations are community reported and are not yet confirmed for this item.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Links",
+        value=f"[Star Citizen Wiki]({result.wiki_url}) • [Live prices on UEX]({result.uex_url})",
+        inline=False,
+    )
+    if result.image_url:
+        embed.set_thumbnail(url=result.image_url)
+    embed.set_footer(text="Item data: Star Citizen Wiki API • Prices: UEX • Unofficial community tool")
+    return embed
+
+
+def build_loot_command_example_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title="Example /loot search Response",
+        description=(
+            "**Example command:** `/loot search name:ADP-mk4 Arms Justified`\n"
+            "Searches the current local lootable-item catalog, then adds cached UEX pricing."
+        ),
+        color=discord.Color.gold(),
+    )
+    embed.add_field(
+        name="ADP-mk4 Arms Justified",
+        value=(
+            "Lootable: Yes — game catalog flag\n"
+            "Type: Arms · Category: Heavy · Clark Defense Systems\n"
+            "Rarity and current game version are shown when available."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="UEX Pricing",
+        value=(
+            "Player marketplace average and terminal sell average appear when available.\n"
+            "Every result includes a **Live prices on UEX** link."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Location Confidence",
+        value=(
+            "The Wiki lootable flag does not identify an exact crate. Until community locations are verified, "
+            "the result clearly says that no exact location is confirmed."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Try a few searches",
+        value=(
+            "`/loot search name:ADP-mk4 Arms Justified`\n"
+            "`/loot search name:ADP-mk4 Core Justified`\n"
+            "`/loot search name:ADP-mk4 Helmet Justified`"
+        ),
+        inline=False,
+    )
+    embed.set_footer(text="Example data only • The deployment refreshes this post without creating duplicates")
+    return embed
+
+
 def build_inventory_search_embed(
     results: list[dict],
     item: str | None = None,
@@ -4741,6 +4914,9 @@ def build_command_channel_directory_embed(settings: Settings) -> discord.Embed:
     inventory_commands = channel_commands.setdefault(INVENTORY_CHANNEL_ID, [])
     if "/inventory search" not in inventory_commands:
         inventory_commands.append("/inventory search")
+    loot_commands = channel_commands.setdefault(LOOT_CHANNEL_ID, [])
+    if "/loot search" not in loot_commands:
+        loot_commands.append("/loot search")
 
     lines = []
     for channel_id, command_names in sorted(channel_commands.items(), key=lambda item: min(item[1])):

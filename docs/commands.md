@@ -364,6 +364,26 @@ Examples:
 /item search section:Vehicle Weapons category:Guns
 ```
 
+## `/loot search`
+
+Finds items marked lootable in the current Star Citizen Wiki API catalog and adds current UEX value data.
+
+The Wiki catalog and UEX marketplace-price snapshot refresh together once every 24 hours and are served from the local database/cache between refreshes.
+
+The response is public and the command can only be used in Discord channel `1533075933441822830`.
+
+| Option | Required | Description |
+|---|---:|---|
+| `name` | Yes | Lootable item name. Autocomplete uses the locally cached Wiki catalog. |
+
+Example:
+
+```text
+/loot search name:ADP-mk4 Arms Justified
+```
+
+The Wiki lootable flag confirms that the item can generate as loot. Exact farming locations require separately verified community reports.
+
 ## `/inventory search`
 
 Searches the inventory saved through the website for the Discord account running the command. Results are ephemeral, so only the requesting user can see their inventory.
