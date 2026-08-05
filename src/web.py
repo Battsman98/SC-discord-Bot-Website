@@ -1232,18 +1232,23 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
             skipped.append(candidate)
             continue
         display_name = _ship_display_name(detail.name)
-        await state().cache.save_user_ship(
-            user.id,
-            display_name,
-            "pledged",
-            detail.manufacturer,
-            _ship_basic_info(detail),
-            detail.source_name,
-            detail.source_url,
-            detail.image_url,
-            None,
-            None,
-        )
+        try:
+            await state().cache.save_user_ship(
+                user.id,
+                display_name,
+                "pledged",
+                detail.manufacturer,
+                _ship_basic_info(detail),
+                detail.source_name,
+                detail.source_url,
+                detail.image_url,
+                None,
+                None,
+            )
+        except Exception:
+            logging.exception("Could not save imported ship %r for user %s", display_name, user.id)
+            skipped.append(candidate)
+            continue
         try:
             await _sync_auto_loaners(user.id, display_name, "pledged", detail.status)
         except Exception:
@@ -1260,9 +1265,12 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
             ship_name = str(ship.get("name") or "").strip()
             if not ship_name or _normalize_text(ship_name) in protected_names:
                 continue
-            await state().cache.delete_user_ship(user.id, ship_name)
-            await state().cache.delete_user_loaners_for_ship(user.id, ship_name)
-            removed.append(ship_name)
+            try:
+                await state().cache.delete_user_ship(user.id, ship_name)
+                await state().cache.delete_user_loaners_for_ship(user.id, ship_name)
+                removed.append(ship_name)
+            except Exception:
+                logging.exception("Could not remove stale pledged ship %r for user %s", ship_name, user.id)
     return {
         "status": "imported",
         "candidates": sorted(candidates, key=str.lower),
