@@ -11,7 +11,7 @@ import re
 from typing import Any, Iterable
 
 
-_INSERT_ID_TABLES = {"user_inventory_items", "user_refinery_orders"}
+_INSERT_ID_TABLES = {"user_inventory_items", "user_refinery_orders", "loot_sighting_reports"}
 
 
 def _translate_sql(sql: str) -> str:

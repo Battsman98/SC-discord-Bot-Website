@@ -49,6 +49,17 @@ def test_insert_cursor_exposes_postgres_returning_id():
     assert raw.calls[0][0].rstrip().endswith("RETURNING id")
 
 
+def test_loot_sighting_insert_exposes_postgres_returning_id():
+    raw = FakeConnection()
+    connection = PostgresConnection(raw)
+    cursor = connection.execute(
+        "INSERT INTO loot_sighting_reports (item_uuid, item_name) VALUES (?, ?)",
+        ("uuid", "Item"),
+    )
+    assert cursor.lastrowid == 42
+    assert raw.calls[0][0].rstrip().endswith("RETURNING id")
+
+
 def test_connect_uses_autocommit_to_isolate_failed_cache_operations(monkeypatch):
     raw = FakeConnection()
     calls = []

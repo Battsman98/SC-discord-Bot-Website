@@ -224,7 +224,35 @@ class SQLiteCache:
             """
         )
         connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS loot_sighting_reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_uuid TEXT NOT NULL,
+                item_name TEXT NOT NULL,
+                normalized_item_name TEXT NOT NULL,
+                location TEXT NOT NULL,
+                location_type TEXT,
+                game_version TEXT,
+                notes TEXT,
+                screenshot_url TEXT,
+                reporter_id INTEGER NOT NULL,
+                reporter_name TEXT NOT NULL,
+                guild_id INTEGER,
+                channel_id INTEGER,
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_id INTEGER,
+                reviewer_name TEXT,
+                review_message_id INTEGER,
+                created_at INTEGER NOT NULL,
+                reviewed_at INTEGER
+            )
+            """
+        )
+        connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_item_catalog_normalized_name ON item_catalog(normalized_name)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_loot_sightings_item_status ON loot_sighting_reports(normalized_item_name, status, reviewed_at)"
         )
         cls._ensure_column(connection, "user_ships", "image_url", "TEXT")
         cls._ensure_column(connection, "user_ships", "notes", "TEXT")
@@ -297,6 +325,95 @@ class SQLiteCache:
     async def delete(self, cache_key: str) -> None:
         self._connection.execute("DELETE FROM cache_entries WHERE cache_key = ?", (cache_key,))
         self._connection.commit()
+
+    async def add_loot_sighting_report(
+        self,
+        *,
+        item_uuid: str,
+        item_name: str,
+        location: str,
+        location_type: str | None,
+        game_version: str | None,
+        notes: str | None,
+        screenshot_url: str | None,
+        reporter_id: int,
+        reporter_name: str,
+        guild_id: int | None,
+        channel_id: int | None,
+    ) -> int:
+        normalized = " ".join(item_name.casefold().replace("-", " ").split())
+        cursor = self._connection.execute(
+            """
+            INSERT INTO loot_sighting_reports (
+                item_uuid, item_name, normalized_item_name, location, location_type,
+                game_version, notes, screenshot_url, reporter_id, reporter_name,
+                guild_id, channel_id, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item_uuid, item_name, normalized, location, location_type, game_version,
+                notes, screenshot_url, reporter_id, reporter_name, guild_id, channel_id,
+                int(time.time()),
+            ),
+        )
+        self._connection.commit()
+        return int(cursor.lastrowid)
+
+    async def loot_sighting_report(self, report_id: int) -> dict[str, Any] | None:
+        rows = await self._loot_sighting_rows("WHERE id = ?", (report_id,))
+        return rows[0] if rows else None
+
+    async def pending_loot_sighting_reports(self, limit: int = 100) -> list[dict[str, Any]]:
+        return await self._loot_sighting_rows(
+            "WHERE status = 'pending' ORDER BY id ASC LIMIT ?", (max(1, min(limit, 500)),)
+        )
+
+    async def approved_loot_sightings(self, item_name: str, limit: int = 10) -> list[dict[str, Any]]:
+        normalized = " ".join(item_name.casefold().replace("-", " ").split())
+        return await self._loot_sighting_rows(
+            "WHERE normalized_item_name = ? AND status = 'approved' ORDER BY reviewed_at DESC, id DESC LIMIT ?",
+            (normalized, max(1, min(limit, 25))),
+        )
+
+    async def set_loot_sighting_review_message(self, report_id: int, message_id: int) -> None:
+        self._connection.execute(
+            "UPDATE loot_sighting_reports SET review_message_id = ? WHERE id = ?",
+            (message_id, report_id),
+        )
+        self._connection.commit()
+
+    async def review_loot_sighting(
+        self, report_id: int, status: str, reviewer_id: int, reviewer_name: str
+    ) -> bool:
+        if status not in {"approved", "rejected"}:
+            raise ValueError("Loot sighting status must be approved or rejected.")
+        cursor = self._connection.execute(
+            """
+            UPDATE loot_sighting_reports
+            SET status = ?, reviewer_id = ?, reviewer_name = ?, reviewed_at = ?
+            WHERE id = ? AND status = 'pending'
+            """,
+            (status, reviewer_id, reviewer_name, int(time.time()), report_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount == 1
+
+    async def _loot_sighting_rows(self, where: str, parameters: tuple[Any, ...]) -> list[dict[str, Any]]:
+        rows = self._connection.execute(
+            f"""
+            SELECT id, item_uuid, item_name, location, location_type, game_version,
+                   notes, screenshot_url, reporter_id, reporter_name, guild_id, channel_id,
+                   status, reviewer_id, reviewer_name, review_message_id, created_at, reviewed_at
+            FROM loot_sighting_reports {where}
+            """,
+            parameters,
+        ).fetchall()
+        keys = (
+            "id", "item_uuid", "item_name", "location", "location_type", "game_version",
+            "notes", "screenshot_url", "reporter_id", "reporter_name", "guild_id", "channel_id",
+            "status", "reviewer_id", "reviewer_name", "review_message_id", "created_at", "reviewed_at",
+        )
+        return [dict(zip(keys, row)) for row in rows]
 
     async def add_audit_event(
         self,

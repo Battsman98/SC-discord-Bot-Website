@@ -742,6 +742,13 @@ function renderLootItem(item) {
       ? `Terminal sell average: ${money(item.terminal_sell_average)}`
       : null,
   ].filter(Boolean).join("<br>") || "No current UEX price average found.";
+  const sightings = (item.community_sightings || []).slice(0, 5).map((sighting) => {
+    const details = [sighting.location_type, sighting.game_version].filter(Boolean).join(" Â· ");
+    const approved = sighting.reviewed_at
+      ? ` Â· approved ${new Date(Number(sighting.reviewed_at) * 1000).toLocaleDateString()}`
+      : "";
+    return `<strong>${escapeHtml(sighting.location)}</strong>${details ? ` â€” ${escapeHtml(details)}` : ""}${escapeHtml(approved)}`;
+  }).join("<br>") || "No community sighting has been approved for this item yet.";
   return card(item.name, [
     ["Lootable", "Yes — game catalog flag"],
     ["Type", item.classification],
@@ -751,7 +758,7 @@ function renderLootItem(item) {
     ["Rarity", item.rarity],
     ["Game version", item.game_version],
     ["UEX pricing", pricing],
-    ["Locations", "Exact loot locations require verified community reports."],
+    ["Approved community sightings", sightings],
     ["Links", `${link(item.wiki_url, "Star Citizen Wiki")} · ${link(item.uex_url, "Live prices on UEX")}`],
   ], item.description ? `<p class="result-source">${escapeHtml(item.description)}</p>` : "");
 }

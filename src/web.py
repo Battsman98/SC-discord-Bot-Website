@@ -4045,7 +4045,9 @@ async def loot_item(query: str = Query(min_length=2, max_length=160)) -> dict[st
     result = await state().sources.lookup_loot_item(query)
     if result is None:
         not_found(f"No lootable item found for {query}.")
-    return encode(result)
+    payload = encode(result)
+    payload["community_sightings"] = await state().cache.approved_loot_sightings(result.name)
+    return payload
 
 
 @app.get("/api/autocomplete/loot-items")

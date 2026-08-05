@@ -61,6 +61,7 @@ VISITOR_CATEGORY_NAME = "Discord Bot Hub"
 LEGACY_VISITOR_CATEGORY_NAME = "Visitor Bot Hub"
 AUDIT_LOG_CATEGORY_ID = 1516295744603164732
 AUDIT_LOG_CATEGORY_NAME = "audit log"
+LOOT_REVIEW_CHANNEL_NAME = "loot-report-reviews"
 WEBSITE_CHANGELOG_CHANNEL_NAME = "website-changelog"
 DISCORD_CHANGELOG_CHANNEL_NAME = "discord-changelog"
 CHANGELOG_GITHUB_REPOSITORY = "Battsman98/SC-discord-Bot-Website"
@@ -313,7 +314,7 @@ def _allowed_command_channel_id(bot: "GameAssistBot", command_name: str) -> int 
         allowed_channel_id = bot.settings.command_channel_ids.get("item locator")
     if command_name == "inventory search" and bot.inventory_channel_id:
         allowed_channel_id = bot.inventory_channel_id
-    if command_name == "loot search":
+    if command_name.startswith("loot "):
         allowed_channel_id = LOOT_CHANNEL_ID
     return allowed_channel_id
 
@@ -452,6 +453,7 @@ class GameAssistBot(commands.Bot):
         self.visitor_channels: dict[str, int] = {}
         self.visitor_category_id: int | None = None
         self.application_review_channel_id: int | None = None
+        self.loot_review_channel_id: int | None = None
         self._membership_application_lock = asyncio.Lock()
         self.hub_role_ids: dict[str, int] = {}
         self.changelog_channels: dict[str, int] = {}
@@ -505,6 +507,7 @@ class GameAssistBot(commands.Bot):
             return
 
         await self._run_startup_step("create Bot Manager role", self.ensure_bot_manager_role)
+        await self._run_startup_step("provision loot report reviews", self.ensure_loot_review_channel)
         await self._run_startup_step("provision changelog channels", self.ensure_changelog_channels)
         await self._run_startup_step("record deployment changelog", self.record_deployment)
         await self._run_startup_step("provision Visitor hub", self.ensure_visitor_access)
@@ -515,6 +518,7 @@ class GameAssistBot(commands.Bot):
         await self._run_startup_step("sync command references", self.sync_commands_reference_message)
         await self._run_startup_step("sync Visitor command examples", self.sync_visitor_command_examples)
         await self._run_startup_step("sync loot command example", self.sync_loot_command_example)
+        await self._run_startup_step("restore pending loot reviews", self.restore_pending_loot_reviews)
         await self._run_startup_step("sync Executive Hangar status", self.sync_exec_status_message)
         await self._run_startup_step("sync contested-zone timers", self.sync_cz_timers_message)
         self._commands_reference_synced = True
@@ -1538,6 +1542,95 @@ class GameAssistBot(commands.Bot):
             if overwrite != current_overwrite:
                 await channel.set_permissions(role, overwrite=overwrite, reason="Grant Bot Manager access")
         logging.info("Bot Manager role %s is ready", role.id)
+
+    async def ensure_loot_review_channel(self) -> None:
+        guild = self.get_guild(self.settings.discord_guild_id or 0)
+        if guild is None or guild.me is None:
+            logging.error("Could not resolve the configured guild for loot review provisioning")
+            return
+        category = guild.get_channel(AUDIT_LOG_CATEGORY_ID)
+        if not isinstance(category, discord.CategoryChannel):
+            category = discord.utils.find(
+                lambda item: item.name.casefold() == AUDIT_LOG_CATEGORY_NAME.casefold(), guild.categories
+            )
+        if category is None:
+            logging.error("Could not resolve the audit log category for loot reviews")
+            return
+        channel = discord.utils.find(
+            lambda item: item.name == LOOT_REVIEW_CHANNEL_NAME and item.category_id == category.id,
+            guild.text_channels,
+        )
+        topic = "Private audit queue for community loot sightings. Only Bot Managers can approve or reject."
+        if channel is None:
+            channel = await guild.create_text_channel(
+                LOOT_REVIEW_CHANNEL_NAME,
+                category=category,
+                overwrites=category.overwrites,
+                topic=topic,
+                reason="Create community loot sighting review queue",
+            )
+        elif channel.topic != topic or not channel.permissions_synced:
+            await channel.edit(category=category, sync_permissions=True, topic=topic)
+        self.loot_review_channel_id = channel.id
+
+    async def publish_loot_review(self, report: dict) -> None:
+        channel = self.get_channel(self.loot_review_channel_id or 0)
+        if not isinstance(channel, discord.TextChannel):
+            await self.ensure_loot_review_channel()
+            channel = self.get_channel(self.loot_review_channel_id or 0)
+        if not isinstance(channel, discord.TextChannel):
+            raise RuntimeError("Loot review channel is unavailable.")
+        view = LootSightingReviewView(int(report["id"]))
+        self.add_view(view)
+        message_id = report.get("review_message_id")
+        message = None
+        if isinstance(message_id, int):
+            with suppress(discord.NotFound, discord.Forbidden, discord.HTTPException):
+                message = await channel.fetch_message(message_id)
+        embed = build_loot_sighting_review_embed(report)
+        if message is None:
+            message = await channel.send(embed=embed, view=view, silent=True)
+            await self.cache.set_loot_sighting_review_message(int(report["id"]), message.id)
+        else:
+            await message.edit(embed=embed, view=view)
+
+    async def restore_pending_loot_reviews(self) -> None:
+        for report in await self.cache.pending_loot_sighting_reports():
+            await self.publish_loot_review(report)
+
+    async def review_loot_sighting(
+        self, interaction: discord.Interaction, report_id: int, approved: bool
+    ) -> None:
+        if not _is_bot_manager(interaction.user):
+            await interaction.response.send_message(
+                f"Only members with the **{BOT_MANAGER_ROLE_NAME}** role can review loot reports.",
+                ephemeral=True,
+            )
+            return
+        status = "approved" if approved else "rejected"
+        changed = await self.cache.review_loot_sighting(
+            report_id, status, interaction.user.id, str(interaction.user)
+        )
+        report = await self.cache.loot_sighting_report(report_id)
+        if report is None:
+            await interaction.response.send_message("That loot report no longer exists.", ephemeral=True)
+            return
+        if not changed:
+            await interaction.response.send_message(
+                f"This report was already {report['status']}.", ephemeral=True
+            )
+            return
+        embed = build_loot_sighting_review_embed(report)
+        await interaction.response.edit_message(embed=embed, view=None)
+        await self.log_audit_event(
+            "Loot Sighting Reviewed",
+            {
+                "Report": f"#{report_id}", "Item": report["item_name"],
+                "Location": report["location"], "Status": status.title(),
+                "Reviewer": _audit_user(interaction.user),
+            },
+            color=discord.Color.green() if approved else discord.Color.red(),
+        )
 
     async def ensure_feedback_forum(self) -> None:
         channel_id = self.visitor_channels.get("feedback-and-issues") or self.settings.feedback_forum_channel_id
@@ -3068,6 +3161,34 @@ item_group = app_commands.Group(name="item", description="Item lookup tools.")
 loot_group = app_commands.Group(name="loot", description="Lootable item lookup tools.")
 
 
+class LootSightingReviewView(discord.ui.View):
+    def __init__(self, report_id: int) -> None:
+        super().__init__(timeout=None)
+        self.report_id = report_id
+        approve = discord.ui.Button(
+            label="Approve", style=discord.ButtonStyle.success,
+            custom_id=f"loot-report:approve:{report_id}",
+        )
+        reject = discord.ui.Button(
+            label="Reject", style=discord.ButtonStyle.danger,
+            custom_id=f"loot-report:reject:{report_id}",
+        )
+        approve.callback = self._approve
+        reject.callback = self._reject
+        self.add_item(approve)
+        self.add_item(reject)
+
+    async def _approve(self, interaction: discord.Interaction) -> None:
+        bot = interaction.client
+        if isinstance(bot, GameAssistBot):
+            await bot.review_loot_sighting(interaction, self.report_id, True)
+
+    async def _reject(self, interaction: discord.Interaction) -> None:
+        bot = interaction.client
+        if isinstance(bot, GameAssistBot):
+            await bot.review_loot_sighting(interaction, self.report_id, False)
+
+
 @loot_group.command(name="search", description="Find a lootable Star Citizen item and its UEX value.")
 @app_commands.describe(name="Lootable item name, such as ADP-mk4 Arms Justified.")
 async def loot_search_command(interaction: discord.Interaction, name: str) -> None:
@@ -3083,7 +3204,8 @@ async def loot_search_command(interaction: discord.Interaction, name: str) -> No
             ephemeral=True,
         )
         return
-    await interaction.followup.send(embed=build_loot_item_embed(result), ephemeral=True)
+    sightings = await bot.cache.approved_loot_sightings(result.name)
+    await interaction.followup.send(embed=build_loot_item_embed(result, sightings), ephemeral=True)
 
 
 @loot_search_command.autocomplete("name")
@@ -3095,6 +3217,77 @@ async def loot_search_autocomplete(
         return []
     names = await bot.sources.autocomplete_loot_items(current)
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
+
+
+@loot_group.command(name="report", description="Report where you found a lootable item.")
+@app_commands.describe(
+    name="Lootable item name.",
+    location="Where you found it, including the facility, mission, or point of interest.",
+    game_version="Optional patch observed, such as 4.9.0; defaults to the item's current catalog version.",
+    location_type="Optional category, such as bunker, settlement, mission, or asteroid base.",
+    screenshot="Optional screenshot showing the item or loot container.",
+    notes="Optional directions, container details, mission name, or other verification context.",
+)
+async def loot_report_command(
+    interaction: discord.Interaction,
+    name: str,
+    location: str,
+    game_version: str | None = None,
+    location_type: str | None = None,
+    screenshot: discord.Attachment | None = None,
+    notes: str | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    if screenshot and not _is_image_attachment(screenshot):
+        await interaction.response.send_message(
+            "The optional evidence attachment must be a PNG, JPG, WEBP, or GIF image.", ephemeral=True
+        )
+        return
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    item = await bot.sources.lookup_loot_item(name)
+    if item is None:
+        await interaction.followup.send(
+            f"No lootable item matching `{name}` was found. Choose an item from autocomplete and try again.",
+            ephemeral=True,
+        )
+        return
+    report_id = await bot.cache.add_loot_sighting_report(
+        item_uuid=item.uuid,
+        item_name=item.name,
+        location=location.strip()[:300],
+        location_type=(location_type or "").strip()[:100] or None,
+        game_version=(game_version or item.game_version or "").strip()[:50] or None,
+        notes=(notes or "").strip()[:1000] or None,
+        screenshot_url=screenshot.url if screenshot else None,
+        reporter_id=interaction.user.id,
+        reporter_name=str(interaction.user),
+        guild_id=interaction.guild_id,
+        channel_id=interaction.channel_id,
+    )
+    report = await bot.cache.loot_sighting_report(report_id)
+    try:
+        await bot.publish_loot_review(report or {})
+    except (RuntimeError, discord.HTTPException):
+        logging.exception("Could not publish loot report %s to the review queue", report_id)
+        await interaction.followup.send(
+            f"Report **#{report_id}** was saved, but the private review post could not be published yet. "
+            "It will be restored when the bot reconnects.",
+            ephemeral=True,
+        )
+        return
+    await interaction.followup.send(
+        f"Loot sighting **#{report_id}** was submitted privately for Bot Manager review.", ephemeral=True
+    )
+
+
+@loot_report_command.autocomplete("name")
+async def loot_report_autocomplete(
+    interaction: discord.Interaction, current: str,
+) -> list[app_commands.Choice[str]]:
+    return await loot_search_autocomplete(interaction, current)
 
 
 @item_group.command(name="locator", description="Find in-game buyable Star Citizen items.")
@@ -4519,7 +4712,9 @@ def build_item_locator_embed(
     return embed
 
 
-def build_loot_item_embed(result: LootItemResult) -> discord.Embed:
+def build_loot_item_embed(
+    result: LootItemResult, sightings: list[dict] | None = None
+) -> discord.Embed:
     details = [
         _line("Lootable", "Yes — game catalog flag"),
         _line("Type", result.classification),
@@ -4551,7 +4746,7 @@ def build_loot_item_embed(result: LootItemResult) -> discord.Embed:
     )
     embed.add_field(
         name="Locations",
-        value="Exact loot locations are community reported and are not yet confirmed for this item.",
+        value=_format_approved_loot_sightings(sightings or []),
         inline=False,
     )
     embed.add_field(
@@ -4563,6 +4758,72 @@ def build_loot_item_embed(result: LootItemResult) -> discord.Embed:
         embed.set_thumbnail(url=result.image_url)
     embed.set_footer(text="Item data: Star Citizen Wiki API • Prices: UEX • Unofficial community tool")
     return embed
+
+
+def _format_approved_loot_sightings(sightings: list[dict]) -> str:
+    if not sightings:
+        return (
+            "No community sighting has been approved for this item yet. "
+            "Use `/loot report` to submit one."
+        )
+    lines = []
+    for sighting in sightings[:5]:
+        details = [sighting.get("location_type"), sighting.get("game_version")]
+        suffix = " · ".join(str(value) for value in details if value)
+        timestamp = sighting.get("reviewed_at")
+        confirmed = f" · approved <t:{timestamp}:R>" if isinstance(timestamp, int) else ""
+        lines.append(f"• **{sighting['location']}**{f' — {suffix}' if suffix else ''}{confirmed}")
+    return "\n".join(lines)[:1024]
+
+
+def build_loot_sighting_review_embed(report: dict) -> discord.Embed:
+    status = str(report.get("status") or "pending")
+    colors = {
+        "pending": discord.Color.orange(),
+        "approved": discord.Color.green(),
+        "rejected": discord.Color.red(),
+    }
+    embed = discord.Embed(
+        title=f"Loot Sighting #{report.get('id')} — {status.title()}",
+        description=f"**{report.get('item_name', 'Unknown item')}**",
+        color=colors.get(status, discord.Color.blurple()),
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.add_field(name="Location", value=str(report.get("location") or "Unknown")[:1024], inline=False)
+    embed.add_field(name="Location Type", value=report.get("location_type") or "Not supplied", inline=True)
+    embed.add_field(name="Game Version", value=report.get("game_version") or "Not supplied", inline=True)
+    embed.add_field(
+        name="Reported By",
+        value=f"<@{report.get('reporter_id')}> · {report.get('reporter_name')}",
+        inline=False,
+    )
+    if report.get("notes"):
+        embed.add_field(name="Verification Notes", value=str(report["notes"])[:1024], inline=False)
+    if report.get("screenshot_url"):
+        embed.add_field(name="Evidence", value=f"[Open original screenshot]({report['screenshot_url']})", inline=False)
+        embed.set_image(url=str(report["screenshot_url"]))
+    if status != "pending":
+        embed.add_field(
+            name="Reviewed By",
+            value=f"<@{report.get('reviewer_id')}> · {report.get('reviewer_name')}",
+            inline=False,
+        )
+    embed.set_footer(
+        text="Only Bot Managers can approve or reject. Approval publishes the location in item searches."
+    )
+    return embed
+
+
+def _is_bot_manager(user: discord.User | discord.Member) -> bool:
+    return isinstance(user, discord.Member) and any(
+        role.name.casefold() == BOT_MANAGER_ROLE_NAME.casefold() for role in user.roles
+    )
+
+
+def _is_image_attachment(attachment: discord.Attachment) -> bool:
+    if attachment.content_type and attachment.content_type.casefold().startswith("image/"):
+        return True
+    return Path(attachment.filename).suffix.casefold() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 
 def build_loot_command_example_embed() -> discord.Embed:
@@ -4594,8 +4855,16 @@ def build_loot_command_example_embed() -> discord.Embed:
     embed.add_field(
         name="Location Confidence",
         value=(
-            "The Wiki lootable flag does not identify an exact crate. Until community locations are verified, "
-            "the result clearly says that no exact location is confirmed."
+            "Approved community sightings show their location, patch, type, and approval age. "
+            "Use `/loot report` to submit a sighting with an optional screenshot."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Community Review",
+        value=(
+            "Reports go to the private audit-log review queue. Only members with the Bot Manager role "
+            "can approve or reject them."
         ),
         inline=False,
     )

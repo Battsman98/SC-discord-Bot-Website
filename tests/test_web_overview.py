@@ -35,6 +35,8 @@ def test_items_page_includes_lootable_finder_with_autocomplete_and_uex_links() -
     assert 'id="lootItemsOutput"' in html
     assert 'setupLootItemAutocomplete();' in javascript
     assert '/api/autocomplete/loot-items?query=' in javascript
+    assert "community_sightings" in javascript
+    assert "Approved community sightings" in javascript
     assert '/api/loot/items?query=' in javascript
     assert 'Live prices on UEX' in javascript
 

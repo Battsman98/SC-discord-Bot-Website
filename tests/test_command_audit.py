@@ -199,7 +199,8 @@ def test_loot_example_embed_documents_command_prices_and_confidence() -> None:
     assert embed.title == "Example /loot search Response"
     assert "/loot search name:ADP-mk4 Arms Justified" in embed.description
     assert "Live prices on UEX" in values
-    assert "no exact location is confirmed" in values
+    assert "Approved community sightings" in values
+    assert "/loot report" in values
     assert "visible only to the person" in values
 
 
@@ -207,7 +208,7 @@ def test_loot_search_response_is_private_to_requester() -> None:
     source = inspect.getsource(loot_search_command.callback)
 
     assert "defer(thinking=True, ephemeral=True)" in source
-    assert "embed=build_loot_item_embed(result), ephemeral=True" in source
+    assert "embed=build_loot_item_embed(result, sightings), ephemeral=True" in source
 
 
 def test_visitor_hub_channel_replaces_legacy_command_channel() -> None:
