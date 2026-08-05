@@ -2798,6 +2798,10 @@ body.hangar-modal-open {
     grid-template-columns: 1fr;
   }
 
+  .ship-search-form .field-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .resource-grid {
     grid-template-columns: 1fr;
   }
@@ -2952,6 +2956,10 @@ body.hangar-modal-open {
 }
 
 @media (max-width: 680px) {
+  .ship-search-form .field-row {
+    grid-template-columns: 1fr;
+  }
+
   .scanner-progress ul {
     max-height: 360px;
   }

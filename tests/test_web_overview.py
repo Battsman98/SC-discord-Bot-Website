@@ -357,6 +357,15 @@ def test_selecting_ships_opens_and_refreshes_the_hangar() -> None:
     assert "function showToolPanel(tab, id)" in javascript
 
 
+def test_ship_search_filters_stay_compact_at_partial_desktop_widths() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert 'class="panel form wide ship-search-form"' in html
+    assert ".ship-search-form .field-row {\n    grid-template-columns: repeat(3, minmax(0, 1fr));" in css
+    assert "@media (max-width: 680px) {\n  .ship-search-form .field-row {\n    grid-template-columns: 1fr;" in css
+
+
 def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
