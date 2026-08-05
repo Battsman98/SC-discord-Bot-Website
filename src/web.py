@@ -1221,13 +1221,21 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
         candidates.update(_extract_rsi_pledge_ship_names(page))
     if not candidates:
         raise HTTPException(status_code=400, detail="No ship or vehicle candidates were supplied.")
-    for candidate in sorted(candidates, key=str.lower):
+    resolution_gate = asyncio.Semaphore(4)
+
+    async def resolve_candidate(candidate: str) -> tuple[str, Any]:
         try:
-            detail = await _resolve_imported_ship(candidate)
+            async with resolution_gate:
+                return candidate, await _resolve_imported_ship(candidate)
         except Exception:
             logging.exception("Could not resolve RSI hangar candidate %r for user %s", candidate, user.id)
-            skipped.append(candidate)
-            continue
+            return candidate, None
+
+    resolved_candidates = await asyncio.gather(*(
+        resolve_candidate(candidate)
+        for candidate in sorted(candidates, key=str.lower)
+    ))
+    for candidate, detail in resolved_candidates:
         if detail is None:
             skipped.append(candidate)
             continue

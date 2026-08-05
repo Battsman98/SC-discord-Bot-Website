@@ -376,6 +376,8 @@ def test_rsi_hangar_import_shows_page_scan_progress() -> None:
     assert 'direction === "from-game-assist-rsi-progress"' in javascript
     assert ".rsi-import-progress-track" in css
     assert "rsi-connector-extension-v0.4.7.zip" in javascript
+    assert 'outputs.savedShips.insertAdjacentHTML("afterbegin", summary)' in javascript
+    assert 'outputs.lookup.innerHTML = `<div class="state">' not in javascript.split("function showRsiImportResult", 1)[1].split("function showRsiImportProgress", 1)[0]
 
 
 def test_live_inventory_scans_use_the_low_overhead_request_path() -> None:
