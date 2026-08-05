@@ -1222,20 +1222,14 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
         candidates.update(_extract_rsi_pledge_ship_names(page))
     if not candidates:
         raise HTTPException(status_code=400, detail="No ship or vehicle candidates were supplied.")
-    resolution_gate = asyncio.Semaphore(4)
-
-    async def resolve_candidate(candidate: str) -> tuple[str, Any]:
+    resolved_candidates: list[tuple[str, Any]] = []
+    for candidate in sorted(candidates, key=str.lower):
         try:
-            async with resolution_gate:
-                return candidate, await _resolve_imported_ship(candidate)
+            detail = await _resolve_imported_ship(candidate)
         except Exception:
             logging.exception("Could not resolve RSI hangar candidate %r for user %s", candidate, user.id)
-            return candidate, None
-
-    resolved_candidates = await asyncio.gather(*(
-        resolve_candidate(candidate)
-        for candidate in sorted(candidates, key=str.lower)
-    ))
+            detail = None
+        resolved_candidates.append((candidate, detail))
     for candidate, detail in resolved_candidates:
         if detail is None:
             skipped.append(candidate)
@@ -1300,10 +1294,6 @@ def _rsi_import_protected_names(candidates: set[str], imported: list[str]) -> se
 
 async def _resolve_imported_ship(candidate: str) -> Any:
     for name in _rsi_import_lookup_candidates(candidate):
-        detail = await state().sources.lookup_ship(name)
-        if detail is not None:
-            return detail
-    for name in _rsi_import_lookup_candidates(candidate):
         results = await state().sources.search_ships(query=name, limit=5)
         if results:
             normalized = _normalize_text(name)
@@ -1317,6 +1307,10 @@ async def _resolve_imported_ship(candidate: str) -> Any:
                 None,
             )
             return exact or results[0]
+    for name in _rsi_import_lookup_candidates(candidate):
+        detail = await state().sources.lookup_ship(name)
+        if detail is not None:
+            return detail
     return None
 
 

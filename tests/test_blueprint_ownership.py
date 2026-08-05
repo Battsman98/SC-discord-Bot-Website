@@ -12,6 +12,7 @@ from src.web import (
     _extract_rsi_pledge_ship_names,
     _rsi_import_lookup_candidates,
     _rsi_import_protected_names,
+    _resolve_imported_ship,
     _ship_basic_info,
     _ship_display_name,
     _ship_image_needs_refresh,
@@ -198,6 +199,25 @@ def test_rsi_sync_protects_canonical_and_display_ship_names() -> None:
     assert "aegis reclaimer" in protected
     assert "reclaimer" in protected
     assert "moth" not in protected
+
+
+def test_rsi_import_resolves_from_fast_ship_search_before_detail_lookup(monkeypatch) -> None:
+    carrack = SimpleNamespace(name="Anvil Carrack")
+
+    class Sources:
+        async def search_ships(self, **_kwargs):
+            return [carrack]
+
+        async def lookup_ship(self, _name):
+            raise AssertionError("detail lookup should not run when search resolves the ship")
+
+    monkeypatch.setattr(
+        web_module,
+        "state",
+        lambda: SimpleNamespace(sources=Sources()),
+    )
+
+    assert asyncio.run(_resolve_imported_ship("Carrack")) is carrack
 
 
 def test_failed_rsi_import_does_not_delete_existing_pledged_ships(monkeypatch) -> None:
