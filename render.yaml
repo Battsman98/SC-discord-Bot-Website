@@ -84,6 +84,7 @@ services:
     autoDeployTrigger: commit
     buildFilter:
       paths:
+        - docs/**
         - data/**
         - src/bot.py
         - src/cache.py
