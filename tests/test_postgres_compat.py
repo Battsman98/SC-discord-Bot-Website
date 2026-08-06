@@ -37,6 +37,14 @@ def test_translate_sqlite_placeholders_and_schema_syntax():
     assert "NOCASE" not in translated
 
 
+def test_nullable_ship_quantity_placeholder_stays_typed_for_postgres():
+    translated = _translate_sql(
+        "quantity = CASE WHEN CAST(? AS BIGINT) IS NULL THEN user_ships.quantity ELSE excluded.quantity END"
+    )
+
+    assert "CAST(%s AS BIGINT) IS NULL" in translated
+
+
 def test_insert_cursor_exposes_postgres_returning_id():
     raw = FakeConnection()
     connection = PostgresConnection(raw)

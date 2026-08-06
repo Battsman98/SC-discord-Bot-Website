@@ -731,7 +731,7 @@ class SQLiteCache:
                 image_url = excluded.image_url,
                 notes = excluded.notes,
                 loaner_for = excluded.loaner_for,
-                quantity = CASE WHEN ? IS NULL THEN user_ships.quantity ELSE excluded.quantity END,
+                quantity = CASE WHEN CAST(? AS BIGINT) IS NULL THEN user_ships.quantity ELSE excluded.quantity END,
                 saved_at = excluded.saved_at
             """,
             (user_id, ship_name, ownership_type, manufacturer, role, source_name, source_url, image_url, notes, loaner_for, quantity, now, quantity),
