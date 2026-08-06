@@ -23,6 +23,7 @@ const outputs = {
   audit: document.querySelector("#auditOutput"),
   visitorAnalytics: document.querySelector("#visitorAnalyticsOutput"),
   gameDataStatus: document.querySelector("#gameDataStatusOutput"),
+  rsiImportHealth: document.querySelector("#rsiImportHealthOutput"),
   intel: document.querySelector("#intelOutput"),
   warbonds: document.querySelector("#warbondOutput"),
 };
@@ -1019,12 +1020,23 @@ async function importRsiPledgesFromBrowser() {
     if (connected.code !== 200) throw new Error("RSI browser connector is not available.");
     outputs.savedShips.innerHTML = stateMessage("Reading ships and vehicles from RSI...");
     const response = await rsiConnect({ action: "importHangar" }, 60000, showRsiImportProgress);
-    if (response.code !== 200) throw new Error(response.error || "RSI hangar import failed.");
+    if (response.code !== 200) {
+      if (response.diagnostics) {
+        await api("/api/me/ships/import/rsi/diagnostics", {
+          method: "POST",
+          body: { diagnostics: response.diagnostics, outcome: `connector_error_${response.code}` },
+        }).catch(() => {});
+      }
+      throw new Error(response.error || "RSI hangar import failed.");
+    }
     const candidates = Array.isArray(response.candidates) ? response.candidates : [];
     if (!candidates.length) throw new Error("No ships or vehicles were found. Make sure you are signed into RSI in this browser.");
     connectorCompleted = true;
     outputs.savedShips.innerHTML = stateMessage("Updating pledged ships...");
-    const result = await api("/api/me/ships/import/rsi", { method: "POST", body: { candidates, authoritative: true } });
+    const result = await api("/api/me/ships/import/rsi", {
+      method: "POST",
+      body: { candidates, authoritative: true, diagnostics: response.diagnostics || null },
+    });
     await loadSavedShips({ quiet: true });
     showRsiImportResult(result);
   } catch (error) {
@@ -1045,7 +1057,7 @@ function connectorInstallPrompt(message) {
       <p>${escapeHtml(message)} Install the local importer once, then click Import RSI Hangar again.</p>
     </div>
     <div class="connector-actions">
-      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.8.zip">Download connector v0.4.8</a>
+      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.9.zip">Download connector v0.4.9</a>
       <button type="button" data-open-extension-help>Install steps</button>
       <button type="button" data-import-rsi-files>Use saved HTML</button>
     </div>
@@ -3506,6 +3518,7 @@ async function loadAudit() {
     ]);
     renderVisitorAnalytics(analytics);
     await loadGameDataStatus();
+    await loadRsiImportHealth();
     renderCards(outputs.audit, events, (event) => card(event.title, [
       ["Action type", auditActionLabel(event.action_type)],
       ["When", dateTime(event.created_at)],
@@ -3817,6 +3830,27 @@ function stateMessage(message) {
 
 function errorMessage(message) {
   return `<div class="error">${escapeHtml(message)}</div>`;
+}
+
+async function loadRsiImportHealth() {
+  if (!currentUser.can_manage_admin || !outputs.rsiImportHealth) return;
+  try {
+    const health = await api("/api/audit/rsi-import-health");
+    const details = [
+      health.connector_version && `Connector ${health.connector_version}`,
+      health.parser_version && `Parser ${health.parser_version}`,
+      health.page_count !== undefined && `Pages ${health.scanned_pages}/${health.page_count}`,
+      health.pledge_count !== undefined && `${health.pledge_count} pledges`,
+      health.typed_candidates !== undefined && `${health.typed_candidates} candidates`,
+      health.imported !== undefined && `${health.imported} imported`,
+      health.fingerprint_changed && "RSI structure changed",
+    ].filter(Boolean).join(" · ");
+    const checked = health.checked_at ? `Checked ${dateTime(health.checked_at)}` : "Waiting for the first diagnostic scan";
+    const className = health.status === "healthy" ? "state" : "error";
+    outputs.rsiImportHealth.innerHTML = `<div class="${className}"><strong>${escapeHtml(String(health.status || "unavailable").toUpperCase())}</strong><p>${escapeHtml(details || health.message || checked)}</p><small>${escapeHtml(checked)}</small></div>`;
+  } catch (error) {
+    outputs.rsiImportHealth.innerHTML = errorMessage(error.message);
+  }
 }
 
 function notifyPotentialHotfix() {

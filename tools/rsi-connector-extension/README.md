@@ -30,4 +30,4 @@ using your existing browser RSI login session. It does not ask for, display, sto
 6. Open [SC Companion](https://sccompanion.org/).
 7. Click `Ships`, then `Import RSI Hangar`.
 
-Version 0.4.8 reports pledge-page scan progress, imports only RSI items explicitly typed as ships or vehicles, and scans additional pages concurrently.
+Version 0.4.9 reports pledge-page scan progress, imports only RSI items explicitly typed as ships or vehicles, and sends privacy-safe parser health metrics and a structural fingerprint to SC Companion.

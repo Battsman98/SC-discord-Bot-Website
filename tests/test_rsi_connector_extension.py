@@ -9,10 +9,12 @@ def test_rsi_connector_reports_paginated_scan_progress() -> None:
     content = (EXTENSION_DIR / "content.js").read_text(encoding="utf-8")
     manifest = (EXTENSION_DIR / "manifest.json").read_text(encoding="utf-8")
 
-    assert '"version": "0.4.8"' in manifest
+    assert '"version": "0.4.9"' in manifest
     assert "function pledgePageCount(pageHTML)" in background
     assert "return [...extractTypedItemShips(pageHTML)]" in background
-    assert "js-pledge-name" not in background
+    assert "function importDiagnostics(scannedPages, pageCount, typedCandidates)" in background
+    assert 'parser_version: "typed-items-v2"' in background
+    assert "markup_fingerprint: fnv1a(structure)" in background
     assert "shipLinks" not in background
     assert "containedShips" not in background
     assert "(?:Standalone Ship|Game Package|Package)" not in background

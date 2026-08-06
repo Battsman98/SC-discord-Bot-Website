@@ -151,6 +151,7 @@ SHIP_LOANERS = {
     "x1 velocity": ["Aurora MR"],
     "zeus mk ii mr": ["Zeus Mk II ES"],
 }
+RSI_IMPORT_HEALTH_KEY = "rsi-import-health:v1"
 SHIP_DISPLAY_PREFIXES = (
     "Aegis ",
     "Anvil ",
@@ -284,10 +285,26 @@ class ShipOwnershipRequest(BaseModel):
     increment: bool = False
 
 
+class RsiImportDiagnostics(BaseModel):
+    connector_version: str = Field(min_length=1, max_length=20)
+    parser_version: str = Field(min_length=1, max_length=40)
+    page_count: int = Field(ge=0, le=25)
+    scanned_pages: int = Field(ge=0, le=25)
+    pledge_count: int = Field(ge=0, le=5000)
+    typed_candidates: int = Field(ge=0, le=500)
+    markup_fingerprint: str = Field(min_length=8, max_length=64)
+
+
 class RsiPledgeImportRequest(BaseModel):
     pages: list[str] = Field(default_factory=list)
     candidates: list[str] = Field(default_factory=list)
     authoritative: bool = False
+    diagnostics: RsiImportDiagnostics | None = None
+
+
+class RsiImportDiagnosticReport(BaseModel):
+    diagnostics: RsiImportDiagnostics
+    outcome: str = Field(min_length=1, max_length=40)
 
 
 class InventoryItemRequest(BaseModel):
@@ -1275,7 +1292,7 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
                 removed.append(ship_name)
             except Exception:
                 logging.exception("Could not remove stale pledged ship %r for user %s", ship_name, user.id)
-    return {
+    result = {
         "status": "imported" if imported else "no_recognized_ships",
         "complete": import_complete,
         "candidates": sorted(candidates, key=str.lower),
@@ -1283,6 +1300,75 @@ async def import_rsi_pledges(request: RsiPledgeImportRequest, user=Depends(requi
         "skipped": sorted(set(skipped), key=str.lower),
         "removed": sorted(set(removed), key=str.lower),
     }
+    if request.diagnostics is not None:
+        await _record_rsi_import_health(
+            request.diagnostics,
+            "success" if imported else "no_recognized_ships",
+            len(result["imported"]),
+            len(result["skipped"]),
+        )
+    return result
+
+
+@app.post("/api/me/ships/import/rsi/diagnostics")
+async def report_rsi_import_diagnostics(
+    request: RsiImportDiagnosticReport,
+    _user=Depends(require_user),
+) -> dict[str, str]:
+    await _record_rsi_import_health(request.diagnostics, request.outcome, 0, 0)
+    return {"status": "recorded"}
+
+
+async def _record_rsi_import_health(
+    diagnostics: RsiImportDiagnostics,
+    outcome: str,
+    imported: int,
+    skipped: int,
+) -> dict[str, Any]:
+    previous = await state().cache.get(RSI_IMPORT_HEALTH_KEY) or {}
+    fingerprint = diagnostics.markup_fingerprint.lower()
+    previous_fingerprint = str(previous.get("markup_fingerprint") or "").lower()
+    fingerprint_changed = bool(previous_fingerprint and fingerprint != previous_fingerprint)
+    scan_complete = diagnostics.page_count > 0 and diagnostics.scanned_pages == diagnostics.page_count
+    healthy = outcome == "success" and scan_complete and diagnostics.typed_candidates > 0 and imported > 0
+    status = "healthy" if healthy else "warning"
+    payload = {
+        "status": status,
+        "checked_at": int(time.time()),
+        "outcome": outcome,
+        "connector_version": diagnostics.connector_version,
+        "parser_version": diagnostics.parser_version,
+        "page_count": diagnostics.page_count,
+        "scanned_pages": diagnostics.scanned_pages,
+        "pledge_count": diagnostics.pledge_count,
+        "typed_candidates": diagnostics.typed_candidates,
+        "imported": imported,
+        "skipped": skipped,
+        "markup_fingerprint": fingerprint,
+        "previous_fingerprint": previous_fingerprint or None,
+        "fingerprint_changed": fingerprint_changed,
+    }
+    await state().cache.set(RSI_IMPORT_HEALTH_KEY, payload, 315360000)
+    if fingerprint_changed or not healthy:
+        title = "RSI Import Markup Changed" if fingerprint_changed else "RSI Import Parser Warning"
+        await state().cache.add_audit_event(
+            title,
+            {
+                "Status": status,
+                "Outcome": outcome,
+                "Connector": diagnostics.connector_version,
+                "Parser": diagnostics.parser_version,
+                "Pages": f"{diagnostics.scanned_pages}/{diagnostics.page_count}",
+                "Pledges": diagnostics.pledge_count,
+                "Candidates": diagnostics.typed_candidates,
+                "Imported": imported,
+                "Skipped": skipped,
+                "Fingerprint": fingerprint,
+                "Previous Fingerprint": previous_fingerprint or "none",
+            },
+            "ships",
+        )
+    return payload
 
 
 def _rsi_import_protected_names(candidates: set[str], imported: list[str]) -> set[str]:
@@ -4260,6 +4346,17 @@ async def audit_recent(
 @app.get("/api/audit/visitors")
 async def audit_visitors(_: None = Depends(require_bot_admin)) -> dict[str, Any]:
     return await state().cache.website_visitor_analytics()
+
+
+@app.get("/api/audit/rsi-import-health")
+async def audit_rsi_import_health(_: None = Depends(require_bot_admin)) -> dict[str, Any]:
+    health = await state().cache.get(RSI_IMPORT_HEALTH_KEY)
+    if health:
+        return health
+    return {
+        "status": "unavailable",
+        "message": "No connector 0.4.9 diagnostic scan has been recorded yet.",
+    }
 
 
 @app.get("/api/game-data/status")

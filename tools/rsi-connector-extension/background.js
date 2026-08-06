@@ -61,6 +61,50 @@ function pledgePageCount(pageHTML) {
   return Math.min(25, count);
 }
 
+function countMatches(value, pattern) {
+  return [...String(value || "").matchAll(pattern)].length;
+}
+
+function fnv1a(value) {
+  let hash = 0x811c9dc5;
+  for (const character of String(value || "")) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+function pageStructure(pageHTML) {
+  return [
+    /\bjs-pledge-name\b/i.test(pageHTML) ? "pledge-name" : "no-pledge-name",
+    /class=["'][^"']*\bkind\b/i.test(pageHTML) ? "kind" : "no-kind",
+    /class=["'][^"']*\btitle\b/i.test(pageHTML) ? "title" : "no-title",
+    /class=["'][^"']*\btitle\b[\s\S]{0,900}class=["'][^"']*\bkind\b/i.test(pageHTML)
+      ? "title-before-kind"
+      : "no-title-before-kind",
+    /class=["'][^"']*\bkind\b[\s\S]{0,900}class=["'][^"']*\btitle\b/i.test(pageHTML)
+      ? "kind-before-title"
+      : "no-kind-before-title",
+  ].join(":");
+}
+
+function importDiagnostics(scannedPages, pageCount, typedCandidates) {
+  const orderedPages = [...scannedPages].sort((left, right) => left.page - right.page);
+  const structure = pageStructure(orderedPages.map((item) => item.payload).join(""));
+  return {
+    connector_version: "0.4.9",
+    parser_version: "typed-items-v2",
+    page_count: pageCount,
+    scanned_pages: orderedPages.length,
+    pledge_count: orderedPages.reduce(
+      (total, item) => total + countMatches(item.payload, /\bjs-pledge-name\b/gi),
+      0,
+    ),
+    typed_candidates: typedCandidates,
+    markup_fingerprint: fnv1a(structure),
+  };
+}
+
 async function importHangar(reportProgress = () => {}) {
   const candidates = new Set();
   let finalURL = "";
@@ -78,6 +122,7 @@ async function importHangar(reportProgress = () => {}) {
   }
   for (const name of extractShipCandidates(response.payload)) candidates.add(name);
   const totalPages = Math.max(1, pledgePageCount(response.payload));
+  const scannedPages = [{ page: 1, payload: response.payload }];
   reportProgress({ page: 1, totalPages, candidates: candidates.size });
 
   let completedPages = 1;
@@ -91,14 +136,16 @@ async function importHangar(reportProgress = () => {}) {
       for (const name of extractShipCandidates(pageResponse.payload)) candidates.add(name);
       completedPages += 1;
       reportProgress({ page: completedPages, totalPages, candidates: candidates.size });
-      return { page };
+      return { page, payload: pageResponse.payload };
     } catch (_error) {
       return { page, error: `RSI pledge page ${page} timed out.` };
     }
   }));
   const failedPage = pageResults.find((result) => result.error);
+  scannedPages.push(...pageResults.filter((result) => result.payload));
+  const diagnostics = importDiagnostics(scannedPages, totalPages, candidates.size);
   if (failedPage) {
-    return { code: 504, error: `${failedPage.error} Reload RSI and try again.` };
+    return { code: 504, error: `${failedPage.error} Reload RSI and try again.`, diagnostics };
   }
   if (!candidates.size) {
     const signedOut = /(?:sign in|log in|login)/i.test(finalURL) || /(?:sign in|log in to your account)/i.test(firstPageHTML);
@@ -106,10 +153,11 @@ async function importHangar(reportProgress = () => {}) {
       code: 422,
       error: signedOut
         ? "RSI redirected to sign-in. Sign into RSI in this Chrome profile, then try again."
-        : "RSI returned the hangar page, but no ship records were recognized. Reload the extension and report this message so the parser can be updated."
+        : "RSI returned the hangar page, but no ship records were recognized. Reload the extension and report this message so the parser can be updated.",
+      diagnostics,
     };
   }
-  return { code: 200, candidates: [...candidates].sort((a, b) => a.localeCompare(b)) };
+  return { code: 200, candidates: [...candidates].sort((a, b) => a.localeCompare(b)), diagnostics };
 }
 
 const ALLOWED_WEBSITE_ORIGINS = new Set([
@@ -154,7 +202,7 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
 async function handleMessage(rawMessage, reportProgress = () => {}) {
   const message = JSON.parse(rawMessage || "{}");
   if (message.action === "connect") {
-    return { code: 200, version: "0.4.8", scope: "ships-and-vehicles-only" };
+    return { code: 200, version: "0.4.9", scope: "ships-and-vehicles-only" };
   }
   if (message.action === "importHangar") {
     return await importHangar(reportProgress);

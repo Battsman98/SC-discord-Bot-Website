@@ -4,6 +4,8 @@ from types import SimpleNamespace
 import src.web as web_module
 from src.cache import SQLiteCache
 from src.web import (
+    RSI_IMPORT_HEALTH_KEY,
+    RsiImportDiagnostics,
     RsiPledgeImportRequest,
     SHIP_LOANERS,
     _blueprint_match_confidence,
@@ -13,12 +15,51 @@ from src.web import (
     _rsi_import_lookup_candidates,
     _rsi_import_protected_names,
     _resolve_imported_ship,
+    _record_rsi_import_health,
     _ship_basic_info,
     _ship_display_name,
     _ship_image_needs_refresh,
     _ship_is_in_concept,
     import_rsi_pledges,
 )
+
+
+def test_rsi_import_health_detects_markup_change_without_page_content(monkeypatch) -> None:
+    class Cache:
+        values = {}
+        events = []
+
+        async def get(self, key):
+            return self.values.get(key)
+
+        async def set(self, key, value, _ttl):
+            self.values[key] = value
+
+        async def add_audit_event(self, title, details, action_type):
+            self.events.append((title, details, action_type))
+
+    cache = Cache()
+    monkeypatch.setattr(web_module, "state", lambda: SimpleNamespace(cache=cache))
+    first = RsiImportDiagnostics(
+        connector_version="0.4.9",
+        parser_version="typed-items-v2",
+        page_count=2,
+        scanned_pages=2,
+        pledge_count=17,
+        typed_candidates=17,
+        markup_fingerprint="12345678",
+    )
+    second = first.model_copy(update={"markup_fingerprint": "abcdef12"})
+
+    healthy = asyncio.run(_record_rsi_import_health(first, "success", 17, 0))
+    changed = asyncio.run(_record_rsi_import_health(second, "success", 17, 0))
+
+    assert healthy["status"] == "healthy"
+    assert changed["fingerprint_changed"] is True
+    assert cache.values[RSI_IMPORT_HEALTH_KEY]["markup_fingerprint"] == "abcdef12"
+    assert cache.events[0][0] == "RSI Import Markup Changed"
+    assert cache.events[0][2] == "ships"
+    assert "html" not in str(cache.values).lower()
 
 
 def test_ship_display_name_removes_manufacturer_prefix() -> None:
