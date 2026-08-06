@@ -216,3 +216,24 @@ def test_mission_search_deduplicates_rewards_and_filters_reputation() -> None:
         "Atlas Blueprint",
         "VK-00 Blueprint",
     ]
+
+
+def test_mission_search_orders_contract_colors_yellow_orange_red() -> None:
+    source = SCCraftToolsSource.__new__(SCCraftToolsSource)
+    source._snapshot = {
+        "missions": [
+            {"mission_id": 1, "name": "Red Level Contract: High Risk", "contractor": "Foxwell"},
+            {"mission_id": 2, "name": "Orange Lvl. Contract: Patrol", "contractor": "Foxwell"},
+            {"mission_id": 3, "name": "Yellow Level Contract: Merc Work", "contractor": "Foxwell"},
+            {"mission_id": 4, "name": "Still Looking for Work?", "contractor": "Foxwell"},
+        ]
+    }
+
+    results = asyncio.run(source.lookup_missions(contractor="Foxwell"))
+
+    assert [result.name for result in results] == [
+        "Yellow Level Contract: Merc Work",
+        "Orange Lvl. Contract: Patrol",
+        "Red Level Contract: High Risk",
+        "Still Looking for Work?",
+    ]

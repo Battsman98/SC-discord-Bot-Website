@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from pathlib import Path
 from urllib.parse import urlencode
@@ -227,11 +228,7 @@ class SCCraftToolsSource:
                 source_name=self.name,
             source_url="",
             ))
-        results.sort(key=lambda item: (
-            self._normalize(item.contractor),
-            item.min_standing_reputation if item.min_standing_reputation is not None else -1,
-            self._normalize(item.name),
-        ))
+        results.sort(key=self._mission_sort_key)
         offset = max(0, page - 1) * limit
         return results[offset:offset + limit]
 
@@ -279,13 +276,22 @@ class SCCraftToolsSource:
                 source_name=self.name,
                 source_url="",
             ))
-        results.sort(key=lambda item: (
-            self._normalize(item.contractor),
-            item.min_standing_reputation if item.min_standing_reputation is not None else -1,
-            self._normalize(item.name),
-        ))
+        results.sort(key=self._mission_sort_key)
         offset = max(0, page - 1) * limit
         return results[offset:offset + limit]
+
+    def _mission_sort_key(self, item: MissionResult) -> tuple:
+        match = re.match(r"^(yellow|orange|red)\s+(?:level|lvl\.?)\s+contract", item.name, re.IGNORECASE)
+        color_rank = {"yellow": 0, "orange": 1, "red": 2}.get(
+            match.group(1).lower() if match else "",
+            3,
+        )
+        return (
+            self._normalize(item.contractor),
+            color_rank,
+            item.min_standing_reputation if item.min_standing_reputation is not None else -1,
+            self._normalize(item.name),
+        )
 
     async def autocomplete_missions(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
         results = await self.lookup_missions(limit=10000)
