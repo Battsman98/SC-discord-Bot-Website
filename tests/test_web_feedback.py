@@ -84,8 +84,10 @@ def test_every_visitor_command_channel_has_a_response_example() -> None:
     assert all(embed.title and "Example" in embed.title for embed in examples.values())
 
     blueprint = examples["blueprints-and-missions"]
-    assert "/blueprint name: Atlas Quantum Drive" in blueprint.description
-    assert "select the `name` option" in blueprint.description
+    assert "/blueprint name: NDB-28 Repeater" in blueprint.description
+    assert "select `name`" in blueprint.description
+    assert "Titanium=750, Gold=820, Lindinium=910" in blueprint.description
+    assert "qualities" in blueprint.description
     assert "/blueprint query:" not in blueprint.description
 
     trade = examples["trade-tools"]

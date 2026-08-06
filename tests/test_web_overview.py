@@ -245,6 +245,14 @@ def test_guide_is_embedded_on_overview_without_a_separate_tab() -> None:
     assert 'data-tab="guide"' not in html
     assert 'data-overview-tab="guide"' not in html
     assert 'overviewPanel.append(standaloneGuide.firstElementChild)' in javascript
+
+
+def test_blueprint_guide_explains_per_material_quality_calculation() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    assert "Material Quality Planner" in html
+    assert "Every material can use a different quality" in html
+    assert "Titanium 750, Gold 820, and Lindinium 910" in html
+    assert "0 to 1000" in html
     assert 'data-tab="commands"' not in html
     assert 'data-overview-tab="commands"' not in html
     assert '<section id="commands"' not in html

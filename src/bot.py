@@ -4040,9 +4040,9 @@ def build_visitor_command_example_embeds() -> dict[str, discord.Embed]:
         ),
         "blueprints-and-missions": _visitor_example_embed(
             "Example Blueprint & Mission Response",
-            "/blueprint name: Atlas Quantum Drive",
-            "Type `/blueprint`, select the `name` option, enter or choose `Atlas Quantum Drive`, then submit. Use `category`, `material`, `mission_type`, or `contractor` only when you want to filter instead of searching by name.",
-            (("Atlas Quantum Drive", "Vehicle component · Size 1 · Blueprint available"), ("Ingredients", "Copper × 12 · Iron × 8 · Tungsten × 4"), ("Mission search", "Type `/mission`, select the `name` option, enter or choose a mission name, then submit. Other mission options filter by region, reputation giver, reputation level, or type.")),
+            "/blueprint name: NDB-28 Repeater qualities: Titanium=750, Gold=820, Lindinium=910",
+            "Type `/blueprint`, select `name`, and choose the blueprint. Add `qualities` to calculate crafted stats. Enter one number, such as `750`, to apply it to every material, or enter comma-separated `Material=quality` pairs to give every required material a different value. Qualities must be from 0 to 1000.",
+            (("NDB-28 Repeater", "Vehicle weapon · Blueprint available"), ("Required materials", "Titanium 0.64 SCU · Gold 0.22 SCU · Lindinium 0.13 SCU"), ("Quality calculation", "Titanium Q750: Integrity +5.0%\nGold Q820: Impact Force +3.2%\nLindinium Q910: Impact Force +4.1%"), ("Command tips", "Use `qualities: 750` for the same quality on all materials. Material names are not case-sensitive. Separate different materials with commas and place `=` between each name and quality."), ("Mission search", "Type `/mission`, select the `name` option, enter or choose a mission name, then submit. Other mission options filter by region, reputation giver, reputation level, or type.")),
         ),
         "item-locator": _visitor_example_embed(
             "Example Item Locator Response",

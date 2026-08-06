@@ -569,6 +569,14 @@
           <section id="guide-blueprints" class="guide-section" hidden>
             <h3>Blueprints</h3>
             <p><strong>Blueprint Search</strong> finds crafting blueprints by item name, category, required material, mission type, contractor, or location. Results can include crafting requirements and mission sources.</p>
+            <p><strong>Material Quality Planner</strong> appears inside a blueprint result when quality-effect data is available. It automatically lists every required material, the amount needed in SCU or units, its crafting slot, and the finished-item stat it affects.</p>
+            <ol>
+              <li>Open <strong>Blueprints</strong> and search for the crafted item, such as <strong>NDB-28 Repeater</strong>.</li>
+              <li>Find <strong>Material Quality Planner</strong> in the result card.</li>
+              <li>Enter a quality from <strong>0 to 1000</strong> beside each required material, or move its slider. Every material can use a different quality.</li>
+              <li>Read the calculated multiplier and percentage change shown for that material's affected stat. A quality of 500 is normally the base value; the displayed blueprint curve is authoritative.</li>
+            </ol>
+            <p>Example: for the NDB-28 Repeater, you can enter Titanium 750, Gold 820, and Lindinium 910. The planner calculates Integrity and Impact Force separately while keeping the required amount beside each entry.</p>
             <p><strong>My Blueprints</strong> keeps your saved collection together. Add or remove blueprints from their result controls and refresh the library after updates.</p>
             <p><strong>Blueprint Import</strong> can capture a shared game window, read uploaded screenshots, or match pasted text. Review matches before saving—image text recognition may need correction when the source is small or blurred.</p>
           </section>
