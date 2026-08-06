@@ -161,6 +161,15 @@ def test_blueprint_missions_link_to_mission_search() -> None:
     assert 'form.requestSubmit()' in javascript
 
 
+def test_blueprint_results_include_material_quality_planner() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    assert "Material Quality Planner" in javascript
+    assert "ingredient.quantity" in javascript
+    assert 'data-quality-slider' in javascript
+    assert 'data-quality-number' in javascript
+    assert "modifier_at_min" in javascript
+
+
 def test_mining_page_includes_original_industry_operation_tools_without_external_links() -> None:
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")

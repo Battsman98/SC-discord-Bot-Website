@@ -2687,6 +2687,7 @@ class MiningSystemSelect(discord.ui.Select):
     material="Optional required material or resource.",
     mission_type="Optional mission type that can award the blueprint.",
     contractor="Optional mission contractor.",
+    qualities="Material qualities, e.g. Titanium=750, Gold=800. One number applies to all.",
 )
 async def blueprint_command(
     interaction: discord.Interaction,
@@ -2695,6 +2696,7 @@ async def blueprint_command(
     material: str | None = None,
     mission_type: str | None = None,
     contractor: str | None = None,
+    qualities: str | None = None,
 ) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
@@ -2703,6 +2705,12 @@ async def blueprint_command(
 
     if not any([name, category, material, mission_type, contractor]):
         await interaction.response.send_message("Add a blueprint name or at least one filter.", ephemeral=True)
+        return
+
+    try:
+        quality_values = _parse_blueprint_qualities(qualities)
+    except ValueError as error:
+        await interaction.response.send_message(str(error), ephemeral=True)
         return
 
     await interaction.response.defer(thinking=True, ephemeral=True)
@@ -2760,6 +2768,7 @@ async def blueprint_command(
                     contractor=contractor,
                     page=1,
                     has_next=has_next,
+                    quality_values=quality_values,
                 ),
                 ephemeral=True,
             )
@@ -2777,6 +2786,7 @@ async def blueprint_command(
                     mission_type,
                     contractor,
                     mission_page=1,
+                    quality_values=quality_values,
                 ),
                 "ephemeral": True,
             }
@@ -2789,13 +2799,14 @@ async def blueprint_command(
                     mission_type,
                     contractor,
                     page=1,
+                    quality_values=quality_values,
                 )
             await interaction.followup.send(**kwargs)
             return
 
         await interaction.followup.send(
             embeds=[
-                build_blueprint_embed(result, lookup_name, category, lookup_material, mission_type, contractor, mission_page=1)
+                build_blueprint_embed(result, lookup_name, category, lookup_material, mission_type, contractor, mission_page=1, quality_values=quality_values)
                 for result in results
             ],
             ephemeral=True,
@@ -2987,8 +2998,9 @@ def _normalize_choice(value: str) -> str:
 
 
 class BlueprintSelect(discord.ui.Select):
-    def __init__(self, results: list[BlueprintResult]) -> None:
+    def __init__(self, results: list[BlueprintResult], quality_values: dict[str, float] | None = None) -> None:
         self.results = results[:25]
+        self.quality_values = quality_values or {}
         options = [
             discord.SelectOption(
                 label=result.name[:100],
@@ -3007,9 +3019,9 @@ class BlueprintSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction) -> None:
         result = self.results[int(self.values[0])]
         has_next = _blueprint_mission_page_count(result.missions) > 1
-        kwargs = {"embed": build_blueprint_embed(result, mission_page=1)}
+        kwargs = {"embed": build_blueprint_embed(result, mission_page=1, quality_values=self.quality_values)}
         if has_next:
-            kwargs["view"] = BlueprintDetailView(result, page=1)
+            kwargs["view"] = BlueprintDetailView(result, page=1, quality_values=self.quality_values)
         else:
             kwargs["view"] = None
         await interaction.response.edit_message(**kwargs)
@@ -3025,6 +3037,7 @@ class BlueprintDetailView(discord.ui.View):
         mission_type: str | None = None,
         contractor: str | None = None,
         page: int = 1,
+        quality_values: dict[str, float] | None = None,
     ) -> None:
         super().__init__(timeout=300)
         self.result = result
@@ -3034,6 +3047,7 @@ class BlueprintDetailView(discord.ui.View):
         self.mission_type = mission_type
         self.contractor = contractor
         self.page = page
+        self.quality_values = quality_values or {}
         self.page_count = _blueprint_mission_page_count(result.missions)
         self.previous_page.disabled = self.page_count <= 1
         self.next_page.disabled = self.page_count <= 1
@@ -3062,6 +3076,7 @@ class BlueprintDetailView(discord.ui.View):
                 self.mission_type,
                 self.contractor,
                 mission_page=page,
+                quality_values=self.quality_values,
             ),
             view=BlueprintDetailView(
                 self.result,
@@ -3071,6 +3086,7 @@ class BlueprintDetailView(discord.ui.View):
                 self.mission_type,
                 self.contractor,
                 page=page,
+                quality_values=self.quality_values,
             ),
         )
 
@@ -3085,6 +3101,7 @@ class BlueprintSelectView(discord.ui.View):
         contractor: str | None = None,
         page: int = 1,
         has_next: bool = False,
+        quality_values: dict[str, float] | None = None,
     ) -> None:
         super().__init__(timeout=300)
         self.category = category
@@ -3093,7 +3110,8 @@ class BlueprintSelectView(discord.ui.View):
         self.contractor = contractor
         self.page = page
         self.has_next = has_next
-        self.add_item(BlueprintSelect(results))
+        self.quality_values = quality_values or {}
+        self.add_item(BlueprintSelect(results, self.quality_values))
         self.previous_page.disabled = page <= 1
         self.next_page.disabled = not has_next
 
@@ -3152,6 +3170,7 @@ class BlueprintSelectView(discord.ui.View):
                 contractor=self.contractor,
                 page=page,
                 has_next=has_next,
+                quality_values=self.quality_values,
             ),
         )
 
@@ -4547,6 +4566,7 @@ def build_blueprint_embed(
     mission_type: str | None = None,
     contractor: str | None = None,
     mission_page: int = 1,
+    quality_values: dict[str, float] | None = None,
 ) -> discord.Embed:
     description = [
         _line("Category", result.category),
@@ -4564,6 +4584,12 @@ def build_blueprint_embed(
         color=discord.Color.dark_gold(),
     )
     embed.add_field(name="Materials", value=_format_blueprint_ingredients(result.ingredients), inline=False)
+    if quality_values:
+        embed.add_field(
+            name="Quality Calculation",
+            value=_format_blueprint_quality_calculation(result.ingredients, quality_values),
+            inline=False,
+        )
     page_count = _blueprint_mission_page_count(result.missions)
     field_name = "Blueprint Missions"
     if page_count > 1:
@@ -4975,7 +5001,62 @@ def _format_blueprint_ingredients(ingredients: list[BlueprintIngredient]) -> str
         unit = ingredient.unit or "SCU"
         slot = f" ({ingredient.slot.title()})" if ingredient.slot else ""
         lines.append(f"{ingredient.name}: {quantity} {unit}{slot}")
+        for effect in ingredient.quality_effects or []:
+            low = (effect.modifier_at_min - 1) * 100
+            high = (effect.modifier_at_max - 1) * 100
+            lines.append(
+                f"  {effect.stat}: Q{effect.quality_min:g} {low:+g}% -> "
+                f"Q{effect.quality_max:g} {high:+g}%"
+            )
     return _limit_lines(lines, 1000)
+
+
+def _parse_blueprint_qualities(value: str | None) -> dict[str, float]:
+    if not value or not value.strip():
+        return {}
+    raw = value.strip()
+    try:
+        shared = float(raw)
+    except ValueError:
+        shared = None
+    if shared is not None:
+        if not 0 <= shared <= 1000:
+            raise ValueError("Blueprint quality must be between 0 and 1000.")
+        return {"*": shared}
+
+    qualities = {}
+    for entry in raw.replace(";", ",").split(","):
+        if not entry.strip():
+            continue
+        if "=" not in entry:
+            raise ValueError("Use `Material=quality`, for example `Titanium=750, Gold=800`.")
+        material, number = (part.strip() for part in entry.split("=", 1))
+        try:
+            quality = float(number)
+        except ValueError as error:
+            raise ValueError(f"Quality for `{material}` must be a number from 0 to 1000.") from error
+        if not material or not 0 <= quality <= 1000:
+            raise ValueError("Every material quality must be between 0 and 1000.")
+        qualities[_normalize_choice(material)] = quality
+    return qualities
+
+
+def _format_blueprint_quality_calculation(
+    ingredients: list[BlueprintIngredient], quality_values: dict[str, float]
+) -> str:
+    lines = []
+    for ingredient in ingredients:
+        quality = quality_values.get(_normalize_choice(ingredient.name), quality_values.get("*"))
+        if quality is None:
+            continue
+        amount = _format_number(ingredient.quantity) if ingredient.quantity is not None else "Unknown"
+        lines.append(f"**{ingredient.name} - {amount} {ingredient.unit or 'SCU'} - Q{quality:g}**")
+        for effect in ingredient.quality_effects or []:
+            span = effect.quality_max - effect.quality_min
+            progress = 1 if span == 0 else max(0, min(1, (quality - effect.quality_min) / span))
+            modifier = effect.modifier_at_min + progress * (effect.modifier_at_max - effect.modifier_at_min)
+            lines.append(f"{effect.stat}: x{modifier:.3f} ({(modifier - 1) * 100:+.1f}%)")
+    return _limit_lines(lines, 1000) if lines else "No entered material names matched this blueprint."
 
 
 def _blueprint_mission_lines(missions: list[BlueprintMission]) -> list[str]:

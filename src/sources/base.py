@@ -112,11 +112,23 @@ class MiningLocationResult:
 
 
 @dataclass(frozen=True)
+class BlueprintQualityEffect:
+    stat: str
+    quality_min: int | float
+    quality_max: int | float
+    modifier_at_min: int | float
+    modifier_at_max: int | float
+    effect_type: str | None = None
+
+
+@dataclass(frozen=True)
 class BlueprintIngredient:
     name: str
     quantity: int | float | None
     unit: str | None
     slot: str | None
+    min_quality: int | float | None = None
+    quality_effects: list[BlueprintQualityEffect] | None = None
 
 
 @dataclass(frozen=True)

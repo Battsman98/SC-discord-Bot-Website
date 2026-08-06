@@ -510,6 +510,15 @@ function renderCards(target, items, renderer) {
   bindSectionToggles(target);
   bindBlueprintButtons(target);
   bindShipButtons(target);
+  target.querySelectorAll("[data-quality-row]").forEach((row) => {
+    updateBlueprintQualityRow(row);
+    row.querySelector("[data-quality-slider]")?.addEventListener("input", () => updateBlueprintQualityRow(row));
+    row.querySelector("[data-quality-number]")?.addEventListener("input", (event) => {
+      const slider = row.querySelector("[data-quality-slider]");
+      slider.value = Math.max(0, Math.min(1000, Number(event.target.value) || 0));
+      updateBlueprintQualityRow(row);
+    });
+  });
 }
 
 function card(title, rows, footer = "") {
@@ -686,7 +695,42 @@ function renderBlueprint(item) {
       const missionName = escapeHtml(mission.name);
       return `${escapeHtml(mission.contractor || "Unknown")}: <a href="#missions" data-mission-link="${escapeAttribute(mission.name)}">${missionName}</a>`;
     }).join("<br>")],
-  ], `<div class="card-actions">${action}</div>`);
+  ], `${blueprintQualityPlanner(item)}<div class="card-actions">${action}</div>`);
+}
+
+function blueprintQualityPlanner(item) {
+  const ingredients = (item.ingredients || []).filter((ingredient) => ingredient.quality_effects?.length);
+  if (!ingredients.length) return "";
+  return `<section class="blueprint-quality-planner">
+    <h4>Material Quality Planner</h4>
+    <p>Adjust each material quality to preview its finished-item stat.</p>
+    ${ingredients.map((ingredient) => {
+      const quality = Math.max(Number(ingredient.min_quality || 0), 500);
+      const amount = `${ingredient.quantity ?? "?"} ${ingredient.unit || "SCU"}`;
+      return `<div class="blueprint-quality-row" data-quality-row>
+        <div><strong>${escapeHtml(ingredient.slot || ingredient.name)}</strong><span>${escapeHtml(ingredient.name)} · ${escapeHtml(amount)}</span></div>
+        <label>Quality <input type="range" min="0" max="1000" step="1" value="${quality}" data-quality-slider><input class="blueprint-quality-number" type="number" min="0" max="1000" step="1" value="${quality}" data-quality-number aria-label="${escapeAttribute(ingredient.name)} quality"></label>
+        <div class="blueprint-quality-effects" data-quality-effects='${escapeAttribute(JSON.stringify(ingredient.quality_effects))}'></div>
+      </div>`;
+    }).join("")}
+  </section>`;
+}
+
+function updateBlueprintQualityRow(row) {
+  const slider = row.querySelector("[data-quality-slider]");
+  const numberInput = row.querySelector("[data-quality-number]");
+  const target = row.querySelector("[data-quality-effects]");
+  if (!slider || !target) return;
+  const quality = Number(slider.value);
+  numberInput.value = quality;
+  const effects = JSON.parse(target.dataset.qualityEffects || "[]");
+  target.innerHTML = effects.map((effect) => {
+    const min = Number(effect.quality_min);
+    const max = Number(effect.quality_max);
+    const progress = max === min ? 1 : Math.max(0, Math.min(1, (quality - min) / (max - min)));
+    const modifier = Number(effect.modifier_at_min) + progress * (Number(effect.modifier_at_max) - Number(effect.modifier_at_min));
+    return `<span>${escapeHtml(effect.stat)} <strong>×${modifier.toFixed(3)} (${((modifier - 1) * 100).toFixed(1)}%)</strong></span>`;
+  }).join("");
 }
 
 function renderBlueprintImportMatches(payload) {

@@ -9,6 +9,7 @@ from src.cache import SQLiteCache
 from src.config import Settings
 from src.sources.base import (
     BlueprintIngredient,
+    BlueprintQualityEffect,
     BlueprintMission,
     BlueprintResult,
     MissionBlueprintReward,
@@ -427,9 +428,32 @@ class SCCraftToolsSource:
                     quantity=self._number_or_none(row.get("quantity_scu")),
                     unit=self._string_or_none(self._first_option_value(row, "unit")) or "SCU",
                     slot=self._string_or_none(row.get("slot")),
+                    min_quality=self._number_or_none(self._first_option_value(row, "min_quality")),
+                    quality_effects=self._parse_quality_effects(row.get("quality_effects")),
                 )
             )
         return ingredients
+
+    def _parse_quality_effects(self, value: object) -> list[BlueprintQualityEffect]:
+        if not isinstance(value, list):
+            return []
+        effects = []
+        for row in value:
+            if not isinstance(row, dict):
+                continue
+            values = [self._number_or_none(row.get(key)) for key in (
+                "quality_min", "quality_max", "modifier_at_min", "modifier_at_max"
+            )]
+            stat = self._string_or_none(row.get("stat"))
+            if any(value is None for value in values) or not stat:
+                continue
+            effects.append(BlueprintQualityEffect(
+                stat=stat,
+                quality_min=values[0], quality_max=values[1],
+                modifier_at_min=values[2], modifier_at_max=values[3],
+                effect_type=self._string_or_none(row.get("type")),
+            ))
+        return effects
 
     def _parse_mission(self, row: dict, missions_by_id: dict) -> BlueprintMission:
         mission_id = str(row.get("mission_id") or "")
@@ -547,7 +571,11 @@ class SCCraftToolsSource:
 
     def _blueprint_to_cache(self, result: BlueprintResult) -> dict:
         data = result.__dict__.copy()
-        data["ingredients"] = [ingredient.__dict__ for ingredient in result.ingredients]
+        data["ingredients"] = []
+        for ingredient in result.ingredients:
+            item = ingredient.__dict__.copy()
+            item["quality_effects"] = [effect.__dict__ for effect in (ingredient.quality_effects or [])]
+            data["ingredients"].append(item)
         data["missions"] = [mission.__dict__ for mission in result.missions]
         return data
 
@@ -556,7 +584,14 @@ class SCCraftToolsSource:
         cached["category"] = self._display_category(cached.get("category"))
         cached.setdefault("component_size", None)
         cached["ingredients"] = [
-            BlueprintIngredient(**ingredient)
+            BlueprintIngredient(**{
+                **ingredient,
+                "quality_effects": [
+                    BlueprintQualityEffect(**effect)
+                    for effect in ingredient.get("quality_effects", [])
+                    if isinstance(effect, dict)
+                ],
+            })
             for ingredient in cached.get("ingredients", [])
             if isinstance(ingredient, dict)
         ]

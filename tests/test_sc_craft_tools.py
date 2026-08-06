@@ -18,7 +18,15 @@ def test_parse_blueprint_includes_materials_and_mission_rep() -> None:
                     "slot": "CASE",
                     "name": "Iron",
                     "quantity_scu": 0.04,
-                    "options": [{"unit": "scu"}],
+                    "options": [{"unit": "scu", "min_quality": 1}],
+                    "quality_effects": [{
+                        "stat": "Integrity",
+                        "quality_min": 0,
+                        "quality_max": 1000,
+                        "modifier_at_min": 0.8,
+                        "modifier_at_max": 1.2,
+                        "type": "multiplicative",
+                    }],
                 }
             ],
             "missions": [
@@ -43,6 +51,9 @@ def test_parse_blueprint_includes_materials_and_mission_rep() -> None:
     assert result.category == "Salvage"
     assert result.ingredients[0].name == "Iron"
     assert result.ingredients[0].quantity == 0.04
+    assert result.ingredients[0].min_quality == 1
+    assert result.ingredients[0].quality_effects[0].stat == "Integrity"
+    assert result.ingredients[0].quality_effects[0].modifier_at_max == 1.2
     assert result.missions[0].contractor == "Adagio Holdings"
     assert result.missions[0].mission_type == "Salvage"
     assert result.missions[0].min_standing_name == "Jr. Contractor"

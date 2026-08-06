@@ -8,6 +8,8 @@ from src.bot import (
     apply_community_mining_locations,
     build_multi_mining_signature_embed,
     _format_blueprint_missions,
+    _format_blueprint_quality_calculation,
+    _parse_blueprint_qualities,
     _format_mining_location_page,
     _mining_multi_search_terms,
     _mining_space_search_terms,
@@ -17,7 +19,31 @@ from src.bot import (
     build_mining_embed,
 )
 from src.cache import SQLiteCache
-from src.sources.base import BlueprintMission, BlueprintResult, MiningLocationResult, MiningSystemLocations
+from src.sources.base import (
+    BlueprintIngredient, BlueprintMission, BlueprintQualityEffect, BlueprintResult,
+    MiningLocationResult, MiningSystemLocations,
+)
+
+
+def test_blueprint_quality_input_parses_shared_and_per_material_values() -> None:
+    assert _parse_blueprint_qualities("750") == {"*": 750}
+    assert _parse_blueprint_qualities("Titanium=750, Gold=800") == {
+        "titanium": 750,
+        "gold": 800,
+    }
+
+
+def test_blueprint_quality_calculation_includes_amount_and_modifier() -> None:
+    ingredient = BlueprintIngredient(
+        name="Titanium", quantity=0.64, unit="SCU", slot="Reinforced Frame",
+        quality_effects=[BlueprintQualityEffect(
+            stat="Integrity", quality_min=0, quality_max=1000,
+            modifier_at_min=0.9, modifier_at_max=1.1,
+        )],
+    )
+    text = _format_blueprint_quality_calculation([ingredient], {"titanium": 750})
+    assert "Titanium - 0.64 SCU - Q750" in text
+    assert "Integrity: x1.050 (+5.0%)" in text
 
 
 class FakeMiningSources:
