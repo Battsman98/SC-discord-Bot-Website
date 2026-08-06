@@ -253,7 +253,10 @@ let inventoryScannerHistory = [];
 let inventoryScannerPendingReview = null;
 let inventoryScannerStatus = "";
 let inventoryScannerInFlight = 0;
-const inventoryScannerMaxInFlight = 1;
+// The web service provisions two OCR workers. Keep both busy so a stopped scan
+// drains its captured frames in parallel instead of making the user wait on a
+// long serial backlog.
+const inventoryScannerMaxInFlight = 2;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];

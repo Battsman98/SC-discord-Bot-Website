@@ -750,6 +750,26 @@ def test_inventory_scanner_gate_rejects_overlapping_scan_for_same_user() -> None
     asyncio.run(run())
 
 
+def test_inventory_scanner_gate_allows_two_parallel_scans_for_same_user() -> None:
+    async def run() -> None:
+        gate = web_module.InventoryScannerGate(worker_count=2, capacity=4)
+        active = 0
+        max_active = 0
+
+        async def scan() -> None:
+            nonlocal active, max_active
+            async with gate.admit(42):
+                active += 1
+                max_active = max(max_active, active)
+                await asyncio.sleep(0.02)
+                active -= 1
+
+        await asyncio.gather(scan(), scan())
+        assert max_active == 2
+
+    asyncio.run(run())
+
+
 def test_inventory_match_prefers_named_multitool_variant_over_generic_item() -> None:
     candidate = 'Pyro RYT "micro tech" Multi-Tool'
     variant = _inventory_match_confidence(candidate, 'Pyro RYT "microTech" Multi-Tool')

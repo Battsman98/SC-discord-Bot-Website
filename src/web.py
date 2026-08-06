@@ -192,26 +192,27 @@ class InventoryScannerGate:
     def __init__(self, worker_count: int = 2, capacity: int = 4) -> None:
         self.worker_count = max(1, worker_count)
         self.capacity = max(self.worker_count, capacity)
+        self.per_user_capacity = min(2, self.worker_count)
         self._workers = asyncio.Semaphore(self.worker_count)
         self._state_lock = asyncio.Lock()
-        self._admitted_users: set[int] = set()
+        self._admitted_users: dict[int, int] = {}
 
     @asynccontextmanager
     async def admit(self, user_id: int):
         scan_id = secrets.token_urlsafe(12)
         async with self._state_lock:
-            if user_id in self._admitted_users:
+            if self._admitted_users.get(user_id, 0) >= self.per_user_capacity:
                 raise HTTPException(
                     status_code=409,
-                    detail="This account already has an inventory scan in progress.",
+                    detail="This account already has the maximum number of inventory scans in progress.",
                 )
-            if len(self._admitted_users) >= self.capacity:
+            if sum(self._admitted_users.values()) >= self.capacity:
                 raise HTTPException(
                     status_code=429,
                     detail="The inventory scanner is busy. Try again in a few seconds.",
                     headers={"Retry-After": "2"},
                 )
-            self._admitted_users.add(user_id)
+            self._admitted_users[user_id] = self._admitted_users.get(user_id, 0) + 1
 
         queued_at = time.perf_counter()
         try:
@@ -219,7 +220,11 @@ class InventoryScannerGate:
                 yield scan_id, round((time.perf_counter() - queued_at) * 1000)
         finally:
             async with self._state_lock:
-                self._admitted_users.discard(user_id)
+                remaining = self._admitted_users.get(user_id, 1) - 1
+                if remaining:
+                    self._admitted_users[user_id] = remaining
+                else:
+                    self._admitted_users.pop(user_id, None)
 
 
 class MiningCommunityRequest(BaseModel):

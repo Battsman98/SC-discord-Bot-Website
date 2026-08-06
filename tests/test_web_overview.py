@@ -533,11 +533,11 @@ def test_live_scanner_preserves_screen_resolution_and_lossless_titles() -> None:
     assert 'new File([blob], "inventory-tooltip.png", { type: "image/png" })' in javascript
 
 
-def test_live_scanner_avoids_ocr_cpu_contention_and_reports_stage_timings() -> None:
+def test_live_scanner_uses_provisioned_ocr_workers_and_reports_stage_timings() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
 
-    assert "inventoryScannerMaxInFlight = 1" in javascript
+    assert "inventoryScannerMaxInFlight = 2" in javascript
     assert "inventoryScannerPendingHashes" in javascript
     assert '"ocr_ms": ocr_ms' in python
     assert '"match_ms": match_ms' in python
