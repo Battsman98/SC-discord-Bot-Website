@@ -2909,8 +2909,17 @@ async def mission_command(
         if not results:
             await interaction.followup.send("No missions found for those filters.", ephemeral=True)
             return
+        filters = {
+            "query": name,
+            "region": region,
+            "contractor": rep_giver,
+            "reputation_level": rep_level,
+            "mission_type": mission_type,
+        }
+        next_results = await bot.sources.lookup_missions(**filters, limit=10, page=2)
         await interaction.followup.send(
             embeds=[build_mission_embed(result) for result in results],
+            view=MissionResultsView(bot.sources, filters, page=1, has_next=bool(next_results)),
             ephemeral=True,
         )
     except Exception:
@@ -2918,6 +2927,43 @@ async def mission_command(
         await interaction.followup.send(
             "Mission lookup hit an internal error. I logged the details so it can be fixed.",
             ephemeral=True,
+        )
+
+
+class MissionResultsView(discord.ui.View):
+    def __init__(self, sources, filters: dict[str, str | None], page: int, has_next: bool) -> None:
+        super().__init__(timeout=300)
+        self.sources = sources
+        self.filters = filters
+        self.page = page
+        self.has_next = has_next
+        self.previous_page.disabled = page <= 1
+        self.next_page.disabled = not has_next
+
+    @discord.ui.button(label="Previous Page", style=discord.ButtonStyle.secondary)
+    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page - 1)
+
+    @discord.ui.button(label="Next Page", style=discord.ButtonStyle.secondary)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page + 1)
+
+    async def _show_page(self, interaction: discord.Interaction, page: int) -> None:
+        page = max(1, page)
+        results = await self.sources.lookup_missions(
+            **self.filters,
+            limit=10,
+            page=page,
+        )
+        if not results:
+            await interaction.response.send_message("No more missions found.", ephemeral=True)
+            return
+        next_results = await self.sources.lookup_missions(**self.filters, limit=10, page=page + 1)
+        await interaction.response.edit_message(
+            embeds=[build_mission_embed(result) for result in results],
+            view=MissionResultsView(self.sources, self.filters, page, bool(next_results)),
         )
 
 

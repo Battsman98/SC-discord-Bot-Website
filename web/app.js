@@ -445,8 +445,7 @@ async function handleForm(action, form) {
     }
     if (action === "missions") {
       setLoading(outputs.missions);
-      const params = queryParams(data, ["query", "region", "contractor", "reputation_level", "mission_type"]);
-      renderCards(outputs.missions, await api(`/api/missions?${params}`), renderMission);
+      await loadMissionResults(form, 1);
     }
     if (action === "items") {
       setLoading(outputs.items);
@@ -1096,6 +1095,33 @@ async function importRsiPledgesFromBrowser() {
     }
   }
 }
+
+async function loadMissionResults(form, page) {
+  const data = Object.fromEntries(new FormData(form).entries());
+  const params = queryParams(data, ["query", "region", "contractor", "reputation_level", "mission_type"]);
+  const pageSize = 25;
+  const items = await api(`/api/missions?${params}&limit=${pageSize}&page=${page}`);
+  renderCards(outputs.missions, items, renderMission);
+  if (!items.length) return;
+  const navigation = document.createElement("div");
+  navigation.className = "card-actions mission-pagination";
+  navigation.innerHTML = `${page > 1 ? '<button type="button" data-mission-page="previous">Previous</button>' : ""}<span>Page ${page}</span>${items.length === pageSize ? '<button type="button" data-mission-page="next">Next</button>' : ""}`;
+  navigation.dataset.currentPage = String(page);
+  outputs.missions.append(navigation);
+}
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-mission-page]");
+  if (!button) return;
+  const navigation = button.closest(".mission-pagination");
+  const currentPage = Number(navigation?.dataset.currentPage || 1);
+  const page = button.dataset.missionPage === "next" ? currentPage + 1 : Math.max(1, currentPage - 1);
+  const form = document.querySelector('form[data-action="missions"]');
+  if (!form) return;
+  setLoading(outputs.missions);
+  await loadMissionResults(form, page);
+  outputs.missions.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 function connectorInstallPrompt(message) {
   return `<div class="connector-prompt">
