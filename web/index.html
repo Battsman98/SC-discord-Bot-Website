@@ -372,6 +372,23 @@
         <button type="submit">Find Lootable Item</button>
       </form>
       <div id="lootItemsOutput" class="results"></div>
+      <form class="panel form wide" id="lootReportForm">
+        <h2>Report a Loot Location</h2>
+        <p class="form-note">Signed-in community reports are reviewed before they affect location confidence.</p>
+        <div class="field-row">
+          <label class="form-field"><span>Lootable item</span><input name="item_name" list="lootItemSuggestions" minlength="2" required></label>
+          <label class="form-field"><span>Point of interest</span><input name="location" placeholder="Jumptown" minlength="2" required></label>
+          <label class="form-field"><span>Planet or moon</span><input name="celestial_body" placeholder="Daymar"></label>
+        </div>
+        <div class="field-row">
+          <label class="form-field"><span>Location type</span><input name="location_type" placeholder="Drug lab, bunker, distribution center"></label>
+          <label class="form-field"><span>Game patch</span><input name="game_version" placeholder="4.9.0"></label>
+          <label class="form-field"><span>Evidence link</span><input name="source_url" type="url" placeholder="Public screenshot, guide, or post"></label>
+        </div>
+        <label class="form-field"><span>What did you see?</span><textarea name="notes" maxlength="1000" placeholder="Container color/type, room, mission, directions, or other useful details"></textarea></label>
+        <button type="submit">Submit for Review</button>
+        <p class="form-note" id="lootReportStatus"></p>
+      </form>
       <div id="itemsOutput" class="results"></div>
     </section>
 

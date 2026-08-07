@@ -38,6 +38,10 @@ def test_items_page_includes_lootable_finder_with_autocomplete_and_uex_links() -
     assert "community_sightings" in javascript
     assert "Approved community sightings" in javascript
     assert '/api/loot/items?query=' in javascript
+    assert 'id="lootReportForm"' in html
+    assert 'name="celestial_body"' in html
+    assert '"/api/loot/reports"' in javascript
+    assert "confidence" in javascript
     assert 'Live prices on UEX' in javascript
 
 

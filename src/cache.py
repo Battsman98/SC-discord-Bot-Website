@@ -231,10 +231,12 @@ class SQLiteCache:
                 item_name TEXT NOT NULL,
                 normalized_item_name TEXT NOT NULL,
                 location TEXT NOT NULL,
+                celestial_body TEXT,
                 location_type TEXT,
                 game_version TEXT,
                 notes TEXT,
                 screenshot_url TEXT,
+                source_url TEXT,
                 reporter_id INTEGER NOT NULL,
                 reporter_name TEXT NOT NULL,
                 guild_id INTEGER,
@@ -264,6 +266,8 @@ class SQLiteCache:
         cls._ensure_column(connection, "user_inventory_items", "volume_scu", "REAL")
         cls._ensure_column(connection, "item_catalog", "class_name", "TEXT")
         cls._ensure_column(connection, "item_catalog", "is_lootable", "INTEGER")
+        cls._ensure_column(connection, "loot_sighting_reports", "celestial_body", "TEXT")
+        cls._ensure_column(connection, "loot_sighting_reports", "source_url", "TEXT")
         cls._ensure_column(connection, "audit_events", "action_type", "TEXT NOT NULL DEFAULT 'other'")
         cls._backfill_audit_action_types(connection)
         connection.commit()
@@ -340,19 +344,21 @@ class SQLiteCache:
         reporter_name: str,
         guild_id: int | None,
         channel_id: int | None,
+        celestial_body: str | None = None,
+        source_url: str | None = None,
     ) -> int:
         normalized = " ".join(item_name.casefold().replace("-", " ").split())
         cursor = self._connection.execute(
             """
             INSERT INTO loot_sighting_reports (
-                item_uuid, item_name, normalized_item_name, location, location_type,
-                game_version, notes, screenshot_url, reporter_id, reporter_name,
+                item_uuid, item_name, normalized_item_name, location, celestial_body, location_type,
+                game_version, notes, screenshot_url, source_url, reporter_id, reporter_name,
                 guild_id, channel_id, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                item_uuid, item_name, normalized, location, location_type, game_version,
-                notes, screenshot_url, reporter_id, reporter_name, guild_id, channel_id,
+                item_uuid, item_name, normalized, location, celestial_body, location_type, game_version,
+                notes, screenshot_url, source_url, reporter_id, reporter_name, guild_id, channel_id,
                 int(time.time()),
             ),
         )
@@ -374,6 +380,51 @@ class SQLiteCache:
             "WHERE normalized_item_name = ? AND status = 'approved' ORDER BY reviewed_at DESC, id DESC LIMIT ?",
             (normalized, max(1, min(limit, 25))),
         )
+
+    async def loot_location_evidence(self, item_name: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Group approved observations into useful, confidence-scored POI evidence."""
+        sightings = await self.approved_loot_sightings(item_name, 25)
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for sighting in sightings:
+            key = " ".join(str(sighting["location"]).casefold().replace("-", " ").split())
+            grouped.setdefault(key, []).append(sighting)
+        evidence: list[dict[str, Any]] = []
+        now = int(time.time())
+        for rows in grouped.values():
+            reporters = {row["reporter_id"] for row in rows}
+            screenshots = sum(bool(row.get("screenshot_url")) for row in rows)
+            sources = sum(bool(row.get("source_url")) for row in rows)
+            latest = max(int(row.get("reviewed_at") or row.get("created_at") or 0) for row in rows)
+            score = 25 + min(45, len(reporters) * 15) + min(10, screenshots * 5) + min(10, sources * 5)
+            if latest and now - latest <= 180 * 86400:
+                score += 10
+            score = min(100, score)
+            confidence = "Confirmed" if score >= 80 else "Likely" if score >= 55 else "Possible"
+            newest = max(rows, key=lambda row: int(row.get("reviewed_at") or 0))
+            location_type = next((row.get("location_type") for row in rows if row.get("location_type")), None)
+            discord_location_type = " · ".join(
+                value for value in (
+                    next((row.get("celestial_body") for row in rows if row.get("celestial_body")), None),
+                    location_type,
+                    f"{confidence} confidence ({len(rows)} report{'s' if len(rows) != 1 else ''})",
+                ) if value
+            )
+            evidence.append({
+                "location": newest["location"],
+                "celestial_body": next((row.get("celestial_body") for row in rows if row.get("celestial_body")), None),
+                "location_type": discord_location_type,
+                "game_version": next((row.get("game_version") for row in rows if row.get("game_version")), None),
+                "confidence": confidence,
+                "confidence_score": score,
+                "report_count": len(rows),
+                "independent_reporters": len(reporters),
+                "evidence_count": screenshots + sources,
+                "latest_confirmed_at": latest,
+                "reviewed_at": latest,
+                "source_urls": list(dict.fromkeys(row["source_url"] for row in rows if row.get("source_url")))[:3],
+            })
+        evidence.sort(key=lambda row: (-row["confidence_score"], -row["report_count"], row["location"].casefold()))
+        return evidence[:max(1, min(limit, 25))]
 
     async def set_loot_sighting_review_message(self, report_id: int, message_id: int) -> None:
         self._connection.execute(
@@ -401,16 +452,16 @@ class SQLiteCache:
     async def _loot_sighting_rows(self, where: str, parameters: tuple[Any, ...]) -> list[dict[str, Any]]:
         rows = self._connection.execute(
             f"""
-            SELECT id, item_uuid, item_name, location, location_type, game_version,
-                   notes, screenshot_url, reporter_id, reporter_name, guild_id, channel_id,
+            SELECT id, item_uuid, item_name, location, celestial_body, location_type, game_version,
+                   notes, screenshot_url, source_url, reporter_id, reporter_name, guild_id, channel_id,
                    status, reviewer_id, reviewer_name, review_message_id, created_at, reviewed_at
             FROM loot_sighting_reports {where}
             """,
             parameters,
         ).fetchall()
         keys = (
-            "id", "item_uuid", "item_name", "location", "location_type", "game_version",
-            "notes", "screenshot_url", "reporter_id", "reporter_name", "guild_id", "channel_id",
+            "id", "item_uuid", "item_name", "location", "celestial_body", "location_type", "game_version",
+            "notes", "screenshot_url", "source_url", "reporter_id", "reporter_name", "guild_id", "channel_id",
             "status", "reviewer_id", "reviewer_name", "review_message_id", "created_at", "reviewed_at",
         )
         return [dict(zip(keys, row)) for row in rows]

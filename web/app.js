@@ -331,6 +331,7 @@ setupStaticInventorySelects();
 setupInventoryCatalogAutocomplete();
 setupInventorySearchEnterKey();
 setupLootItemAutocomplete();
+setupLootReportForm();
 
 function initToolMenus() {
   document.querySelectorAll(".tab-panel").forEach((tab) => {
@@ -790,6 +791,8 @@ function renderLootItem(item) {
       : null,
   ].filter(Boolean).join("<br>") || "No current UEX price average found.";
   const sightings = (item.community_sightings || []).slice(0, 5).map((sighting) => {
+    sighting.location_type = sighting.location_type || sighting.celestial_body;
+    sighting.reviewed_at = sighting.latest_confirmed_at || sighting.reviewed_at;
     const details = [sighting.location_type, sighting.game_version].filter(Boolean).join(" Â· ");
     const approved = sighting.reviewed_at
       ? ` Â· approved ${new Date(Number(sighting.reviewed_at) * 1000).toLocaleDateString()}`
@@ -844,6 +847,28 @@ function setupLootItemAutocomplete() {
   input.addEventListener("input", () => {
     window.clearTimeout(timer);
     timer = window.setTimeout(load, 180);
+  });
+}
+
+function setupLootReportForm() {
+  const form = document.querySelector("#lootReportForm");
+  const status = document.querySelector("#lootReportStatus");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    const values = Object.fromEntries(new FormData(form).entries());
+    button.disabled = true;
+    if (status) status.textContent = "Submitting report…";
+    try {
+      const result = await api("/api/loot/reports", { method: "POST", body: values });
+      form.reset();
+      if (status) status.textContent = `Report #${result.report_id} is waiting for moderator review. Thank you.`;
+    } catch (error) {
+      if (status) status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
   });
 }
 

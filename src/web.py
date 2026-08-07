@@ -235,6 +235,16 @@ class MiningCommunityRequest(BaseModel):
     reported_by: str = "Website"
 
 
+class LootSightingRequest(BaseModel):
+    item_name: str = Field(min_length=2, max_length=160)
+    location: str = Field(min_length=2, max_length=300)
+    celestial_body: str | None = Field(default=None, max_length=100)
+    location_type: str | None = Field(default=None, max_length=100)
+    game_version: str | None = Field(default=None, max_length=50)
+    source_url: str | None = Field(default=None, max_length=1000)
+    notes: str | None = Field(default=None, max_length=1000)
+
+
 class RefineryOrderRequest(BaseModel):
     label: str = Field(min_length=1, max_length=120)
     material: str | None = Field(default=None, max_length=120)
@@ -4161,8 +4171,31 @@ async def loot_item(query: str = Query(min_length=2, max_length=160)) -> dict[st
     if result is None:
         not_found(f"No lootable item found for {query}.")
     payload = encode(result)
-    payload["community_sightings"] = await state().cache.approved_loot_sightings(result.name)
+    payload["community_sightings"] = await state().cache.loot_location_evidence(result.name)
     return payload
+
+
+@app.post("/api/loot/reports")
+async def report_loot_sighting(request: LootSightingRequest, user=Depends(require_user)) -> dict[str, Any]:
+    item = await state().sources.lookup_loot_item(request.item_name)
+    if item is None:
+        not_found(f"No lootable item found for {request.item_name}.")
+    report_id = await state().cache.add_loot_sighting_report(
+        item_uuid=item.uuid,
+        item_name=item.name,
+        location=request.location.strip(),
+        celestial_body=(request.celestial_body or "").strip() or None,
+        location_type=(request.location_type or "").strip() or None,
+        game_version=(request.game_version or item.game_version or "").strip() or None,
+        notes=(request.notes or "").strip() or None,
+        screenshot_url=None,
+        source_url=(request.source_url or "").strip() or None,
+        reporter_id=user.id,
+        reporter_name=user.display_name or user.username,
+        guild_id=None,
+        channel_id=None,
+    )
+    return {"report_id": report_id, "status": "pending"}
 
 
 @app.get("/api/autocomplete/loot-items")

@@ -1367,6 +1367,7 @@ class GameAssistBot(commands.Bot):
         panel.add_field(name="1", value="Do you want to become a member of the community?", inline=False)
         panel.add_field(name="2", value="Will you follow the rules in place?", inline=False)
         panel.add_field(name="3", value="What is your RSI Handle?", inline=False)
+        panel.add_field(name="4", value="What Star Citizen organizations are you a part of?", inline=False)
         panel.set_footer(text="Select Apply for Membership to begin. Your answers are private.")
         message = None
         if isinstance(message_id, int):
@@ -3269,7 +3270,7 @@ async def loot_search_command(interaction: discord.Interaction, name: str) -> No
             ephemeral=True,
         )
         return
-    sightings = await bot.cache.approved_loot_sightings(result.name)
+    sightings = await bot.cache.loot_location_evidence(result.name)
     await interaction.followup.send(embed=build_loot_item_embed(result, sightings), ephemeral=True)
 
 
@@ -3282,6 +3283,60 @@ async def loot_search_autocomplete(
         return []
     names = await bot.sources.autocomplete_loot_items(current)
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
+
+
+@loot_group.command(name="found", description="Quickly report where you found a lootable item.")
+@app_commands.describe(
+    name="Lootable item name.",
+    location="Named point of interest or facility.",
+    celestial_body="Planet or moon, such as Daymar.",
+    screenshot="Optional screenshot showing the item or container.",
+)
+async def loot_found_command(
+    interaction: discord.Interaction,
+    name: str,
+    location: str,
+    celestial_body: str | None = None,
+    screenshot: discord.Attachment | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    if screenshot and not _is_image_attachment(screenshot):
+        await interaction.response.send_message("Evidence must be a PNG, JPG, WEBP, or GIF image.", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    item = await bot.sources.lookup_loot_item(name)
+    if item is None:
+        await interaction.followup.send(f"No lootable item matching `{name}` was found.", ephemeral=True)
+        return
+    report_id = await bot.cache.add_loot_sighting_report(
+        item_uuid=item.uuid,
+        item_name=item.name,
+        location=location.strip()[:300],
+        celestial_body=(celestial_body or "").strip()[:100] or None,
+        location_type=None,
+        game_version=item.game_version,
+        notes=None,
+        screenshot_url=screenshot.url if screenshot else None,
+        reporter_id=interaction.user.id,
+        reporter_name=str(interaction.user),
+        guild_id=interaction.guild_id,
+        channel_id=interaction.channel_id,
+    )
+    report = await bot.cache.loot_sighting_report(report_id)
+    await bot.publish_loot_review(report or {})
+    await interaction.followup.send(
+        f"Thanks ? sighting **#{report_id}** is waiting for Bot Manager review.", ephemeral=True
+    )
+
+
+@loot_found_command.autocomplete("name")
+async def loot_found_autocomplete(
+    interaction: discord.Interaction, current: str,
+) -> list[app_commands.Choice[str]]:
+    return await loot_search_autocomplete(interaction, current)
 
 
 @loot_group.command(name="report", description="Report where you found a lootable item.")
