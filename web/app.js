@@ -270,6 +270,7 @@ let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
 let inventoryScannerLastQueuedHash = "";
 let inventoryScannerLastQueuedContextToken = "";
+let inventoryScannerLastQueuedAt = 0;
 let inventoryScannerLastCountedKey = "";
 let inventoryScannerLastCountedCaptureToken = "";
 let inventoryScannerTitleBox = "";
@@ -2394,6 +2395,7 @@ async function startInventoryScanner() {
   inventoryScannerLastContextHash = "";
   inventoryScannerLastQueuedHash = "";
   inventoryScannerLastQueuedContextToken = "";
+  inventoryScannerLastQueuedAt = 0;
   inventoryScannerLastCountedKey = "";
   inventoryScannerLastCountedCaptureToken = "";
   inventoryScannerTitleBox = "";
@@ -2497,8 +2499,11 @@ async function scanInventoryHover() {
     const alreadyQueued = inventoryScannerPendingHashes.has(captureToken)
       || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken);
     if (alreadyQueued || (!titleChanged && !contextChanged)) return;
-    inventoryScannerLastQueuedHash = capture.hash;
-    inventoryScannerLastQueuedContextToken = contextToken;
+    // Two OCR workers can sustainably process this rate. Do not update the
+    // last hash during the cooldown, so a brief new hover remains eligible on
+    // the next 350 ms capture instead of being silently discarded.
+    if (performance.now() - inventoryScannerLastQueuedAt < 600) return;
+    inventoryScannerLastQueuedAt = performance.now();
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
@@ -2549,6 +2554,10 @@ async function processInventoryScannerCapture(capture) {
   if (payload?.items?.length) {
     inventoryScannerLastHash = capture.hash;
     inventoryScannerLastContextHash = capture.contextHash;
+    // A capture is deduplicated only after OCR succeeds. Transitional frames
+    // that return no item must leave the stable frame eligible for retry.
+    inventoryScannerLastQueuedHash = capture.hash;
+    inventoryScannerLastQueuedContextToken = capture.tileToken || capture.contextHash;
     inventoryScannerEmptyReadStreak = 0;
     const names = payload.items.map((item) => item.name).filter(Boolean);
     inventoryScannerStatus = names.length
@@ -3935,7 +3944,7 @@ function errorMessage(message) {
 }
 
 function inventoryScannerTitleHash(sourceCanvas, titleBox = "") {
-  const fallback = [0.30, 0.235, 0.38, 0.0475];
+  const fallback = [0.30, 0.245, 0.38, 0.0275];
   const values = titleBox
     ? titleBox.split(",").map((value) => Number(value))
     : fallback;
