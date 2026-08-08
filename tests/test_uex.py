@@ -87,6 +87,7 @@ def test_parse_commodity_orders_buy_and_sell_markets() -> None:
                 "planet_name": "ArcCorp",
                 "star_system_name": "Stanton",
                 "game_version": "4.8.1",
+                "date_modified": 1_786_100_000,
             },
             {
                 "terminal_name": "Low Sell Price",
@@ -113,6 +114,7 @@ def test_parse_commodity_orders_buy_and_sell_markets() -> None:
     assert result.buy_from[0].system == "Stanton"
     assert result.buy_from[0].planet == "ArcCorp"
     assert result.buy_from[0].location == "Area 18"
+    assert result.buy_from[0].updated_at == 1_786_100_000
     assert result.sell_to[0].terminal_name == "Low Sell Price"
     assert result.sell_to[0].price == 29500
     assert result.sell_to[0].demand == 100

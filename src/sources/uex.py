@@ -978,6 +978,7 @@ class UEXSource:
             price=row.get(price_key) or row.get(price_key.replace("_avg", "")),
             demand=row.get(demand_key) or row.get(demand_key.replace("_avg", "")) or None,
             game_version=self._string_or_none(row.get("game_version")),
+            updated_at=self._int_or_none(row.get("date_modified") or row.get("date_added")),
         )
 
     def _parse_mining_location_result(self, commodity: dict, html: str, source_url: str) -> MiningLocationResult:

@@ -16,6 +16,7 @@ from src.bot import (
     loot_search_command,
     _allowed_command_channel_id,
     _format_interaction_options,
+    _format_markets,
     _interaction_command_name,
     _message_embed_matches,
     _message_records_deployment,
@@ -25,6 +26,23 @@ from src.bot import (
     inventory_group,
     industry_group,
 )
+from src.sources.base import CommodityMarket
+
+
+def test_commodity_markets_show_location_update_age() -> None:
+    text = _format_markets([
+        CommodityMarket(
+            terminal_name="Admin",
+            system="Stanton",
+            planet="Daymar",
+            location="Jumptown",
+            price=25,
+            demand=100,
+            game_version="4.9.0",
+            updated_at=1_786_100_000,
+        )
+    ])
+    assert "Updated: <t:1786100000:R>" in text
 
 
 def test_deployment_changelog_targets_match_changed_application() -> None:

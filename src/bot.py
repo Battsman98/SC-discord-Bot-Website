@@ -5464,6 +5464,8 @@ def _format_markets(markets: list[CommodityMarket]) -> str:
             f"{index}. {_format_currency(market.price, 'aUEC')}/SCU avg | "
             f"System: {system} | Planet: {planet} | Location: {location} | Demand: {demand}"
         )
+        if market.updated_at:
+            line += f" | Updated: <t:{market.updated_at}:R>"
         candidate = "\n".join([*lines, line])
         if len(candidate) > 1000:
             lines.append("More locations available in UEX.")

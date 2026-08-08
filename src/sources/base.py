@@ -59,6 +59,7 @@ class CommodityMarket:
     price: int | float
     demand: int | float | None
     game_version: str | None
+    updated_at: int | None = None
 
 
 @dataclass(frozen=True)
