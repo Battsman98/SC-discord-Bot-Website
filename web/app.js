@@ -2489,7 +2489,7 @@ async function scanInventoryHover() {
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const contextToken = capture.tileToken || capture.contextHash;
     const captureToken = `${capture.hash}:${contextToken}`;
-    const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 4;
+    const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 7;
     const contextChanged = inventoryScannerCaptureChanged(
       inventoryScannerLastQueuedContextToken,
       contextToken,
@@ -2697,7 +2697,11 @@ async function captureInventoryScannerCrop() {
   canvas.height = targetHeight;
   const context = canvas.getContext("2d");
   context.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  const hash = imageAverageHash(canvas);
+  // Hash the tooltip title band, not the whole shared screen. On a full-screen
+  // capture the title occupies only a few thousand pixels, so ten genuinely
+  // different item names can otherwise produce an almost identical hash and
+  // never enter the OCR queue.
+  const hash = inventoryScannerTitleHash(canvas, requestTitleBox);
   const contextCanvas = document.createElement("canvas");
   contextCanvas.width = 360;
   contextCanvas.height = 540;
@@ -3928,6 +3932,33 @@ function stateMessage(message) {
 
 function errorMessage(message) {
   return `<div class="error">${escapeHtml(message)}</div>`;
+}
+
+function inventoryScannerTitleHash(sourceCanvas, titleBox = "") {
+  const fallback = [0.30, 0.235, 0.38, 0.0475];
+  const values = titleBox
+    ? titleBox.split(",").map((value) => Number(value))
+    : fallback;
+  const valid = values.length === 4
+    && values.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+    && values[2] > 0
+    && values[3] > 0;
+  const [x, y, width, height] = valid ? values : fallback;
+  const titleCanvas = document.createElement("canvas");
+  titleCanvas.width = Math.max(1, Math.round(sourceCanvas.width * width));
+  titleCanvas.height = Math.max(1, Math.round(sourceCanvas.height * height));
+  titleCanvas.getContext("2d").drawImage(
+    sourceCanvas,
+    Math.round(sourceCanvas.width * x),
+    Math.round(sourceCanvas.height * y),
+    titleCanvas.width,
+    titleCanvas.height,
+    0,
+    0,
+    titleCanvas.width,
+    titleCanvas.height,
+  );
+  return imageAverageHash(titleCanvas);
 }
 
 async function loadRsiImportHealth() {
