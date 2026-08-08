@@ -799,6 +799,27 @@ def test_inventory_scanner_rejects_ambiguous_variant_matches_for_review() -> Non
     assert accepted == []
 
 
+def test_live_scanner_sample_uses_local_catalog_for_compact_ocr_titles() -> None:
+    samples = {
+        "GP-xPIndustrial Battery": "GP-XP Industrial Battery",
+        "oLPstorageKeycard": "OLP Storage Keycard",
+        "UEE6th Platoon Medal (Pristine)": "UEE 6th Platoon Medal (Pristine)",
+        "UNEUnification WarMedal(Pristine)": "UNE Unification War Medal (Pristine)",
+    }
+
+    async def run() -> None:
+        for scanned, expected in samples.items():
+            lookups = await _inventory_scanner_lookups(
+                scanned, None, candidate_limit=1, category="Other"
+            )
+            items = await _match_inventory_scanner_text(
+                scanned, "Sample", "Other", 0.88, None, lookups
+            )
+            assert [item["name"] for item in items] == [expected]
+
+    asyncio.run(run())
+
+
 def test_inventory_scanner_reuses_catalog_lookups_for_results_and_diagnostics(monkeypatch) -> None:
     text = "FS-9 LMG\nWeapon\nSize 1\nEffective Range 100 m"
     calls: list[str] = []

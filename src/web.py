@@ -426,8 +426,12 @@ async def lifespan(app: FastAPI):
         _warm_inventory_scanner(sources),
         name="inventory-scanner-warmup",
     )
+    # Do not advertise the service as ready while the OCR engines are still
+    # loading. A request that wins this startup race otherwise pays several
+    # seconds of model initialization and holds one of the scarce scan slots.
+    await app.state.game_assist.scanner_warmup_task
     logging.getLogger("uvicorn.error").info(
-        "Web startup ready in %.3f seconds; inventory scanner warming in background",
+        "Web startup ready in %.3f seconds; inventory scanner warm",
         time.perf_counter() - startup_started,
     )
     try:
@@ -3138,6 +3142,13 @@ def _inventory_scanner_accepted_matches(
                 difflib.SequenceMatcher(
                     None, "".join(candidate_words[:2]), result_words[0]
                 ).ratio(),
+                difflib.SequenceMatcher(
+                    None,
+                    "".join(candidate_words)[:14],
+                    "".join(result_words)[:14],
+                ).ratio()
+                if "".join(candidate_words)[:3] == "".join(result_words)[:3]
+                else 0,
             )
             if family_similarity < 0.70:
                 return []
@@ -3296,6 +3307,38 @@ async def _inventory_lookup_scored_matches(
 ) -> list[tuple[Any, float]]:
     seen: set[str] = set()
     scored: list[tuple[Any, float]] = []
+
+    # Live scans must not depend on PostgreSQL catalog hydration or an upstream
+    # HTTP request. The bundled P4K index is already memory-resident and covers
+    # the scanner's exact-title/alias use case. Keep richer catalog lookup as a
+    # fallback only when local data cannot produce a confident answer.
+    local_results = [
+        *_inventory_scanner_catalog_supplements(candidate),
+        *P4K_INVENTORY_CATALOG.lookup(candidate, limit * 2),
+    ]
+    for result in local_results:
+        key = _normalize_text(getattr(result, "name", ""))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        names = (result.name, *getattr(result, "catalog_aliases", ()))
+        scored.append(
+            (
+                result,
+                max(_inventory_match_confidence(candidate, name) for name in names),
+            )
+        )
+    if quick:
+        ranked_local = sorted(scored, key=lambda item: (-item[1], -len(item[0].name), item[0].name.lower()))
+        ranked_local = [
+            item for item in ranked_local
+            if len(_normalize_text(item[0].name).split()) > 1
+            or not any(
+                other_score >= item[1] and len(_normalize_text(other.name).split()) > 1
+                for other, other_score in ranked_local
+            )
+        ]
+        return ranked_local[:limit]
 
     async def lookup(query: str) -> list[Any]:
         try:
