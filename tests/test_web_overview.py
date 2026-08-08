@@ -584,7 +584,9 @@ def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames
 
     assert "inventoryScannerLastQueuedHash" in javascript
     assert "inventoryScannerLastQueuedContextToken" in javascript
-    assert "const titleChanged = imageHashDistance" in javascript
+    assert "const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 7" in javascript
+    assert "const hash = inventoryScannerTitleHash(canvas, requestTitleBox)" in javascript
+    assert "function inventoryScannerTitleHash" in javascript
     assert "const contextChanged = inventoryScannerCaptureChanged" in javascript
     assert "inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)" in javascript
 
