@@ -69,7 +69,7 @@ class UEXSource:
         normalized_purchase_system = self._normalize(purchase_system) or normalized_system
         normalized_sell_system = self._normalize(sell_system) or normalized_system
         cache_key = (
-            f"uex:commodity:v7:{commodity['name'].lower()}:"
+            f"uex:commodity:v8:{commodity['name'].lower()}:"
             f"buy-{normalized_purchase_system or 'all'}:"
             f"sell-{normalized_sell_system or 'all'}"
         )
