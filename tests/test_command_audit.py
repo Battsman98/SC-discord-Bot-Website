@@ -7,6 +7,7 @@ import discord
 
 from src.config import Settings
 from src.bot import (
+    build_commodity_embed,
     build_inventory_search_embed,
     build_command_channel_directory_embed,
     build_loot_command_example_embed,
@@ -27,6 +28,7 @@ from src.bot import (
     industry_group,
 )
 from src.sources.base import CommodityMarket
+from src.sources.base import CommodityResult
 
 
 def test_commodity_markets_show_location_update_age() -> None:
@@ -43,6 +45,32 @@ def test_commodity_markets_show_location_update_age() -> None:
         )
     ])
     assert "Updated: <t:1786100000:R>" in text
+
+
+def test_commodity_embed_links_to_uex_commodity_page() -> None:
+    result = CommodityResult(
+        name="Gold (Ore)",
+        code="GOLD",
+        kind="Ore",
+        average_buy_price=10,
+        average_sell_price=20,
+        is_illegal=False,
+        is_mineral=True,
+        is_raw=True,
+        is_refined=False,
+        is_harvestable=False,
+        wiki_url=None,
+        buy_from=[],
+        sell_to=[],
+        source_name="UEX",
+    )
+
+    embed = build_commodity_embed(result)
+
+    source = next(field for field in embed.fields if field.name == "Source")
+    assert source.value == (
+        "UEX · [View on UEX](https://uexcorp.space/commodities/info/name/gold-ore/)"
+    )
 
 
 def test_deployment_changelog_targets_match_changed_application() -> None:

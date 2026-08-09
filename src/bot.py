@@ -4599,8 +4599,18 @@ def build_commodity_embed(
             value=_format_commodity_estimate(result, quantity_scu),
             inline=False,
         )
-    embed.set_footer(text=f"Source: {result.source_name}")
+    uex_url = _uex_commodity_url(result.name)
+    embed.add_field(
+        name="Source",
+        value=f"{result.source_name} · [View on UEX]({uex_url})",
+        inline=False,
+    )
     return embed
+
+
+def _uex_commodity_url(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-")
+    return f"https://uexcorp.space/commodities/info/name/{slug}/"
 
 
 def build_mining_embed(
