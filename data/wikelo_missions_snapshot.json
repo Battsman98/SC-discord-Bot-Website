@@ -23,7 +23,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/uninitialized-2"
@@ -95,7 +97,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/adventure-a-a-venture"
@@ -152,7 +156,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 25,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/armor-with-horn-and-string"
@@ -224,7 +230,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 25,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/armor-with-vanduul"
@@ -296,7 +304,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 250,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/asgard-fight-mod"
@@ -328,7 +338,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 20,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/atls-cool-metal-color"
@@ -375,7 +387,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 20,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/atls-orange-line"
@@ -407,7 +421,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 20,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/atls-snowland-color"
@@ -439,7 +455,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/build-a-mod-scorpius"
@@ -486,7 +504,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/built-on-s71-rifle"
@@ -508,7 +528,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/clipper-fight-now"
@@ -539,7 +561,9 @@
         }
       ],
       "rewards": [],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/combat-clothing"
@@ -576,7 +600,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/curious-weapon"
@@ -658,7 +684,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 25,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/do-lava-suit"
@@ -680,7 +708,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/extra-special-wolf"
@@ -717,7 +747,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/f55-look-better"
@@ -754,7 +786,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 250,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/f8-war-mod"
@@ -791,7 +825,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/firebird-mod"
@@ -833,7 +869,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/fix-up-coda-gun"
@@ -860,7 +898,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/fortune-ship-for-you"
@@ -907,7 +947,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/fun-kopion-skull-gun"
@@ -954,7 +996,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/fun-kopion-tooth-gun"
@@ -1001,7 +1045,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/fun-military-skull-gun"
@@ -1048,7 +1094,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/fun-military-tooth-gun"
@@ -1075,7 +1123,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/golem-rocks"
@@ -1112,7 +1162,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/guardian-fight-mod"
@@ -1149,7 +1201,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/guardian-take-down-ship"
@@ -1191,7 +1245,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/guardian-wik-x"
@@ -1222,7 +1278,9 @@
         }
       ],
       "rewards": [],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/heavy-and-bright"
@@ -1269,7 +1327,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/heavy-volt-zapper"
@@ -1336,7 +1396,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 25,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/hide-snow-suit"
@@ -1373,7 +1435,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/hot-shot"
@@ -1440,7 +1504,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/look-at-desert-but-dont-see-you"
@@ -1472,7 +1538,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 20,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/make-a-ursa-mod"
@@ -1509,7 +1577,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 20,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/make-atls-shoot"
@@ -1566,7 +1636,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 25,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/make-glowy-armor"
@@ -1608,7 +1680,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/make-gun-sandy"
@@ -1645,7 +1719,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 20,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/make-jumpy-atls-shoot"
@@ -1712,7 +1788,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/make-space-navy-armor"
@@ -1749,7 +1827,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/make-volt-shotgun-angrier"
@@ -1786,7 +1866,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 250,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/more-than-a-max"
@@ -1833,7 +1915,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/most-special-wolf"
@@ -1885,7 +1969,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 250,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/new-move-big-starlancer-ship"
@@ -2002,7 +2088,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 1000,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/now-make-polaris-short-time-deal"
@@ -2024,7 +2112,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 20,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/noxy-mod"
@@ -2051,7 +2141,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/peregrine-wikelo-mod"
@@ -2098,7 +2190,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/prettify-karna-gun"
@@ -2140,7 +2234,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/prospects-look-good"
@@ -2182,7 +2278,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 250,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/prowler-more-utility"
@@ -2204,7 +2302,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 20,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/pulse-plus"
@@ -2246,7 +2346,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/ready-for-raft"
@@ -2273,7 +2375,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/red-fight-apollo"
@@ -2345,7 +2449,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/red-fight-armor"
@@ -2382,7 +2488,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/red-fight-shotgun"
@@ -2424,7 +2532,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/rsi-meteor-mod"
@@ -2506,7 +2616,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/shiny-builder-suit"
@@ -2543,7 +2655,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 250,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/sneaky-stabber"
@@ -2580,7 +2694,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/sneaky-starfighter-ion"
@@ -2612,7 +2728,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/snow-snipe"
@@ -2729,7 +2847,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/special-idris-for-killing"
@@ -2756,7 +2876,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/spirit-cargo-mod"
@@ -2793,7 +2915,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/starfighter-inferno-special"
@@ -2850,7 +2974,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 500,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/starlifter-a2-war-mod"
@@ -2892,7 +3018,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/suit-up-take-off"
@@ -2964,7 +3092,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 25,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/test-armor"
@@ -2996,7 +3126,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/too-much-gun"
@@ -3018,7 +3150,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/trade-council-scrip-for-favors"
@@ -3040,7 +3174,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/trade-merc-scrip-for-favors"
@@ -3062,7 +3198,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/trade-worm-parts-for-favors"
@@ -3084,7 +3222,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/turn-things-to-favor"
@@ -3111,7 +3251,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/upgrade-intrepid"
@@ -3303,7 +3445,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/very-hungry"
@@ -3345,7 +3489,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/volt-gun-more-navy-like"
@@ -3402,7 +3548,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 25,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/walk-in-danger-look-good"
@@ -3469,7 +3617,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/want-armor-look-like-tree"
@@ -3501,7 +3651,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/want-better-eyes"
@@ -3523,7 +3675,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/want-polaris-need-something-special"
@@ -3560,7 +3714,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 250,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/want-taurus-ship"
@@ -3592,7 +3748,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/what-is-terrapin"
@@ -3629,7 +3787,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/where-wolf-here-wolf"
@@ -3821,7 +3981,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/wikelo-arrive-to-system"
@@ -3858,7 +4020,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/wikelo-navy-f7"
@@ -3905,7 +4069,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/xian-xanthule-suit-made-better"
@@ -3937,7 +4103,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/yormandi-gun"
@@ -3974,7 +4142,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 10,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/your-best-shot"
@@ -4016,7 +4186,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": null,
       "version": "4.9.0-LIVE.12232306",
       "released": false,
       "source_url": "https://api.star-citizen.wiki/missions/zappy-gun-more-woodlike"
@@ -4053,7 +4225,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 100,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/zeus-cargo-special"
@@ -4080,7 +4254,9 @@
           "unit": "item"
         }
       ],
-      "reputation": null,
+      "reputation_required_name": "New Customer",
+      "reputation_required": 0,
+      "reputation_reward": 30,
       "version": "4.9.0-LIVE.12232306",
       "released": true,
       "source_url": "https://api.star-citizen.wiki/missions/zeus-special"

@@ -98,7 +98,9 @@ class WikeloSource:
         return WikeloMissionResult(
             mission_id=str(row.get("mission_id") or ""), name=str(row.get("name") or "Unknown mission"),
             rewards=items("rewards"), requirements=items("requirements"),
-            reputation=row.get("reputation"), version=row.get("version"),
+            reputation_required_name=str(row.get("reputation_required_name") or row.get("reputation") or "New Customer"),
+            reputation_required=row.get("reputation_required") or 0,
+            reputation_reward=row.get("reputation_reward"), version=row.get("version"),
             released=bool(row.get("released")), source_url=str(row.get("source_url") or ""),
         )
 

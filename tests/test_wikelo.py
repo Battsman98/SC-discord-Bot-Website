@@ -9,6 +9,8 @@ def test_wikelo_lookup_searches_rewards_and_formats_requirements(tmp_path) -> No
     snapshot.write_text(json.dumps({"missions": [{
         "mission_id": "abc", "name": "Now make Polaris", "released": True,
         "version": "4.9", "source_url": "https://example.test/mission",
+        "reputation_required_name": "Very Good Customer", "reputation_required": 340,
+        "reputation_reward": 250,
         "rewards": [{"name": "RSI Polaris", "quantity": 1, "unit": "item"}],
         "requirements": [{"name": "Wikelo Favor", "quantity": 30, "unit": "item"},
                          {"name": "Savrilium", "quantity": 48, "unit": "SCU"}],
@@ -17,6 +19,9 @@ def test_wikelo_lookup_searches_rewards_and_formats_requirements(tmp_path) -> No
     assert [result.name for result in results] == ["Now make Polaris"]
     assert results[0].requirements[1].quantity == 48
     assert results[0].requirements[1].unit == "SCU"
+    assert results[0].reputation_required_name == "Very Good Customer"
+    assert results[0].reputation_required == 340
+    assert results[0].reputation_reward == 250
 
 
 def test_current_wikelo_snapshot_has_searchable_offers() -> None:

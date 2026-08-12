@@ -145,6 +145,8 @@ def test_missions_include_wikelo_item_lookup_tab() -> None:
     assert "Wikelo Mission Lookup" in html
     assert "/api/missions/wikelo" in javascript
     assert "Turn in" in javascript
+    assert "Wikelo reputation required" in javascript
+    assert "Wikelo reputation awarded" in javascript
     assert "data-wikelo-suggestion-menu" in html
     assert "Select one of ${suggestions.length} matching items or missions." in javascript
 

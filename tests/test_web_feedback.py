@@ -89,6 +89,8 @@ def test_every_visitor_command_channel_has_a_response_example() -> None:
     assert "Titanium=750, Gold=820, Lindinium=910" in blueprint.description
     assert "qualities" in blueprint.description
     assert "/blueprint query:" not in blueprint.description
+    assert "/wikelo" in "\n".join(field.value for field in blueprint.fields)
+    assert "Wikelo reputation awarded" in "\n".join(field.value for field in blueprint.fields)
 
     trade = examples["trade-tools"]
     assert "investment: 500000" in trade.description

@@ -4194,10 +4194,10 @@ def build_visitor_command_example_embeds() -> dict[str, discord.Embed]:
             (("Net payout", "1,050,000 aUEC"), ("Crew shares", "Alex 350,000 · Bex 350,000 · Cato 350,000"), ("Other tools", "After typing `/industry`, select `refinery` for completion times or `brief` for an operation brief.")),
         ),
         "blueprints-and-missions": _visitor_example_embed(
-            "Example Blueprint & Mission Response",
+            "Example Blueprint, Mission & Wikelo Response",
             "/blueprint name: NDB-28 Repeater qualities: Titanium=750, Gold=820, Lindinium=910",
             "Type `/blueprint`, select `name`, and choose the blueprint. Add `qualities` to calculate crafted stats. Enter one number, such as `750`, to apply it to every material, or enter comma-separated `Material=quality` pairs to give every required material a different value. Qualities must be from 0 to 1000.",
-            (("NDB-28 Repeater", "Vehicle weapon · Blueprint available"), ("Required materials", "Titanium 0.64 SCU · Gold 0.22 SCU · Lindinium 0.13 SCU"), ("Quality calculation", "Titanium Q750: Integrity +5.0%\nGold Q820: Impact Force +3.2%\nLindinium Q910: Impact Force +4.1%"), ("Command tips", "Use `qualities: 750` for the same quality on all materials. Material names are not case-sensitive. Separate different materials with commas and place `=` between each name and quality."), ("Mission search", "Type `/mission`, select the `name` option, enter or choose a mission name, then submit. Other mission options filter by region, reputation giver, reputation level, or type.")),
+            (("NDB-28 Repeater", "Vehicle weapon · Blueprint available"), ("Required materials", "Titanium 0.64 SCU · Gold 0.22 SCU · Lindinium 0.13 SCU"), ("Quality calculation", "Titanium Q750: Integrity +5.0%\nGold Q820: Impact Force +3.2%\nLindinium Q910: Impact Force +4.1%"), ("Command tips", "Use `qualities: 750` for the same quality on all materials. Material names are not case-sensitive. Separate different materials with commas and place `=` between each name and quality."), ("Mission search", "Type `/mission`, select the `name` option, enter or choose a mission name, then submit. Other mission options filter by region, reputation giver, reputation level, or type."), ("Wikelo search", "Type `/wikelo`, select `item`, then choose a reward or mission such as `Golem`. The result shows the mission, turn-in list, required Wikelo reputation, and Wikelo reputation awarded.")),
         ),
         "item-locator": _visitor_example_embed(
             "Example Item Locator Response",
@@ -4963,8 +4963,16 @@ def build_wikelo_embed(result: WikeloMissionResult) -> discord.Embed:
 
     embed.add_field(name="Reward", value=format_items(result.rewards) or "Reward details unavailable", inline=False)
     embed.add_field(name="Turn In", value=format_items(result.requirements) or "No turn-in items listed", inline=False)
-    if result.reputation:
-        embed.add_field(name="Required Reputation", value=result.reputation, inline=True)
+    embed.add_field(
+        name="Wikelo Reputation Required",
+        value=f"{result.reputation_required_name} ({result.reputation_required:g} rep)",
+        inline=True,
+    )
+    embed.add_field(
+        name="Wikelo Reputation Awarded",
+        value=f"+{result.reputation_reward:g} rep" if result.reputation_reward is not None else "No Wikelo reputation awarded",
+        inline=True,
+    )
     embed.add_field(name="Availability", value="Released" if result.released else "Unreleased / verify in game", inline=True)
     embed.set_footer(text="Wikelo Emporium" + (f" | {result.version}" if result.version else ""))
     return embed

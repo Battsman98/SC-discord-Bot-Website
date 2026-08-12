@@ -191,7 +191,9 @@ class WikeloMissionResult:
     name: str
     rewards: list[WikeloRequirement]
     requirements: list[WikeloRequirement]
-    reputation: str | None
+    reputation_required_name: str
+    reputation_required: int | float
+    reputation_reward: int | float | None
     version: str | None
     released: bool
     source_url: str

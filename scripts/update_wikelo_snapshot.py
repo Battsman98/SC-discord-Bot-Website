@@ -33,7 +33,10 @@ async def _detail(session: aiohttp.ClientSession, summary: dict) -> dict:
         "requirements": [_requirement(item) for item in row.get("hauling_orders") or []],
         "rewards": [{"name": item.get("name"), "quantity": item.get("amount") or 1, "unit": "item"}
                     for item in row.get("reward_items") or []],
-        "reputation": row.get("min_standing_name"), "version": row.get("game_version"),
+        "reputation_required_name": row.get("min_standing_name") or "New Customer",
+        "reputation_required": (row.get("min_standing") or {}).get("min_reputation", 0),
+        "reputation_reward": _wikelo_reputation_reward(row),
+        "version": row.get("game_version"),
         "released": bool(row.get("released") and not row.get("not_for_release")),
         "source_url": row.get("web_url"),
     }
@@ -43,6 +46,19 @@ def _requirement(item: dict) -> dict:
     scu = item.get("max_scu") or item.get("min_scu")
     return {"name": item.get("name"), "quantity": scu if scu is not None else (item.get("max_amount") or item.get("min_amount") or 1),
             "unit": "SCU" if scu is not None else "item"}
+
+
+def _wikelo_reputation_reward(row: dict) -> int | float | None:
+    rewards = [
+        item.get("amount")
+        for item in row.get("reputation_gained") or []
+        if item.get("scope") == "Wikelo" or item.get("faction") == "Wikelo Emporium"
+    ]
+    values = [value for value in rewards if isinstance(value, (int, float))]
+    if values:
+        return sum(values)
+    value = row.get("reputation_amount")
+    return value if isinstance(value, (int, float)) else None
 
 
 if __name__ == "__main__":

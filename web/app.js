@@ -942,7 +942,10 @@ function renderWikeloMission(item) {
   return card(item.name, [
     ["Reward", formatItems(item.rewards) || "Reward details unavailable"],
     ["Turn in", formatItems(item.requirements) || "No turn-in items listed"],
-    ["Required reputation", item.reputation || "None"],
+    ["Wikelo reputation required", `${escapeHtml(item.reputation_required_name)} (${number(item.reputation_required)} rep)`],
+    ["Wikelo reputation awarded", item.reputation_reward === null || item.reputation_reward === undefined
+      ? "No Wikelo reputation awarded"
+      : `+${number(item.reputation_reward)} rep`],
     ["Availability", item.released ? "Released" : "Unreleased / verify in game"],
     ["Game version", item.version],
     ["Mission details", item.source_url ? `<a href="${escapeAttribute(item.source_url)}" target="_blank" rel="noopener">View mission data</a>` : null],
