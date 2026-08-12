@@ -1930,6 +1930,16 @@ body.hangar-modal-open {
   justify-items: end;
 }
 
+.wikelo-autocomplete-field {
+  position: relative;
+}
+
+.wikelo-suggestion-menu {
+  margin-top: 0.35rem;
+  position: static;
+  width: 100%;
+}
+
 .rsi-import-progress {
   display: grid;
   gap: 10px;

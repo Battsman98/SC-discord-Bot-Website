@@ -950,25 +950,77 @@ function renderWikeloMission(item) {
 }
 
 function setupWikeloAutocomplete() {
-  const input = document.querySelector('form[data-action="wikelo"] [name="query"]');
+  const form = document.querySelector('form[data-action="wikelo"]');
+  const input = form?.querySelector('[name="query"]');
   const datalist = document.querySelector("#wikeloSuggestions");
-  if (!input || !datalist) return;
+  const menu = form?.querySelector("[data-wikelo-suggestion-menu]");
+  const status = form?.querySelector("[data-wikelo-autocomplete-status]");
+  if (!form || !input || !datalist || !menu) return;
   let timer = null;
+  let suggestions = [];
+  let requestNumber = 0;
+
+  const clearSuggestions = (message = "") => {
+    suggestions = [];
+    requestNumber += 1;
+    datalist.replaceChildren();
+    menu.replaceChildren();
+    menu.hidden = true;
+    if (status) status.textContent = message;
+  };
+
+  const selectSuggestion = (name) => {
+    input.value = name;
+    menu.hidden = true;
+    if (status) status.textContent = `Selected ${name}. Click Find Wikelo Mission to search.`;
+  };
+
+  const renderMenu = () => {
+    menu.replaceChildren(...suggestions.slice(0, 8).map((name) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "inventory-catalog-option";
+      button.textContent = name;
+      button.addEventListener("click", () => selectSuggestion(name));
+      return button;
+    }));
+    menu.hidden = !suggestions.length;
+  };
+
   input.addEventListener("input", () => {
     clearTimeout(timer);
     timer = setTimeout(async () => {
-      if (input.value.trim().length < 2) return datalist.replaceChildren();
+      const query = input.value.trim();
+      if (query.length < 2) {
+        clearSuggestions("Type at least two characters, then select an item or mission.");
+        return;
+      }
+      const currentRequest = ++requestNumber;
       try {
-        const names = await api(`/api/autocomplete/wikelo?query=${encodeURIComponent(input.value.trim())}`);
-        datalist.replaceChildren(...names.map((name) => {
+        const names = await api(`/api/autocomplete/wikelo?query=${encodeURIComponent(query)}`);
+        if (currentRequest !== requestNumber) return;
+        suggestions = names;
+        datalist.replaceChildren(...suggestions.map((name) => {
           const option = document.createElement("option");
           option.value = name;
           return option;
         }));
-      } catch (_) {
-        datalist.replaceChildren();
+        renderMenu();
+        if (status) status.textContent = suggestions.length
+          ? `Select one of ${suggestions.length} matching items or missions.`
+          : "No matching Wikelo items or missions.";
+      } catch (error) {
+        clearSuggestions(`Could not load suggestions: ${error.message}`);
       }
     }, 180);
+  });
+
+  input.addEventListener("focus", () => {
+    if (suggestions.length) menu.hidden = false;
+  });
+
+  form.addEventListener("submit", () => {
+    menu.hidden = true;
   });
 }
 

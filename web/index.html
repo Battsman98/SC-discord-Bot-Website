@@ -347,10 +347,12 @@
       <form class="panel form wide" data-action="wikelo">
         <h2>Wikelo Mission Lookup</h2>
         <p class="form-note">Search by Wikelo reward, mission, or required turn-in item. Results show the offer name and every item you must deposit.</p>
-        <label class="form-field">
+        <label class="form-field wikelo-autocomplete-field">
           <span>Wikelo item or mission</span>
           <input name="query" list="wikeloSuggestions" autocomplete="off" placeholder="Polaris, Wikelo Favor, Red Fight Armor" required>
           <datalist id="wikeloSuggestions"></datalist>
+          <div class="inventory-catalog-menu wikelo-suggestion-menu" data-wikelo-suggestion-menu hidden></div>
+          <small data-wikelo-autocomplete-status>Type at least two characters, then select an item or mission.</small>
         </label>
         <button type="submit">Find Wikelo Mission</button>
       </form>
