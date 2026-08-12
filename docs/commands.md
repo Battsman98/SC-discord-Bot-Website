@@ -294,6 +294,24 @@ Examples:
 /myblueprints name:Quantum Drive
 ```
 
+## `/wikelo`
+
+Finds Wikelo offers by reward item, mission name, or required turn-in item. Results show the mission name, rewards, exact quantities to deposit, reputation requirement, release status, and game version.
+
+Response visibility: private to the user.
+
+| Option | Required | Purpose |
+| --- | --- | --- |
+| `item` | Yes | Wikelo reward, mission, or turn-in item to search for. Autocomplete is available. |
+
+Examples:
+
+```text
+/wikelo item:Polaris
+/wikelo item:Wikelo Favor
+/wikelo item:Red Fight Armor
+```
+
 ## `/trade routing`
 
 Finds Star Citizen circular trade route candidates using UEX data.

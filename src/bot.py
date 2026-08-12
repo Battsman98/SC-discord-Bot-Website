@@ -26,6 +26,7 @@ from src.sources.base import (
     MiningLocationResult,
     MiningSystemLocations,
     MissionResult,
+    WikeloMissionResult,
     ShipResult,
     TradeRouteLeg,
     TradeRouteResult,
@@ -127,6 +128,7 @@ VISITOR_COMMAND_CHANNELS = {
     "blueprint": "blueprints-and-missions",
     "myblueprints": "blueprints-and-missions",
     "mission": "blueprints-and-missions",
+    "wikelo": "blueprints-and-missions",
     "item locator": "item-locator",
     "item search": "item-locator",
     "inventory search": "inventory-search",
@@ -494,6 +496,7 @@ class GameAssistBot(commands.Bot):
         self.tree.add_command(blueprint_command)
         self.tree.add_command(my_blueprints_command)
         self.tree.add_command(mission_command)
+        self.tree.add_command(wikelo_command)
         self.tree.add_command(item_group)
         self.tree.add_command(loot_group)
         self.tree.add_command(inventory_group)
@@ -2897,6 +2900,38 @@ async def my_blueprints_command(
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
+@app_commands.command(name="wikelo", description="Find a Wikelo offer and its required turn-in items.")
+@app_commands.describe(item="Reward item, mission name, or required turn-in item.")
+async def wikelo_command(interaction: discord.Interaction, item: str) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    try:
+        results = await bot.sources.lookup_wikelo(item, limit=10)
+        if not results:
+            await interaction.followup.send("No Wikelo missions found for that item.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            embeds=[build_wikelo_embed(result) for result in results], ephemeral=True,
+        )
+    except Exception:
+        logging.exception("Wikelo command failed")
+        await interaction.followup.send("Wikelo lookup hit an internal error.", ephemeral=True)
+
+
+@wikelo_command.autocomplete("item")
+async def wikelo_autocomplete(
+    interaction: discord.Interaction, current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+    values = await bot.sources.autocomplete_wikelo(current)
+    return [app_commands.Choice(name=value[:100], value=value[:100]) for value in values[:25]]
+
+
 @app_commands.command(name="mission", description="Search Star Citizen missions and blueprint rewards.")
 @app_commands.describe(
     name="Mission name.",
@@ -4913,6 +4948,25 @@ def build_loot_item_embed(
     if result.image_url:
         embed.set_thumbnail(url=result.image_url)
     embed.set_footer(text="Item data: Star Citizen Wiki API • Prices: UEX • Unofficial community tool")
+    return embed
+
+
+def build_wikelo_embed(result: WikeloMissionResult) -> discord.Embed:
+    embed = discord.Embed(title=result.name, color=discord.Color(0xE4A63A), url=result.source_url or None)
+
+    def format_items(items) -> str:
+        lines = []
+        for item in items:
+            quantity = f"{item.quantity:g}" if isinstance(item.quantity, (int, float)) else str(item.quantity)
+            lines.append(f"- {quantity}{' SCU' if item.unit == 'SCU' else 'x'} {item.name}")
+        return "\n".join(lines)[:1024]
+
+    embed.add_field(name="Reward", value=format_items(result.rewards) or "Reward details unavailable", inline=False)
+    embed.add_field(name="Turn In", value=format_items(result.requirements) or "No turn-in items listed", inline=False)
+    if result.reputation:
+        embed.add_field(name="Required Reputation", value=result.reputation, inline=True)
+    embed.add_field(name="Availability", value="Released" if result.released else "Unreleased / verify in game", inline=True)
+    embed.set_footer(text="Wikelo Emporium" + (f" | {result.version}" if result.version else ""))
     return embed
 
 

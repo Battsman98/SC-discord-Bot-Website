@@ -138,6 +138,15 @@ def test_mission_filters_use_persistent_labels_and_database_dropdowns() -> None:
     assert 'api("/api/missions/facets")' in javascript
 
 
+def test_missions_include_wikelo_item_lookup_tab() -> None:
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    assert 'data-action="wikelo"' in html
+    assert "Wikelo Mission Lookup" in html
+    assert "/api/missions/wikelo" in javascript
+    assert "Turn in" in javascript
+
+
 def test_mission_and_blueprint_results_do_not_display_game_file_source() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     blueprint_renderer = javascript.split("function renderBlueprint(item)", 1)[1].split(

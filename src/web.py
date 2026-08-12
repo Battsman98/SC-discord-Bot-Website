@@ -667,6 +667,7 @@ def _website_audit_metadata(method: str, path: str) -> tuple[str, str] | None:
         ("/api/commodities", "trade", "Website Commodity Search"),
         ("/api/trade", "trade", "Website Trade Route Search"),
         ("/api/blueprints", "blueprints", "Website Blueprint Search"),
+        ("/api/missions/wikelo", "blueprints", "Website Wikelo Search"),
         ("/api/missions", "blueprints", "Website Mission Search"),
         ("/api/items", "items", "Website Item Search"),
         ("/api/loot/items", "items", "Website Lootable Item Search"),
@@ -4296,6 +4297,19 @@ async def missions(
         reputation_level=reputation_level, mission_type=mission_type,
         limit=limit, page=page,
     ))
+
+
+@app.get("/api/missions/wikelo")
+async def wikelo_missions(
+    query: str = Query(min_length=1, max_length=120),
+    limit: int = Query(default=25, ge=1, le=25),
+) -> list[dict[str, Any]]:
+    return encode(await state().sources.lookup_wikelo(query, limit))
+
+
+@app.get("/api/autocomplete/wikelo")
+async def autocomplete_wikelo(query: str = "") -> list[str]:
+    return await state().sources.autocomplete_wikelo(query)
 
 
 @app.get("/api/missions/facets")

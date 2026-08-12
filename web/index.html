@@ -344,7 +344,18 @@
         </div>
         <button type="submit">Search Missions</button>
       </form>
+      <form class="panel form wide" data-action="wikelo">
+        <h2>Wikelo Mission Lookup</h2>
+        <p class="form-note">Search by Wikelo reward, mission, or required turn-in item. Results show the offer name and every item you must deposit.</p>
+        <label class="form-field">
+          <span>Wikelo item or mission</span>
+          <input name="query" list="wikeloSuggestions" autocomplete="off" placeholder="Polaris, Wikelo Favor, Red Fight Armor" required>
+          <datalist id="wikeloSuggestions"></datalist>
+        </label>
+        <button type="submit">Find Wikelo Mission</button>
+      </form>
       <div id="missionsOutput" class="results"></div>
+      <div id="wikeloOutput" class="results"></div>
     </section>
 
     <section id="items" class="tab-panel">

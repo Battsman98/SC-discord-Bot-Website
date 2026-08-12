@@ -12,6 +12,7 @@ const outputs = {
   operationBrief: document.querySelector("#operationBriefOutput"),
   crafting: document.querySelector("#craftingOutput"),
   missions: document.querySelector("#missionsOutput"),
+  wikelo: document.querySelector("#wikeloOutput"),
   blueprintImport: document.querySelector("#blueprintImportOutput"),
   savedBlueprints: document.querySelector("#savedBlueprintsOutput"),
   items: document.querySelector("#itemsOutput"),
@@ -332,6 +333,7 @@ setupStaticInventorySelects();
 setupInventoryCatalogAutocomplete();
 setupInventorySearchEnterKey();
 setupLootItemAutocomplete();
+setupWikeloAutocomplete();
 setupLootReportForm();
 
 function initToolMenus() {
@@ -448,6 +450,11 @@ async function handleForm(action, form) {
     if (action === "missions") {
       setLoading(outputs.missions);
       await loadMissionResults(form, 1);
+    }
+    if (action === "wikelo") {
+      setLoading(outputs.wikelo);
+      const items = await api(`/api/missions/wikelo?query=${encodeURIComponent(data.query)}`);
+      renderCards(outputs.wikelo, items, renderWikeloMission);
     }
     if (action === "items") {
       setLoading(outputs.items);
@@ -922,6 +929,47 @@ function renderMission(item) {
     ["Blueprint rewards", rewards || "No blueprint reward in the current dataset"],
     ["Game version", item.version],
   ]);
+}
+
+function renderWikeloMission(item) {
+  const formatItems = (items) => items?.map((entry) => {
+    const quantity = number(entry.quantity);
+    const unit = entry.unit === "SCU" ? " SCU" : `×`;
+    return entry.unit === "SCU"
+      ? `${quantity}${unit} ${escapeHtml(entry.name)}`
+      : `${quantity}${unit} ${escapeHtml(entry.name)}`;
+  }).join("<br>");
+  return card(item.name, [
+    ["Reward", formatItems(item.rewards) || "Reward details unavailable"],
+    ["Turn in", formatItems(item.requirements) || "No turn-in items listed"],
+    ["Required reputation", item.reputation || "None"],
+    ["Availability", item.released ? "Released" : "Unreleased / verify in game"],
+    ["Game version", item.version],
+    ["Mission details", item.source_url ? `<a href="${escapeAttribute(item.source_url)}" target="_blank" rel="noopener">View mission data</a>` : null],
+  ]);
+}
+
+function setupWikeloAutocomplete() {
+  const input = document.querySelector('form[data-action="wikelo"] [name="query"]');
+  const datalist = document.querySelector("#wikeloSuggestions");
+  if (!input || !datalist) return;
+  let timer = null;
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (input.value.trim().length < 2) return datalist.replaceChildren();
+      try {
+        const names = await api(`/api/autocomplete/wikelo?query=${encodeURIComponent(input.value.trim())}`);
+        datalist.replaceChildren(...names.map((name) => {
+          const option = document.createElement("option");
+          option.value = name;
+          return option;
+        }));
+      } catch (_) {
+        datalist.replaceChildren();
+      }
+    }, 180);
+  });
 }
 
 function tradeRouteLocation(system, planet, location, terminal) {
@@ -3858,6 +3906,7 @@ function outputForAction(action) {
   if (action === "operationBrief") return outputs.operationBrief;
   if (action === "blueprints") return outputs.crafting;
   if (action === "missions") return outputs.missions;
+  if (action === "wikelo") return outputs.wikelo;
   if (action === "items") return outputs.items;
   if (action === "lootItems") return outputs.lootItems;
   if (action.startsWith("inventory")) return outputs.inventory;

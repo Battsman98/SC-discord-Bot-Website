@@ -20,6 +20,7 @@ Python Discord bot for collecting information from approved websites/APIs and se
 - `/industry split`, `/industry refinery`, and `/industry brief` plan crew payouts, completion times, and operation posts.
 - `/blueprint` searches crafting blueprints, materials, missions, and rep requirements.
 - `/mission` searches missions by name, region, reputation giver, reputation level, and type.
+- `/wikelo` searches Wikelo rewards and shows the mission name and exact turn-in requirements.
 
 Blueprint and mission searches read only from `data/blueprints_snapshot.json`.
 The running website and Discord bot do not automatically fetch or refresh this

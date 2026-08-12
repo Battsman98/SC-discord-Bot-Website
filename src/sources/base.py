@@ -179,6 +179,25 @@ class MissionResult:
 
 
 @dataclass(frozen=True)
+class WikeloRequirement:
+    name: str
+    quantity: int | float
+    unit: str
+
+
+@dataclass(frozen=True)
+class WikeloMissionResult:
+    mission_id: str
+    name: str
+    rewards: list[WikeloRequirement]
+    requirements: list[WikeloRequirement]
+    reputation: str | None
+    version: str | None
+    released: bool
+    source_url: str
+
+
+@dataclass(frozen=True)
 class ItemPurchaseLocation:
     terminal_name: str
     system: str | None

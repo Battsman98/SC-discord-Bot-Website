@@ -11,6 +11,7 @@ from src.sources.base import (
     LootItemResult,
     LookupResult,
     MissionResult,
+    WikeloMissionResult,
     MiningLocationResult,
     ShipResult,
     TradeRouteResult,
@@ -18,12 +19,14 @@ from src.sources.base import (
 from src.sources.sc_craft_tools import SCCraftToolsSource
 from src.sources.star_citizen_wiki import StarCitizenWikiSource
 from src.sources.uex import UEXSource
+from src.sources.wikelo import WikeloSource
 
 
 class SourceRegistry:
     def __init__(self, sources: list[GameInfoSource], session: aiohttp.ClientSession) -> None:
         self._sources = sources
         self._session = session
+        self._wikelo = WikeloSource()
 
     async def lookup(self, query: str) -> LookupResult | None:
         for source in self._sources:
@@ -31,6 +34,12 @@ class SourceRegistry:
             if result is not None:
                 return result
         return None
+
+    async def lookup_wikelo(self, query: str, limit: int = 25) -> list[WikeloMissionResult]:
+        return await self._wikelo.lookup_wikelo(query, limit)
+
+    async def autocomplete_wikelo(self, query: str, limit: int = 25) -> list[str]:
+        return await self._wikelo.autocomplete_wikelo(query, limit)
 
     async def lookup_ship(self, query: str) -> ShipResult | None:
         for source in self._sources:
@@ -456,6 +465,7 @@ class SourceRegistry:
     async def close(self) -> None:
         for source in self._sources:
             await source.close()
+        await self._wikelo.close()
         await self._session.close()
 
 

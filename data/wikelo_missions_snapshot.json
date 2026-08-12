@@ -1,0 +1,4089 @@
+{
+  "source": "https://api.star-citizen.wiki/api/missions",
+  "missions": [
+    {
+      "mission_id": "e4658c41-7219-4925-8994-b69f8076dda5",
+      "name": "<= UNINITIALIZED =>",
+      "requirements": [
+        {
+          "name": "Basketball",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "R97 \"Crimson Camo\" Shotgun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "R97 Shotgun Magazine (18 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/uninitialized-2"
+    },
+    {
+      "mission_id": "956685c4-0324-4cf8-8a67-fed823254e61",
+      "name": "Adventure a A-Venture",
+      "requirements": [
+        {
+          "name": "Venture Core",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Venture Helmet White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Venture Legs",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "MG Scrip",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Saldynium (Ore)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Jaclium (Ore)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Venture Arms",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Venture Core Ascension",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Venture Arms Ascension",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Venture Legs Ascension",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Venture Helmet Ascension",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/adventure-a-a-venture"
+    },
+    {
+      "mission_id": "eda899b9-c58b-48df-88d9-6b34368af2f2",
+      "name": "Armor with horn and string",
+      "requirements": [
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Core",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Legs",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Arms",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Ana Arms Endro",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Ana Legs Endro",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Ana Core Endro",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Ana Helmet Endro",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/armor-with-horn-and-string"
+    },
+    {
+      "mission_id": "372b0eff-0e55-4654-a3ca-542058cb84cf",
+      "name": "Armor with Vanduul",
+      "requirements": [
+        {
+          "name": "Vanduul Plating",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Vanduul Metal",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Legs Turfwar",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Helmet Turfwar",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Core Turfwar",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Arms Turfwar",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Backpack Turfwar",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Testudo Helmet Clanguard",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Arms Clanguard",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Core Clanguard",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Legs Clanguard",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Testudo Backpack Clanguard",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/armor-with-vanduul"
+    },
+    {
+      "mission_id": "5bf19672-f057-4ccf-bdd4-d309edfeea15",
+      "name": "Asgard Fight Mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-1",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-2",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-3",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-1",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-2",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-3",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-1",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-2",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-3",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Anvil Asgard Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/asgard-fight-mod"
+    },
+    {
+      "mission_id": "2fba83a9-7652-40a7-b761-1cf8651bbc34",
+      "name": "ATLS Cool Metal Color",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Argo ATLS",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "ATLS Cool Metal Color",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/atls-cool-metal-color"
+    },
+    {
+      "mission_id": "1a9c813d-f143-49e6-addf-5d068a456cc5",
+      "name": "ATLS Orange Line",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Quantainium",
+          "quantity": 36,
+          "unit": "SCU"
+        },
+        {
+          "name": "Argo ATLS",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Copper",
+          "quantity": 8,
+          "unit": "SCU"
+        },
+        {
+          "name": "Tungsten",
+          "quantity": 8,
+          "unit": "SCU"
+        },
+        {
+          "name": "Corundum",
+          "quantity": 8,
+          "unit": "SCU"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "ATLS Orange Line",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/atls-orange-line"
+    },
+    {
+      "mission_id": "7649f7a6-e0e0-44b5-87bc-803d6052c9f8",
+      "name": "ATLS Snowland Color",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Argo ATLS",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "ATLS Snowland Color",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/atls-snowland-color"
+    },
+    {
+      "mission_id": "0424e501-e57e-47cb-bada-79f849560b4e",
+      "name": "Build a Mod Scorpius",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "RSI Scorpius Wikelo Sneak Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/build-a-mod-scorpius"
+    },
+    {
+      "mission_id": "4df999a1-93ba-47a4-b498-cfaad7553da3",
+      "name": "Built on S71 rifle",
+      "requirements": [
+        {
+          "name": "Carinite",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Saldynium (Ore)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Jaclium (Ore)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "S71 Rifle",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "S71 \"Ascension\" Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "S71 Rifle Magazine (30 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/built-on-s71-rifle"
+    },
+    {
+      "mission_id": "41231c57-f186-4c5e-ae51-524fc1e1d9a3",
+      "name": "Clipper Fight Now",
+      "requirements": [
+        {
+          "name": "Metamaterial Test #146",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Drake Clipper Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/clipper-fight-now"
+    },
+    {
+      "mission_id": "bd341b1f-3a22-46f2-bedc-b5350b371b1f",
+      "name": "Combat Clothing",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "H4-PBF Ammo Carrier",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "BUL-H4 Armor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "BUL-H4 Helmet",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/combat-clothing"
+    },
+    {
+      "mission_id": "9c4459ac-2527-4024-b8f1-a08081df252a",
+      "name": "Curious Weapon",
+      "requirements": [
+        {
+          "name": "Vanduul Plating",
+          "quantity": 2,
+          "unit": "item"
+        },
+        {
+          "name": "Vanduul Metal",
+          "quantity": 2,
+          "unit": "item"
+        },
+        {
+          "name": "Boomtube Rocket Launcher",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Boomtube \"Clanguard\" Rocket Launcher",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Boomtube Rocket",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/curious-weapon"
+    },
+    {
+      "mission_id": "9d32ff6d-6b62-43d4-8b71-85d50e4154f5",
+      "name": "Do Lava Suit",
+      "requirements": [
+        {
+          "name": "Carinite",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-1",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-2",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-3",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Arms",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Legs",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Backpack",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Core",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Strata Core Heatwave",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Arms Heatwave",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Legs Heatwave",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Helmet Heatwave",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Strata Backpack Heatwave",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/do-lava-suit"
+    },
+    {
+      "mission_id": "d4d26850-d4f4-4549-a0af-a478ee0be480",
+      "name": "Extra Special Wolf",
+      "requirements": [
+        {
+          "name": "Metamaterial Test #146",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Kruger L-22 Alpha Wolf Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/extra-special-wolf"
+    },
+    {
+      "mission_id": "314c16b2-fffd-445d-9bfd-fde1414286cd",
+      "name": "F55 Look Better",
+      "requirements": [
+        {
+          "name": "F55 LMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Eye",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Tongue",
+          "quantity": 2,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "F55 \"Mark I\" LMG",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/f55-look-better"
+    },
+    {
+      "mission_id": "eba10cd5-37dc-440a-8eff-18dbcc5e5d8c",
+      "name": "F8 War Mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 40,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 4,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Anvil F8C Lightning Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/f8-war-mod"
+    },
+    {
+      "mission_id": "1ef81be1-714c-4fea-9185-e7a4c2604256",
+      "name": "Firebird Mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Government Cartography Agency Medal (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Aegis Sabre Firebird Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/firebird-mod"
+    },
+    {
+      "mission_id": "e186dc92-bac2-4298-b011-a68b4d058dc5",
+      "name": "Fix up Coda gun",
+      "requirements": [
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "MG Scrip",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Coda Pistol",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Coda \"Ascension\" Pistol",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Coda Pistol Magazine (6 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/fix-up-coda-gun"
+    },
+    {
+      "mission_id": "7c5bdaa6-ad6a-44b3-a374-796b13ddd5e4",
+      "name": "Fortune ship for you",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "MISC Fortune Wikelo Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/fortune-ship-for-you"
+    },
+    {
+      "mission_id": "31f004c2-9b77-4a0f-a500-89f89b606a96",
+      "name": "Fun Kopion Skull Gun",
+      "requirements": [
+        {
+          "name": "Carinite",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Saldynium (Ore)",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Parallax Energy Assault Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Tundra Kopion Horn",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Jaclium (Ore)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Parallax \"Fun Kopion Skull\" Energy Assault Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Parallax Rifle Battery (80 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/fun-kopion-skull-gun"
+    },
+    {
+      "mission_id": "557fcd28-3ab3-4a5d-84b7-e893b73bd8a4",
+      "name": "Fun Kopion Tooth Gun",
+      "requirements": [
+        {
+          "name": "Carinite",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Saldynium (Ore)",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Parallax Energy Assault Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Tundra Kopion Horn",
+          "quantity": 35,
+          "unit": "item"
+        },
+        {
+          "name": "Jaclium (Ore)",
+          "quantity": 40,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Parallax \"Fun Kopion Tooth\" Energy Assault Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Parallax Rifle Battery (80 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/fun-kopion-tooth-gun"
+    },
+    {
+      "mission_id": "4341c2d8-85b4-4623-8271-eff4480ec674",
+      "name": "Fun Military Skull Gun",
+      "requirements": [
+        {
+          "name": "Carinite",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Saldynium (Ore)",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Parallax Energy Assault Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Juvenile)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Jaclium (Ore)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Parallax \"Fun Military Skull\" Energy Assault Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Parallax Rifle Battery (80 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/fun-military-skull-gun"
+    },
+    {
+      "mission_id": "ba114637-1d33-46e5-b9ba-3834566add0f",
+      "name": "Fun Military Tooth Gun",
+      "requirements": [
+        {
+          "name": "Carinite",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Saldynium (Ore)",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Parallax Energy Assault Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Valakkar Fang (Juvenile)",
+          "quantity": 35,
+          "unit": "item"
+        },
+        {
+          "name": "Jaclium (Ore)",
+          "quantity": 40,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Parallax \"Fun Military Tooth\" Energy Assault Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Parallax Rifle Battery (80 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/fun-military-tooth-gun"
+    },
+    {
+      "mission_id": "5712cdfc-84da-456f-97ed-697c9d04c026",
+      "name": "Golem Rocks",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 2,
+          "unit": "item"
+        },
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 15,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Drake Golem Wikelo Work Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/golem-rocks"
+    },
+    {
+      "mission_id": "684c9209-3dec-4519-a86c-7f49df47d14c",
+      "name": "Guardian Fight Mod",
+      "requirements": [
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AA)",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Wikelo Favor",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Mirai Guardian Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/guardian-fight-mod"
+    },
+    {
+      "mission_id": "1af113f6-5650-4da9-abf3-9676dcaf8a91",
+      "name": "Guardian take down ship",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 25,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AA)",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "UEE 6th Platoon Medal (Pristine)",
+          "quantity": 2,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Mirai Guardian QI Wikelo Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/guardian-take-down-ship"
+    },
+    {
+      "mission_id": "ad595a7c-d314-442b-acce-ea140a56cffd",
+      "name": "Guardian WiK-X",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 25,
+          "unit": "item"
+        },
+        {
+          "name": "Vanduul Plating",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Vanduul Metal",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Large Artifact Fragment (Pristine)",
+          "quantity": 2,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Mirai Guardian MX Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/guardian-wik-x"
+    },
+    {
+      "mission_id": "88bb3702-e20a-42e3-8ba3-328f2333e30c",
+      "name": "Heavy and Bright",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "BUL-H4 Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "BUL-H4 Armor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "H4-PBF Ammo Carrier",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/heavy-and-bright"
+    },
+    {
+      "mission_id": "ab52c274-a29e-4730-a311-917a27191416",
+      "name": "Heavy VOLT Zapper",
+      "requirements": [
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-1",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-2",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-3",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Fresnel Energy LMG",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Fresnel \"Deepwater\" Energy LMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Fresnel Energy LMG Battery (165 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/heavy-volt-zapper"
+    },
+    {
+      "mission_id": "9d32ff6d-6b62-43d4-8b71-85d50e413743",
+      "name": "Hide Snow Suit",
+      "requirements": [
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Armor Arms ASD Edition",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Armor Core ASD Edition",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Armor Helmet ASD Edition",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Armor Legs ASD Edition",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Backpack ASD Edition",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Geist Armor Arms Snow Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Armor Core Snow Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Armor Helmet Snow Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Armor Legs Snow Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Geist Backpack Snow Camo",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/hide-snow-suit"
+    },
+    {
+      "mission_id": "ba4e3db4-0f7d-4692-8b9d-8efe3085e84d",
+      "name": "Hot Shot",
+      "requirements": [
+        {
+          "name": "Carinite",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Bluemoon Fungus",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Tripledown Pistol",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Tripledown \"Heatwave\" Pistol",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Tripledown Pistol Magazine (12 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/hot-shot"
+    },
+    {
+      "mission_id": "dbe950bb-885f-4c12-ad7d-878723bb251c",
+      "name": "Look at desert but don't see you",
+      "requirements": [
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Advocacy Badge (Replica)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Core Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Arms Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Legs Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Helmet Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Wikelo Favor",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "DCP Armor Helmet Hunter Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Core Hunter Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Arms Hunter Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Legs Hunter Camo",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/look-at-desert-but-dont-see-you"
+    },
+    {
+      "mission_id": "5dec704a-de79-4311-88d1-53f9d05db952",
+      "name": "Make a Ursa Mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "Saldynium (Ore)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Jaclium (Ore)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "RSI Ursa Medivac Wikelo Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/make-a-ursa-mod"
+    },
+    {
+      "mission_id": "12926a62-afde-4984-8887-dbe564527192",
+      "name": "Make ATLS shoot",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 2,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Apex)",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Argo ATLS",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "NN-13 Cannon",
+          "quantity": 2,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Argo ATLS IKTI",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/make-atls-shoot"
+    },
+    {
+      "mission_id": "b4a0ba2d-a5f6-496b-bc04-5f0bce49067a",
+      "name": "Make glowy armor",
+      "requirements": [
+        {
+          "name": "Antium Core",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Arms",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Legs",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Bokto Core",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Bokto Arms",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Bokto Legs",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Bokto Helmet",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/make-glowy-armor"
+    },
+    {
+      "mission_id": "6472920a-5588-4378-89a1-b2c5bcbfc75c",
+      "name": "Make gun sandy",
+      "requirements": [
+        {
+          "name": "Council Scrip",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Advocacy Badge (Replica)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Quartz Energy SMG",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Quartz \"Hunter Camo\" Energy SMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Quartz Energy SMG Battery (45 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/make-gun-sandy"
+    },
+    {
+      "mission_id": "7b7cd8d9-d3e4-4f48-b995-487933fd332e",
+      "name": "Make jumpy ATLS shoot",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Argo ATLS GEO",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "NN-13 Cannon",
+          "quantity": 2,
+          "unit": "item"
+        },
+        {
+          "name": "Argo ATLS IKTI",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Argo ATLS GEO IKTI",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/make-jumpy-atls-shoot"
+    },
+    {
+      "mission_id": "82d178e8-e7c1-4436-981c-c51dbaa87f3b",
+      "name": "Make space navy armor",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Grassland Quasi Grazer Egg",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Core Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Arms Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Legs Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Helmet Woodland",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "DCP Armor Helmet Cobalt Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Core Cobalt Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Arms Cobalt Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Legs Cobalt Camo",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/make-space-navy-armor"
+    },
+    {
+      "mission_id": "e404f6c6-997d-4195-8e48-1a8f859398c9",
+      "name": "Make VOLT shotgun angrier",
+      "requirements": [
+        {
+          "name": "Irradiated Valakkar Fang (Adult)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Juvenile)",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Prism Laser Shotgun",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Prism \"Irradiated\" Laser Shotgun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Prism Laser Shotgun Battery (20 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/make-volt-shotgun-angrier"
+    },
+    {
+      "mission_id": "99b90562-4e98-46d2-aa7e-0926bed3bdf8",
+      "name": "More than a Max",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "MISC Starlancer MAX Wikelo Work Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/more-than-a-max"
+    },
+    {
+      "mission_id": "3c839c32-d313-4c13-ade0-eb45b5bdea4b",
+      "name": "Most Special Wolf",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 5,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Antium Helmet Midnight Sun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Core Midnight Sun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Arms Midnight Sun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Antium Legs Midnight Sun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Fresnel \"Deepwater\" Energy LMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Kruger L-21 Wolf Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/most-special-wolf"
+    },
+    {
+      "mission_id": "5c494816-ebc0-46a6-a23c-d463d4b0330d",
+      "name": "New Move Big Starlancer Ship",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "MISC Starlancer TAC Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/new-move-big-starlancer-ship"
+    },
+    {
+      "mission_id": "e05b8ffb-7455-4f24-bbcf-43e9dffc0cca",
+      "name": "Now make Polaris. Short Time Deal.",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Polaris Bit",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Apex)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "MG Scrip",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "UEE 6th Platoon Medal (Pristine)",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-1",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-2",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-3",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-1",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-2",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-3",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-1",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-2",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-3",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "RSI Polaris Wikelo Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/now-make-polaris-short-time-deal"
+    },
+    {
+      "mission_id": "a033aab9-262e-44da-9213-35e225fc828a",
+      "name": "Noxy Mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 4,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Aopoa Nox Wikelo Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/noxy-mod"
+    },
+    {
+      "mission_id": "ade95587-2c0d-433e-87c4-865e7dc80b0c",
+      "name": "Peregrine Wikelo Mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 4,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Aegis Sabre Peregrine Wikelo Speedy Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/peregrine-wikelo-mod"
+    },
+    {
+      "mission_id": "698c51c9-2a49-46c4-baf6-2d1abad7661e",
+      "name": "Prettify Karna Gun",
+      "requirements": [
+        {
+          "name": "Irradiated Valakkar Fang (Juvenile)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Kopion Horn",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Adult)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Karna Rifle",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Karna \"Ascension\" Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Karna Rifle Battery (35 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/prettify-karna-gun"
+    },
+    {
+      "mission_id": "200def0f-c70b-4f05-918f-b3efa7f8590f",
+      "name": "Prospects Look Good",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 6,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Saldynium (Ore)",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Jaclium (Ore)",
+          "quantity": 40,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "MISC Prospector Wikelo Work Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/prospects-look-good"
+    },
+    {
+      "mission_id": "fec1ba32-a1bb-4cfb-adc9-8a2f792544e6",
+      "name": "Prowler More Utility",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 40,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Tongue",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Eye",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Esperia Prowler Utility Wikelo Work Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/prowler-more-utility"
+    },
+    {
+      "mission_id": "7304cb29-5e2a-4d01-80bb-2795b6e789d4",
+      "name": "Pulse Plus",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 4,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Mirai Pulse Wikelo Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/pulse-plus"
+    },
+    {
+      "mission_id": "fec4c8e6-df2f-4775-b8c3-c0e3fb7c35e7",
+      "name": "Ready for RAFT?",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 8,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Adult)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Juvenile)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Kopion Horn",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Argo RAFT Wikelo Work Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/ready-for-raft"
+    },
+    {
+      "mission_id": "af13a863-6d63-4935-bec6-d55d73e44f83",
+      "name": "Red Fight Apollo",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Savrilium",
+          "quantity": 48,
+          "unit": "SCU"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "RSI Apollo Triage Wikelo Sneak Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/red-fight-apollo"
+    },
+    {
+      "mission_id": "05bb00fc-bb90-40a5-bcff-214ff876662b",
+      "name": "Red Fight Armor",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Sadaryx",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Monde Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Monde Core",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Monde Arms",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Monde Legs",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Warden Backpack Monde",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Monde Helmet Crimson Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Monde Core Crimson Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Monde Arms Crimson Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Monde Legs Crimson Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Warden Backpack Crimson Camo",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/red-fight-armor"
+    },
+    {
+      "mission_id": "cc80cd24-2ed0-4e9c-aa10-766e6bbdf3d1",
+      "name": "Red Fight Shotgun",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Sadaryx",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "R97 Shotgun",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "R97 \"Crimson Camo\" Shotgun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "R97 Shotgun Magazine (18 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/red-fight-shotgun"
+    },
+    {
+      "mission_id": "71b27232-bb75-417e-8009-a8b5d9787e5a",
+      "name": "RSI Meteor Mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Vanduul Plating",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Vanduul Metal",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Large Artifact Fragment (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "RSI Meteor Wikelo Sneak Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/rsi-meteor-mod"
+    },
+    {
+      "mission_id": "9d32ff6d-6b62-43d4-8b71-85d50e413745",
+      "name": "Shiny Builder Suit",
+      "requirements": [
+        {
+          "name": "Corbel Core Mire",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Corbel Arms Mire",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Corbel Legs Mire",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Novikov Backpack Mire",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-1",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-2",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-3",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Corbel Helmet Mire",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Corbel Helmet Crush",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Corbel Core Crush",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Corbel Arms Crush",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Corbel Legs Crush",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Novikov Backpack Crush",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/shiny-builder-suit"
+    },
+    {
+      "mission_id": "6357945d-2e51-426f-b183-9c6f84c6a88b",
+      "name": "Sneaky Stabber",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 40,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Anvil F8C Lightning Wikelo Sneak Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/sneaky-stabber"
+    },
+    {
+      "mission_id": "da19d1a7-be72-4fea-803e-880d97ffdbe3",
+      "name": "Sneaky Starfighter Ion",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Eye",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Crusader Ares Star Fighter Ion Wikelo Sneak Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/sneaky-starfighter-ion"
+    },
+    {
+      "mission_id": "ab52c274-a29e-4730-a311-917a271917a8",
+      "name": "Snow Snipe",
+      "requirements": [
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 7,
+          "unit": "item"
+        },
+        {
+          "name": "Zenith Laser Sniper Rifle",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Zenith \"Snow Camo\" Laser Sniper Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Zenith Laser Sniper Rifle Battery (22 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/snow-snipe"
+    },
+    {
+      "mission_id": "77fa8882-e82f-4c97-9cab-a7151758cb99",
+      "name": "Special Idris For Killing",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Polaris Bit",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Apex)",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "MG Scrip",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "UEE 6th Platoon Medal (Pristine)",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-1",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-2",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-PWL-3",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-1",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-2",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-RGL-3",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-1",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-2",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "RCMBNT-XTL-3",
+          "quantity": 5,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Aegis Idris-P Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/special-idris-for-killing"
+    },
+    {
+      "mission_id": "64f01a7a-62c6-42fa-8a62-6b537dfa3668",
+      "name": "Spirit Cargo mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 8,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Crusader C1 Spirit Wikelo Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/spirit-cargo-mod"
+    },
+    {
+      "mission_id": "f7e6a331-3f4c-4400-a4cf-dbd75bffa102",
+      "name": "Starfighter Inferno Special",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Tongue",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "UEE 6th Platoon Medal (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Crusader Ares Star Fighter Inferno Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/starfighter-inferno-special"
+    },
+    {
+      "mission_id": "3b698db0-7623-4210-9653-2025d491ab10",
+      "name": "Starlifter A2 War Mod",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Polaris Bit",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "MG Scrip",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 6,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 6,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 6,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 6,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 6,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Crusader A2 Hercules Starlifter Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/starlifter-a2-war-mod"
+    },
+    {
+      "mission_id": "eae3334f-310a-4213-88e5-b84d248cc083",
+      "name": "Suit Up Take Off",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Tailwind Flight Suit",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Tailwind Flight Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Expired Quantanium Fuel Canister",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Tailwind Flight Suit Dominion Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Tailwind Flight Helmet Dominion Camo",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/suit-up-take-off"
+    },
+    {
+      "mission_id": "318bc17e-1b97-4ba5-a527-0c81076ef811",
+      "name": "Test Armor",
+      "requirements": [
+        {
+          "name": "Yormandi Eye",
+          "quantity": 14,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Tongue",
+          "quantity": 7,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Arms",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Legs",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Core",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Backpack",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Palatino Helmet Mark I",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Arms Mark I",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Legs Mark I",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Core Mark I",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Palatino Backpack Mark I",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/test-armor"
+    },
+    {
+      "mission_id": "a026b45d-6726-4a86-898c-e0207f2880c4",
+      "name": "Too Much Gun",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Vendetta HMG",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Vendetta \"Snow Camo\" HMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Vendetta HMG Magazine (1000 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/too-much-gun"
+    },
+    {
+      "mission_id": "7dfd619c-9977-4788-80bb-5671d221c342",
+      "name": "Trade Council Scrip for Favors?",
+      "requirements": [
+        {
+          "name": "Council Scrip",
+          "quantity": 50,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/trade-council-scrip-for-favors"
+    },
+    {
+      "mission_id": "f6717a7c-115e-4e27-8efe-ec8e01b56487",
+      "name": "Trade Merc Scrip for Favors?",
+      "requirements": [
+        {
+          "name": "MG Scrip",
+          "quantity": 50,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/trade-merc-scrip-for-favors"
+    },
+    {
+      "mission_id": "8743632c-fac2-4b7c-ae11-a48e683f11fa",
+      "name": "Trade Worm Parts for Favors?",
+      "requirements": [
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AA)",
+          "quantity": 12,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/trade-worm-parts-for-favors"
+    },
+    {
+      "mission_id": "1141c381-b38d-47af-b8eb-9b8a35985a8e",
+      "name": "Turn Things to Favor",
+      "requirements": [
+        {
+          "name": "Carinite",
+          "quantity": 50,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/turn-things-to-favor"
+    },
+    {
+      "mission_id": "c55c9f61-84d9-4180-8715-eab2fe524deb",
+      "name": "Upgrade Intrepid",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Government Cartography Agency Medal (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Crusader Intrepid Wikelo Work Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/upgrade-intrepid"
+    },
+    {
+      "mission_id": "2597ef18-f1d5-4d97-bba4-8b6f900ded50",
+      "name": "Very Hungry",
+      "requirements": [
+        {
+          "name": "Berry Blend Smoothie",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Ermer Family Farms Fat Free Ice Cream",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "IAE 2951 Hat Blue",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2951 T-Shirt Blue",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2951 T-Shirt White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2951 Hat White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2951 Hat Blue",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2952 T-shirt Black",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2952 T-shirt Red",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2952 Hat Red",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2953 Hat Purple",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2953 Shirt Purple",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2953 Shirt White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2953 Hat White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 T-Shirt Purple",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 Hat Purple",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 T-Shirt White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 Hat White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 Hat White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 T-Shirt White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Coda \"Ascension\" Pistol",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Coda Pistol Magazine (6 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Karna \"Ascension\" Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Karna Rifle Battery (35 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Demeco \"Red Alert\" LMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Demeco LMG Battery (100 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Gallant \"Red Alert\" Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Gallant Rifle Battery (45 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Ravager-212 \"Red Alert\" Twin Shotgun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Ravager-212 Twin Shotgun Magazine (16 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "P8-SC \"Red Alert\" SMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "P8-SC SMG Magazine (45 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "A03 \"Red Alert\" Sniper Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "A03 Sniper Rifle Magazine (15 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Citrus Beef Burrito",
+          "quantity": 69,
+          "unit": "item"
+        },
+        {
+          "name": "Snaggle Stick (Smoke Daddy)",
+          "quantity": 420,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/very-hungry"
+    },
+    {
+      "mission_id": "e44de29c-a2c3-49ef-864b-03eb7ae466db",
+      "name": "Volt gun more Navy-like",
+      "requirements": [
+        {
+          "name": "MG Scrip",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Grassland Quasi Grazer Egg",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "Quartz Energy SMG",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Quartz \"Cobalt Camo\" Energy SMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Quartz Energy SMG Battery (45 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/volt-gun-more-navy-like"
+    },
+    {
+      "mission_id": "3d432269-ee32-4127-abda-60b30a5c3660",
+      "name": "Walk in danger. Look good.",
+      "requirements": [
+        {
+          "name": "Novikov Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "MG Scrip",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Adult)",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Fang (Juvenile)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Novikov Exploration Suit",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Novikov \"Ascension\" Exploration Suit",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Novikov \"Ascension\" Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Novikov \"Ascension\" Backpack",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/walk-in-danger-look-good"
+    },
+    {
+      "mission_id": "c4c7fa2d-91f5-4171-988b-9003841f4fcd",
+      "name": "Want armor look like tree?",
+      "requirements": [
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Valakkar Fang (Juvenile)",
+          "quantity": 50,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Core Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Arms Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Legs Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "ADP-mk4 Helmet Woodland",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Wikelo Favor",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "DCP Armor Helmet Jungle Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Core Jungle Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Arms Jungle Camo",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "DCP Armor Legs Jungle Camo",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/want-armor-look-like-tree"
+    },
+    {
+      "mission_id": "e7352f49-da6c-45c3-a7f7-6e897d788913",
+      "name": "Want Better Eyes?",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Eye",
+          "quantity": 2,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Tongue",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "XDL \"Mark I\" Monocular Rangefinder",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/want-better-eyes"
+    },
+    {
+      "mission_id": "82a0d506-def3-4ab5-b0e0-8833c7102f34",
+      "name": "Want Polaris? Need something special.",
+      "requirements": [
+        {
+          "name": "Quantainium",
+          "quantity": 24,
+          "unit": "SCU"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Polaris Bit",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/want-polaris-need-something-special"
+    },
+    {
+      "mission_id": "8d7849fe-85c5-4c63-9754-a71bae57792f",
+      "name": "Want Taurus ship",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Irradiated Valakkar Pearl (Grade AAA)",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Government Cartography Agency Medal (Pristine)",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "RSI Constellation Taurus Wikelo War Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/want-taurus-ship"
+    },
+    {
+      "mission_id": "94bdfda2-a4d9-4d1a-877b-68518eedf320",
+      "name": "What is Terrapin?",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "ASD Secure Drive",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Anvil Terrapin Medic Wikelo Savior Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/what-is-terrapin"
+    },
+    {
+      "mission_id": "758e6b6a-f89e-4721-ae9e-1ec27d7b2f97",
+      "name": "Where Wolf? Here Wolf",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Vanduul Plating",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Vanduul Metal",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Large Artifact Fragment (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Kruger L-21 Wolf Wikelo Sneak Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/where-wolf-here-wolf"
+    },
+    {
+      "mission_id": "028d7a46-bd97-4e32-a5bf-0b1775f05e1c",
+      "name": "Wikelo Arrive to System",
+      "requirements": [
+        {
+          "name": "Vestal Water",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Tundra Kopion Horn",
+          "quantity": 3,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "IAE 2951 Hat Blue",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2951 T-Shirt Blue",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2951 T-Shirt White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2951 Hat White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2951 Hat Blue",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2952 T-shirt Black",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2952 T-shirt Red",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2952 Hat Red",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2953 Hat Purple",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2953 Shirt Purple",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2953 Shirt White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2953 Hat White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 T-Shirt Purple",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 Hat Purple",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 T-Shirt White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 Hat White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 Hat White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "IAE 2954 T-Shirt White",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Coda \"Ascension\" Pistol",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Coda Pistol Magazine (6 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Karna \"Ascension\" Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Karna Rifle Battery (35 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Demeco \"Red Alert\" LMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Demeco LMG Battery (100 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Gallant \"Red Alert\" Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Gallant Rifle Battery (45 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Ravager-212 \"Red Alert\" Twin Shotgun",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Ravager-212 Twin Shotgun Magazine (16 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "P8-SC \"Red Alert\" SMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "P8-SC SMG Magazine (45 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "A03 \"Red Alert\" Sniper Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "A03 Sniper Rifle Magazine (15 cap)",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Citrus Beef Burrito",
+          "quantity": 69,
+          "unit": "item"
+        },
+        {
+          "name": "Snaggle Stick (Smoke Daddy)",
+          "quantity": 420,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/wikelo-arrive-to-system"
+    },
+    {
+      "mission_id": "c63d9c5a-5e25-49da-8254-b78706abea86",
+      "name": "Wikelo Navy F7",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 16,
+          "unit": "item"
+        },
+        {
+          "name": "DCHS-05 Orbital Positioning Comp-Board",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Government Cartography Agency Medal (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Anvil F7 Hornet Mk Wikelo",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/wikelo-navy-f7"
+    },
+    {
+      "mission_id": "2453dcac-761d-4f95-8783-d31106fcfe1e",
+      "name": "Xi'an Xanthule Suit made better",
+      "requirements": [
+        {
+          "name": "Xanthule Flight Helmet",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Tevarin War Service Marker (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "MG Scrip",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Xanthule Flight Suit",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Xanthule Ascension Flight Suit",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Xanthule Ascension Flight Helmet",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/xian-xanthule-suit-made-better"
+    },
+    {
+      "mission_id": "8df7d9a9-c887-4302-b93c-863788bdca01",
+      "name": "Yormandi Gun",
+      "requirements": [
+        {
+          "name": "Yormandi Eye",
+          "quantity": 6,
+          "unit": "item"
+        },
+        {
+          "name": "Yormandi Tongue",
+          "quantity": 3,
+          "unit": "item"
+        },
+        {
+          "name": "Fresnel Energy LMG",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Fresnel \"Yormandi\" Energy LMG",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/yormandi-gun"
+    },
+    {
+      "mission_id": "dcc744eb-e9c5-4364-a1d2-9b39864baecf",
+      "name": "Your Best Shot",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Killshot Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Expired Quantanium Fuel Canister",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Killshot \"Dominion Camo\" Rifle",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Killshot Rifle Magazine (45 Cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/your-best-shot"
+    },
+    {
+      "mission_id": "f986a67a-76bb-4f19-9c84-d2d6db0bd755",
+      "name": "Zappy gun more woodlike",
+      "requirements": [
+        {
+          "name": "MG Scrip",
+          "quantity": 30,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 5,
+          "unit": "item"
+        },
+        {
+          "name": "Tundra Kopion Horn",
+          "quantity": 35,
+          "unit": "item"
+        },
+        {
+          "name": "Quartz Energy SMG",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "Quartz \"Jungle Camo\" Energy SMG",
+          "quantity": 1,
+          "unit": "item"
+        },
+        {
+          "name": "Quartz Energy SMG Battery (45 cap)",
+          "quantity": 20,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": false,
+      "source_url": "https://api.star-citizen.wiki/missions/zappy-gun-more-woodlike"
+    },
+    {
+      "mission_id": "c3722ee0-4f40-4232-acab-6f254a1d0e25",
+      "name": "Zeus Cargo Special",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 20,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite",
+          "quantity": 15,
+          "unit": "item"
+        },
+        {
+          "name": "Ace Interceptor Helmet",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "Carinite (Pure)",
+          "quantity": 2,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "RSI Zeus Mk II CL",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/zeus-cargo-special"
+    },
+    {
+      "mission_id": "69db67eb-05b6-49cd-bf41-83831f993142",
+      "name": "Zeus Special",
+      "requirements": [
+        {
+          "name": "Wikelo Favor",
+          "quantity": 10,
+          "unit": "item"
+        },
+        {
+          "name": "UEE 6th Platoon Medal (Pristine)",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "rewards": [
+        {
+          "name": "RSI Zeus Mk II ES Wikelo Work Special",
+          "quantity": 1,
+          "unit": "item"
+        }
+      ],
+      "reputation": null,
+      "version": "4.9.0-LIVE.12232306",
+      "released": true,
+      "source_url": "https://api.star-citizen.wiki/missions/zeus-special"
+    }
+  ]
+}
