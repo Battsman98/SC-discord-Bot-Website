@@ -39,16 +39,22 @@ def test_best_warbond_source_uses_closest_eligible_ship() -> None:
     }
 
 
-def test_active_warbonds_are_limited_to_the_curated_rsi_verified_set() -> None:
-    source = WarbondTrackerSource.__new__(WarbondTrackerSource)
-    verified = {name: {"title": offer["name"]} for name, offer in source.ACTIVE_OFFERS.items()}
+def test_active_warbonds_come_from_the_newest_live_price_cohort() -> None:
+    prices = {
+        "old": {"vehicle_name": "Old Sale", "price": 200, "price_warbond": 180, "on_sale": 1, "game_version": "4.8.0", "date_modified": 30},
+        "newer": {"vehicle_name": "Newer", "price": 425, "price_warbond": 385, "on_sale": 1, "game_version": "4.8.2", "date_modified": 50},
+        "newest": {"vehicle_name": "Newest", "price": 400, "price_warbond": 360, "on_sale": 1, "game_version": "4.8.2", "date_modified": 60},
+        "not-sale": {"vehicle_name": "Unavailable", "price": 300, "price_warbond": 275, "on_sale": 0, "game_version": "4.9.0", "date_modified": 70},
+        "not-discounted": {"vehicle_name": "Standard", "price": 100, "price_warbond": 0, "on_sale": 1, "game_version": "4.9.0", "date_modified": 80},
+    }
 
-    rows = source._active_rows({}, verified)
+    rows = WarbondTrackerSource._active_rows(prices)
 
-    assert [row["vehicle_name"] for row in rows] == ["Railen", "Tyilui", "Basher", "Hermes", "MOLE"]
-    assert [(row["price_warbond"], row["price"]) for row in rows] == [
-        (360, 400), (385, 425), (100, 110), (200, 220), (295, 315)
-    ]
+    assert [row["vehicle_name"] for row in rows] == ["Newest", "Newer"]
+
+
+def test_game_versions_are_compared_numerically() -> None:
+    assert WarbondTrackerSource._version_key("4.10.0") > WarbondTrackerSource._version_key("4.9.9")
 
 
 def test_warbond_prices_use_localized_pledge_currency_not_auec() -> None:

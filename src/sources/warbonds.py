@@ -13,14 +13,7 @@ class WarbondTrackerSource:
     PRICES_URL = "https://api.uexcorp.uk/2.0/vehicles_prices"
     VEHICLES_URL = "https://api.uexcorp.uk/2.0/vehicles"
     STORE_URL = "https://robertsspaceindustries.com/en/pledge/ship-upgrades"
-    CACHE_KEY = "warbonds:active:v3"
-    ACTIVE_OFFERS = {
-        "railen": {"name": "Railen", "standard_price": 400, "warbond_price": 360},
-        "tyilui": {"name": "Tyilui", "standard_price": 425, "warbond_price": 385},
-        "basher": {"name": "Basher", "standard_price": 110, "warbond_price": 100},
-        "hermes": {"name": "Hermes", "standard_price": 220, "warbond_price": 200},
-        "mole": {"name": "MOLE", "standard_price": 315, "warbond_price": 295},
-    }
+    CACHE_KEY = "warbonds:active:v4"
 
     def __init__(self, cache: SQLiteCache, timeout_seconds: int = 15) -> None:
         self._cache = cache
@@ -60,13 +53,19 @@ class WarbondTrackerSource:
             raise ValueError("Warbond sources returned an invalid payload.")
 
         usd_prices = self._latest_usd_prices(rows)
-        rsi_results = await asyncio.gather(*(self._verify_rsi_ship(offer["name"]) for offer in self.ACTIVE_OFFERS.values()))
+        active_rows = self._active_rows(usd_prices)
+        rsi_results = await asyncio.gather(
+            *(self._verify_rsi_ship(str(row.get("vehicle_name") or "")) for row in active_rows)
+        )
         rsi_by_name = {
             self._normalize(result.get("title")): result
             for result in rsi_results
             if isinstance(result, dict) and result.get("title")
         }
-        active_rows = self._active_rows(usd_prices, rsi_by_name)
+        active_rows = [
+            row for row in active_rows
+            if self._normalize(row.get("vehicle_name")) in rsi_by_name
+        ]
         vehicle_by_name = {
             self._normalize(vehicle.get("name")): vehicle
             for vehicle in vehicles
@@ -115,18 +114,36 @@ class WarbondTrackerSource:
         }
         return result
 
-    def _active_rows(self, prices: dict[str, dict], rsi_ships: dict[str, dict]) -> list[dict]:
-        rows = []
-        for key, configured in self.ACTIVE_OFFERS.items():
-            if key not in rsi_ships:
-                continue
-            rows.append({
-                **prices.get(key, {}),
-                "vehicle_name": configured["name"],
-                "price": configured["standard_price"],
-                "price_warbond": configured["warbond_price"],
-            })
-        return rows
+    @classmethod
+    def _active_rows(cls, prices: dict[str, dict]) -> list[dict]:
+        """Return live sale rows from the newest UEX game-data release.
+
+        UEX retains historical warbond prices, so merely checking for a non-zero
+        ``price_warbond`` resurrects old promotions.  Its newest game-version
+        cohort is the part of the feed that represents the current store update.
+        """
+        candidates = [
+            row for row in prices.values()
+            if cls._number(row.get("on_sale")) == 1
+            and 0 < cls._number(row.get("price_warbond")) < cls._number(row.get("price"))
+            and str(row.get("game_version") or "").strip()
+        ]
+        if not candidates:
+            return []
+        newest_version = max((str(row["game_version"]) for row in candidates), key=cls._version_key)
+        return sorted(
+            (row for row in candidates if str(row["game_version"]) == newest_version),
+            key=lambda row: cls._number(row.get("date_modified")),
+            reverse=True,
+        )
+
+    @staticmethod
+    def _version_key(value: str) -> tuple[int, ...]:
+        parts = []
+        for part in str(value).split("."):
+            digits = "".join(character for character in part if character.isdigit())
+            parts.append(int(digits or 0))
+        return tuple(parts)
 
     async def _fetch(self, url: str) -> dict | None:
         async with self._session.get(url, headers={"Accept": "application/json"}) as response:
