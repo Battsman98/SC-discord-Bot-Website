@@ -13,7 +13,15 @@ class WarbondTrackerSource:
     PRICES_URL = "https://api.uexcorp.uk/2.0/vehicles_prices"
     VEHICLES_URL = "https://api.uexcorp.uk/2.0/vehicles"
     STORE_URL = "https://robertsspaceindustries.com/en/pledge/ship-upgrades"
-    CACHE_KEY = "warbonds:active:v4"
+    CACHE_KEY = "warbonds:active:v5"
+    # UEX can lag current RSI promotions and sometimes omits their warbond
+    # price entirely. Keep the currently confirmed offers here while using the
+    # live catalogs for ship metadata and source-ship calculations.
+    ACTIVE_OFFERS = {
+        "basher": {"name": "Basher", "standard_price": 110, "warbond_price": 100},
+        "hermes": {"name": "Hermes", "standard_price": 220, "warbond_price": 200},
+        "mole": {"name": "MOLE", "standard_price": 315, "warbond_price": 295},
+    }
 
     def __init__(self, cache: SQLiteCache, timeout_seconds: int = 15) -> None:
         self._cache = cache
@@ -114,36 +122,16 @@ class WarbondTrackerSource:
         }
         return result
 
-    @classmethod
-    def _active_rows(cls, prices: dict[str, dict]) -> list[dict]:
-        """Return live sale rows from the newest UEX game-data release.
-
-        UEX retains historical warbond prices, so merely checking for a non-zero
-        ``price_warbond`` resurrects old promotions.  Its newest game-version
-        cohort is the part of the feed that represents the current store update.
-        """
-        candidates = [
-            row for row in prices.values()
-            if cls._number(row.get("on_sale")) == 1
-            and 0 < cls._number(row.get("price_warbond")) < cls._number(row.get("price"))
-            and str(row.get("game_version") or "").strip()
+    def _active_rows(self, prices: dict[str, dict]) -> list[dict]:
+        return [
+            {
+                **prices.get(key, {}),
+                "vehicle_name": offer["name"],
+                "price": offer["standard_price"],
+                "price_warbond": offer["warbond_price"],
+            }
+            for key, offer in self.ACTIVE_OFFERS.items()
         ]
-        if not candidates:
-            return []
-        newest_version = max((str(row["game_version"]) for row in candidates), key=cls._version_key)
-        return sorted(
-            (row for row in candidates if str(row["game_version"]) == newest_version),
-            key=lambda row: cls._number(row.get("date_modified")),
-            reverse=True,
-        )
-
-    @staticmethod
-    def _version_key(value: str) -> tuple[int, ...]:
-        parts = []
-        for part in str(value).split("."):
-            digits = "".join(character for character in part if character.isdigit())
-            parts.append(int(digits or 0))
-        return tuple(parts)
 
     async def _fetch(self, url: str) -> dict | None:
         async with self._session.get(url, headers={"Accept": "application/json"}) as response:
