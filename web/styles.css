@@ -1709,11 +1709,27 @@ body.hangar-modal-open {
   justify-content: space-between;
   gap: 18px;
   align-items: center;
+  min-height: 68px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
   font-size: 1.18rem;
   line-height: 1.35;
   font-weight: 800;
 }
-.inventory-export-selling input,
+.inventory-export-selling:hover { border-color: var(--accent); background: rgba(255, 255, 255, 0.06); }
+.inventory-export-selling:focus-within { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.inventory-export-selling input {
+  flex: 0 0 30px;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
 .inventory-export-categories input {
   flex: 0 0 16px;
   width: 16px !important;
@@ -1723,6 +1739,14 @@ body.hangar-modal-open {
   padding: 0;
 }
 .inventory-export-help, .inventory-export-empty { color: var(--muted); line-height: 1.5; }
+.inventory-export-station {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  color: var(--accent-2);
+  font-weight: 700;
+}
+.inventory-export-station select { width: 100%; min-height: 46px; }
 .inventory-export-dialog fieldset { margin-top: 20px; padding: 16px; border: 1px solid var(--line); }
 .inventory-export-dialog legend { padding: 0 6px; color: var(--accent-2); font-weight: 700; }
 .inventory-export-category-actions, .inventory-export-actions { display: flex; gap: 10px; }

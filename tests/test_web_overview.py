@@ -22,7 +22,10 @@ def test_inventory_export_offers_categories_and_uex_selling_prices() -> None:
     assert "chooseInventoryExportOptions" in javascript
     assert "Prepare this Excel file for selling items" in javascript
     assert 'params.append("category", category)' in javascript
+    assert 'params.set("location", options.location)' in javascript
     assert 'params.set("selling", "true")' in javascript
+    assert "Station to export" in javascript
+    assert "All stations" in javascript
     assert ".inventory-export-dialog" in css
 
 

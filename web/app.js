@@ -1957,11 +1957,13 @@ async function exportInventory() {
   }
   try {
     const facets = await api("/api/me/inventory/facets");
-    const options = await chooseInventoryExportOptions(facets.categories || []);
+    const options = await chooseInventoryExportOptions(facets);
     if (!options) return;
     const params = new URLSearchParams(inventoryFilterParams());
     params.delete("category");
+    params.delete("location");
     options.categories.forEach((category) => params.append("category", category));
+    if (options.location) params.set("location", options.location);
     if (options.selling) params.set("selling", "true");
     window.location.href = `/api/me/inventory/export?${params.toString()}`;
   } catch (error) {
@@ -1969,8 +1971,10 @@ async function exportInventory() {
   }
 }
 
-function chooseInventoryExportOptions(categories) {
+function chooseInventoryExportOptions(facets) {
   return new Promise((resolve) => {
+    const categories = facets.categories || [];
+    const locations = facets.locations || [];
     const backdrop = document.createElement("div");
     backdrop.className = "inventory-export-backdrop";
     const categoryOptions = categories.length
@@ -1980,6 +1984,12 @@ function chooseInventoryExportOptions(categories) {
       <h2 id="inventoryExportTitle">Export Inventory</h2>
       <label class="inventory-export-selling"><input type="checkbox" data-inventory-export-selling> <span>Prepare this Excel file for selling items</span></label>
       <p class="inventory-export-help">Compares UEX terminal buyback averages with current player-seller marketplace averages, then estimates totals using the player price when available.</p>
+      <label class="inventory-export-station"><span>Station to export</span>
+        <select data-inventory-export-location>
+          <option value="">All stations</option>
+          ${locations.map((location) => `<option value="${escapeAttribute(location)}">${escapeHtml(location)}</option>`).join("")}
+        </select>
+      </label>
       <fieldset>
         <legend>Categories to include</legend>
         <div class="inventory-export-category-actions"><button type="button" data-inventory-export-all>Select all</button><button type="button" data-inventory-export-none>Clear all</button></div>
@@ -2003,7 +2013,11 @@ function chooseInventoryExportOptions(categories) {
         backdrop.querySelector("fieldset").classList.add("inventory-export-selection-error");
         return;
       }
-      finish({ selling: backdrop.querySelector("[data-inventory-export-selling]").checked, categories: selected });
+      finish({
+        selling: backdrop.querySelector("[data-inventory-export-selling]").checked,
+        location: backdrop.querySelector("[data-inventory-export-location]").value,
+        categories: selected,
+      });
     });
     document.addEventListener("keydown", onKeyDown);
     document.body.append(backdrop);
