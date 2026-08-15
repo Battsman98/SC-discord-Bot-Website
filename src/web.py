@@ -2134,14 +2134,21 @@ async def _import_inventory_scanner_images(
         attempted_titles = []
         best_review: tuple[float, str, str, dict[str, list[tuple[Any, float]]]] | None = None
         candidate_boxes = _inventory_title_boxes(title_box)
-        candidate_texts = await asyncio.gather(*(
-            asyncio.to_thread(_read_calibrated_inventory_title, image_data, candidate_box)
-            for candidate_box in candidate_boxes
-        )) if image_data else [""] * len(candidate_boxes)
-        ocr_ms = round((time.perf_counter() - ocr_started_at) * 1000)
-        plausible_titles: list[tuple[str, str]] = []
+        ocr_elapsed = 0.0
+        match_elapsed = 0.0
         seen_titles: set[str] = set()
-        for candidate_box, candidate_text in zip(candidate_boxes, candidate_texts):
+        # The production title OCR pool intentionally contains one engine.
+        # Run candidate boxes serially and stop on the first confident match;
+        # parallel reads otherwise wait on the same engine and outlive an
+        # aborted browser request, blocking every scan queued behind them.
+        for candidate_box in candidate_boxes if image_data else ():
+            candidate_ocr_started_at = time.perf_counter()
+            candidate_text = await asyncio.to_thread(
+                _read_calibrated_inventory_title,
+                image_data,
+                candidate_box,
+            )
+            ocr_elapsed += time.perf_counter() - candidate_ocr_started_at
             if not _inventory_title_candidate_is_plausible(candidate_text):
                 continue
             normalized_title = _normalize_text(candidate_text)
@@ -2149,16 +2156,11 @@ async def _import_inventory_scanner_images(
                 continue
             seen_titles.add(normalized_title)
             attempted_titles.append((candidate_text, candidate_box))
-            plausible_titles.append((candidate_text, candidate_box))
-        match_started_at = time.perf_counter()
-        lookup_groups = await asyncio.gather(*(
-            _inventory_scanner_lookups(
+            candidate_match_started_at = time.perf_counter()
+            candidate_lookups = await _inventory_scanner_lookups(
                 candidate_text, exclude_words, candidate_limit=1,
                 category=default_category, item_type=default_item_type,
             )
-            for candidate_text, _ in plausible_titles
-        ))
-        for (candidate_text, candidate_box), candidate_lookups in zip(plausible_titles, lookup_groups):
             candidate_items = await _match_inventory_scanner_text(
                 candidate_text,
                 default_location,
@@ -2167,6 +2169,7 @@ async def _import_inventory_scanner_images(
                 exclude_words,
                 candidate_lookups,
             )
+            match_elapsed += time.perf_counter() - candidate_match_started_at
             best_score = max(
                 (
                     score
@@ -2183,12 +2186,13 @@ async def _import_inventory_scanner_images(
                 items = candidate_items
                 calibration = {"title_box": candidate_box, "fast_title": True}
                 break
+        ocr_ms = round(ocr_elapsed * 1000)
+        match_ms = round(match_elapsed * 1000)
         if not items and best_review is not None:
             _, ocr_text, candidate_box, scanner_lookups = best_review
             calibration = {"title_box": candidate_box, "fast_title": False}
         elif calibration is None:
             calibration = {"title_box": None, "fast_title": False}
-        match_ms = round((time.perf_counter() - match_started_at) * 1000)
     logging.info(
         "Inventory scanner scan_id=%s category=%r type=%r ocr=%r matches=%r attempts=%r queue_ms=%d ocr_ms=%d match_ms=%d",
         scan_id,

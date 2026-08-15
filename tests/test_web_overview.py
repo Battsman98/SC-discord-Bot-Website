@@ -537,7 +537,7 @@ def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> 
     assert "await asyncio.to_thread(_read_image_text, data)" in python
     assert "candidate_limit=1," in python
     assert "candidate_boxes = _inventory_title_boxes(title_box)" in python
-    assert "candidate_texts = await asyncio.gather" in python
+    assert "candidate_text = await asyncio.to_thread(" in python
     assert "if candidate_items:" in python
     assert "attempts=%r" in python
     assert "effective_min_score = max(min_score, 0.88) if live_scan else min_score" in python
@@ -568,6 +568,9 @@ def test_live_scanner_uses_provisioned_ocr_workers_and_reports_stage_timings() -
     assert "_RAPID_OCR_POOL_SIZE = 1" in python
     assert '"queue_ms": queue_ms' in python
     assert "result_groups = await asyncio.gather" in python
+    assert "for candidate_box in candidate_boxes if image_data else ()" in python
+    assert "candidate_texts = await asyncio.gather" not in python
+    assert "lookup_groups = await asyncio.gather" not in python
 
 
 def test_scanner_tool_panels_show_work_in_progress_notice() -> None:
