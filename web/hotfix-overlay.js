@@ -59,10 +59,12 @@
   window.fetch = async (...args) => {
     try {
       const response = await originalFetch(...args);
-      if (Date.now() <= userAttemptUntil && !response.ok) showPotentialHotfix();
+      if (Date.now() <= userAttemptUntil && response.status >= 500) showPotentialHotfix();
       return response;
     } catch (error) {
-      if (Date.now() <= userAttemptUntil) showPotentialHotfix();
+      // A scanner AbortController timeout is handled inline by the scanner.
+      // Do not cover that useful message with a generic 20-second overlay.
+      if (Date.now() <= userAttemptUntil && error?.name !== "AbortError") showPotentialHotfix();
       throw error;
     }
   };
