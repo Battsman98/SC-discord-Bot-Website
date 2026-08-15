@@ -254,16 +254,17 @@ let inventoryScannerHistory = [];
 let inventoryScannerPendingReview = null;
 let inventoryScannerStatus = "";
 let inventoryScannerInFlight = 0;
-// The web service provisions two OCR workers. Keep both busy so a stopped scan
-// drains its captured frames in parallel instead of making the user wait on a
-// long serial backlog.
-const inventoryScannerMaxInFlight = 2;
+// Keep one request in flight per browser. Two concurrent PNG uploads plus OCR
+// can saturate a small production instance and make every request slower.
+const inventoryScannerMaxInFlight = 1;
 let inventoryScannerPendingHashes = new Set();
+let inventoryScannerPendingCaptures = new Map();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
 // Production OCR can take several seconds on a small instance. Retain enough
 // distinct hover transitions for a user moving at one item per second.
-const inventoryScannerQueueLimit = 12;
+const inventoryScannerQueueLimit = 24;
+const inventoryScannerRequestTimeoutMs = 8000;
 let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
 let inventoryScannerLastTiming = null;
@@ -2490,6 +2491,7 @@ async function startInventoryScanner() {
   inventoryScannerStatus = "Scanner ready.";
   inventoryScannerInFlight = 0;
   inventoryScannerPendingHashes.clear();
+  inventoryScannerPendingCaptures.clear();
   inventoryScannerCaptureBusy = false;
   inventoryScannerQueue = [];
   inventoryScannerStopping = false;
@@ -2552,6 +2554,7 @@ function stopInventoryScanner(clearOutput = true) {
     inventoryScannerStopping = false;
     inventoryScannerQueue = [];
     inventoryScannerPendingHashes.clear();
+    inventoryScannerPendingCaptures.clear();
     return;
   }
   inventoryScannerStopping = true;
@@ -2599,25 +2602,40 @@ async function scanInventoryHover() {
       inventoryScannerLastQueuedContextToken,
       contextToken,
     );
-    const alreadyQueued = inventoryScannerPendingHashes.has(captureToken)
-      || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken);
+    const alreadyQueued = inventoryScannerCapturePending(capture, contextToken);
     if (alreadyQueued || (!titleChanged && !contextChanged)) return;
-    // Two OCR workers can sustainably process this rate. Do not update the
-    // last hash during the cooldown, so a brief new hover remains eligible on
-    // the next 350 ms capture instead of being silently discarded.
+    // Do not update the last hash during the cooldown, so a brief new hover
+    // remains eligible on the next 350 ms capture instead of being discarded.
     if (performance.now() - inventoryScannerLastQueuedAt < 600) return;
     inventoryScannerLastQueuedAt = performance.now();
+    if (inventoryScannerQueue.length >= inventoryScannerQueueLimit) {
+      inventoryScannerStatus = "Scanner is catching up. Hold this item until it is recognized.";
+      return;
+    }
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
       captureMs,
       generation: inventoryScannerGeneration,
     });
-    if (inventoryScannerQueue.length > inventoryScannerQueueLimit) inventoryScannerQueue.shift();
     drainInventoryScannerQueue();
   } finally {
     inventoryScannerCaptureBusy = false;
   }
+}
+
+function inventoryScannerCapturePending(capture, contextToken) {
+  const pending = [
+    ...inventoryScannerPendingCaptures.values(),
+    ...inventoryScannerQueue,
+  ];
+  return pending.some((queued) => (
+    imageHashDistance(queued.hash, capture.hash) <= 7
+    && !inventoryScannerCaptureChanged(
+      queued.tileToken || queued.contextHash,
+      contextToken,
+    )
+  ));
 }
 
 function drainInventoryScannerQueue() {
@@ -2625,6 +2643,7 @@ function drainInventoryScannerQueue() {
     const capture = inventoryScannerQueue.shift();
     inventoryScannerInFlight += 1;
     inventoryScannerPendingHashes.add(capture.captureToken);
+    inventoryScannerPendingCaptures.set(capture.captureToken, capture);
     processInventoryScannerCapture(capture)
       .catch((error) => {
         if (capture.generation === inventoryScannerGeneration) {
@@ -2633,6 +2652,7 @@ function drainInventoryScannerQueue() {
       })
       .finally(() => {
         inventoryScannerPendingHashes.delete(capture.captureToken);
+        inventoryScannerPendingCaptures.delete(capture.captureToken);
         inventoryScannerInFlight = Math.max(0, inventoryScannerInFlight - 1);
         drainInventoryScannerQueue();
         if (inventoryScannerStopping && inventoryScannerInFlight === 0 && inventoryScannerQueue.length === 0) {
@@ -3010,7 +3030,20 @@ async function submitInventoryImages(files, options = {}) {
   }
   try {
     const requestStartedAt = performance.now();
-    const response = await fetch(`/api/me/inventory/import/images?${params}`, { method: "POST", body: formData });
+    const controller = options.liveScan ? new AbortController() : null;
+    const timeout = controller
+      ? setTimeout(() => controller.abort(), inventoryScannerRequestTimeoutMs)
+      : null;
+    let response;
+    try {
+      response = await fetch(`/api/me/inventory/import/images?${params}`, {
+        method: "POST",
+        body: formData,
+        signal: controller?.signal,
+      });
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || `Request failed with ${response.status}`);
     if (options.scannerGeneration !== undefined
@@ -3040,7 +3073,10 @@ async function submitInventoryImages(files, options = {}) {
   } catch (error) {
     if (options.scannerGeneration !== undefined
       && options.scannerGeneration !== inventoryScannerGeneration) return null;
-    outputs.inventoryImport.innerHTML = errorMessage(error.message);
+    const message = error?.name === "AbortError"
+      ? "Scanner request timed out. Hold the current item to retry."
+      : error.message;
+    outputs.inventoryImport.innerHTML = errorMessage(message);
     return null;
   }
 }
