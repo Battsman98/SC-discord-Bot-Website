@@ -2611,6 +2611,15 @@ async function scanInventoryHover() {
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const contextToken = capture.tileToken || capture.contextHash;
     const captureToken = `${capture.hash}:${contextToken}`;
+    // Establish the shared screen as a baseline. Submitting this frame
+    // immediately used to upload a full PNG before the user hovered an item,
+    // so startup failures appeared as soon as the screen picker closed.
+    if (!inventoryScannerLastQueuedHash && !inventoryScannerLastQueuedContextToken) {
+      inventoryScannerLastQueuedHash = capture.hash;
+      inventoryScannerLastQueuedContextToken = contextToken;
+      inventoryScannerStatus = "Scanner ready. Hover the first item.";
+      return;
+    }
     const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 7;
     const contextChanged = inventoryScannerCaptureChanged(
       inventoryScannerLastQueuedContextToken,
