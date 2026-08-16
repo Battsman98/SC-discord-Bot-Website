@@ -537,7 +537,7 @@ def test_live_scanner_uses_preloaded_threaded_ocr_and_reduced_catalog_work() -> 
     assert "await asyncio.to_thread(_read_image_text, data)" in python
     assert "candidate_limit=1," in python
     assert "candidate_boxes = _inventory_title_boxes(title_box)" in python
-    assert "candidate_text = await asyncio.to_thread(" in python
+    assert "candidate_texts = await asyncio.gather" in python
     assert "if candidate_items:" in python
     assert "attempts=%r" in python
     assert "effective_min_score = max(min_score, 0.88) if live_scan else min_score" in python
@@ -560,7 +560,6 @@ def test_live_scanner_uses_provisioned_ocr_workers_and_reports_stage_timings() -
 
     assert "inventoryScannerMaxInFlight = 1" in javascript
     assert "inventoryScannerPendingHashes" in javascript
-    assert "inventoryScannerPendingCaptures" in javascript
     assert '"ocr_ms": ocr_ms' in python
     assert '"match_ms": match_ms' in python
     assert '"server_ms":' in python
@@ -568,9 +567,8 @@ def test_live_scanner_uses_provisioned_ocr_workers_and_reports_stage_timings() -
     assert "_RAPID_OCR_POOL_SIZE = 1" in python
     assert '"queue_ms": queue_ms' in python
     assert "result_groups = await asyncio.gather" in python
-    assert "for candidate_box in candidate_boxes if image_data else ()" in python
-    assert "candidate_texts = await asyncio.gather" not in python
-    assert "lookup_groups = await asyncio.gather" not in python
+    assert "candidate_texts = await asyncio.gather" in python
+    assert "lookup_groups = await asyncio.gather" in python
 
 
 def test_scanner_tool_panels_show_work_in_progress_notice() -> None:
@@ -589,18 +587,15 @@ def test_scanner_tool_panels_show_work_in_progress_notice() -> None:
 def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "inventoryScannerQueueLimit = 24" in javascript
-    assert "inventoryScannerRequestTimeoutMs = 8000" in javascript
+    assert "inventoryScannerQueueLimit = 12" in javascript
     assert "inventoryScannerCaptureBusy" in javascript
     assert "drainInventoryScannerQueue()" in javascript
     assert "processInventoryScannerCapture(capture)" in javascript
     assert "inventoryScannerPendingMatchCount >= requiredConfirmations" not in javascript
     assert "deferRender: true" in javascript
     assert "Recognized: ${names.join" in javascript
-    assert "inventoryScannerQueue.length >= inventoryScannerQueueLimit" in javascript
-    assert "inventoryScannerQueue.length > inventoryScannerQueueLimit" not in javascript
-    assert "inventoryScannerCapturePending(capture, contextToken)" in javascript
-    assert "controller.abort()" in javascript
+    assert "inventoryScannerQueue.length > inventoryScannerQueueLimit" in javascript
+    assert "inventoryScannerQueue.shift()" in javascript
 
 
 def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames() -> None:
@@ -608,18 +603,13 @@ def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames
 
     assert "inventoryScannerLastQueuedHash" in javascript
     assert "inventoryScannerLastQueuedContextToken" in javascript
-    assert "Scanner ready. Hover the first item." in javascript
-    assert "if (!inventoryScannerLastQueuedHash && !inventoryScannerLastQueuedContextToken)" in javascript
-    assert "const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 7" in javascript
-    assert "const hash = inventoryScannerTitleHash(canvas, requestTitleBox)" in javascript
-    assert "function inventoryScannerTitleHash" in javascript
-    assert "performance.now() - inventoryScannerLastQueuedAt < 600" in javascript
-    assert "inventoryScannerLastQueuedAt = performance.now()" in javascript
+    assert "const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 4" in javascript
+    assert "const hash = imageAverageHash(canvas)" in javascript
     assert "inventoryScannerLastQueuedHash = capture.hash" in javascript
-    assert "Transitional frames" in javascript
     assert "const contextChanged = inventoryScannerCaptureChanged" in javascript
-    assert "function inventoryScannerCapturePending" in javascript
-    assert "imageHashDistance(queued.hash, capture.hash) <= 7" in javascript
+    assert "inventoryScannerPendingHashes.has(captureToken)" in javascript
+    assert "inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)" in javascript
+    assert "inventoryScannerLastQueuedAt" not in javascript
 
 
 def test_scanner_review_queue_has_individual_and_bulk_remove_actions() -> None:
