@@ -258,13 +258,9 @@ let inventoryScannerInFlight = 0;
 // can saturate a small production instance and make every request slower.
 const inventoryScannerMaxInFlight = 1;
 let inventoryScannerPendingHashes = new Set();
-let inventoryScannerPendingCaptures = new Map();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
-// Production OCR can take several seconds on a small instance. Retain enough
-// distinct hover transitions for a user moving at one item per second.
-const inventoryScannerQueueLimit = 24;
-const inventoryScannerRequestTimeoutMs = 8000;
+const inventoryScannerQueueLimit = 12;
 let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
 let inventoryScannerLastTiming = null;
@@ -272,7 +268,6 @@ let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
 let inventoryScannerLastQueuedHash = "";
 let inventoryScannerLastQueuedContextToken = "";
-let inventoryScannerLastQueuedAt = 0;
 let inventoryScannerLastCountedKey = "";
 let inventoryScannerLastCountedCaptureToken = "";
 let inventoryScannerTitleBox = "";
@@ -2505,7 +2500,6 @@ async function startInventoryScanner() {
   inventoryScannerStatus = "Scanner ready.";
   inventoryScannerInFlight = 0;
   inventoryScannerPendingHashes.clear();
-  inventoryScannerPendingCaptures.clear();
   inventoryScannerCaptureBusy = false;
   inventoryScannerQueue = [];
   inventoryScannerStopping = false;
@@ -2514,7 +2508,6 @@ async function startInventoryScanner() {
   inventoryScannerLastContextHash = "";
   inventoryScannerLastQueuedHash = "";
   inventoryScannerLastQueuedContextToken = "";
-  inventoryScannerLastQueuedAt = 0;
   inventoryScannerLastCountedKey = "";
   inventoryScannerLastCountedCaptureToken = "";
   inventoryScannerTitleBox = "";
@@ -2568,7 +2561,6 @@ function stopInventoryScanner(clearOutput = true) {
     inventoryScannerStopping = false;
     inventoryScannerQueue = [];
     inventoryScannerPendingHashes.clear();
-    inventoryScannerPendingCaptures.clear();
     return;
   }
   inventoryScannerStopping = true;
@@ -2611,54 +2603,27 @@ async function scanInventoryHover() {
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const contextToken = capture.tileToken || capture.contextHash;
     const captureToken = `${capture.hash}:${contextToken}`;
-    // Establish the shared screen as a baseline. Submitting this frame
-    // immediately used to upload a full PNG before the user hovered an item,
-    // so startup failures appeared as soon as the screen picker closed.
-    if (!inventoryScannerLastQueuedHash && !inventoryScannerLastQueuedContextToken) {
-      inventoryScannerLastQueuedHash = capture.hash;
-      inventoryScannerLastQueuedContextToken = contextToken;
-      inventoryScannerStatus = "Scanner ready. Hover the first item.";
-      return;
-    }
-    const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 7;
+    const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 4;
     const contextChanged = inventoryScannerCaptureChanged(
       inventoryScannerLastQueuedContextToken,
       contextToken,
     );
-    const alreadyQueued = inventoryScannerCapturePending(capture, contextToken);
+    const alreadyQueued = inventoryScannerPendingHashes.has(captureToken)
+      || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken);
     if (alreadyQueued || (!titleChanged && !contextChanged)) return;
-    // Do not update the last hash during the cooldown, so a brief new hover
-    // remains eligible on the next 350 ms capture instead of being discarded.
-    if (performance.now() - inventoryScannerLastQueuedAt < 600) return;
-    inventoryScannerLastQueuedAt = performance.now();
-    if (inventoryScannerQueue.length >= inventoryScannerQueueLimit) {
-      inventoryScannerStatus = "Scanner is catching up. Hold this item until it is recognized.";
-      return;
-    }
+    inventoryScannerLastQueuedHash = capture.hash;
+    inventoryScannerLastQueuedContextToken = contextToken;
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
       captureMs,
       generation: inventoryScannerGeneration,
     });
+    if (inventoryScannerQueue.length > inventoryScannerQueueLimit) inventoryScannerQueue.shift();
     drainInventoryScannerQueue();
   } finally {
     inventoryScannerCaptureBusy = false;
   }
-}
-
-function inventoryScannerCapturePending(capture, contextToken) {
-  const pending = [
-    ...inventoryScannerPendingCaptures.values(),
-    ...inventoryScannerQueue,
-  ];
-  return pending.some((queued) => (
-    imageHashDistance(queued.hash, capture.hash) <= 7
-    && !inventoryScannerCaptureChanged(
-      queued.tileToken || queued.contextHash,
-      contextToken,
-    )
-  ));
 }
 
 function drainInventoryScannerQueue() {
@@ -2666,7 +2631,6 @@ function drainInventoryScannerQueue() {
     const capture = inventoryScannerQueue.shift();
     inventoryScannerInFlight += 1;
     inventoryScannerPendingHashes.add(capture.captureToken);
-    inventoryScannerPendingCaptures.set(capture.captureToken, capture);
     processInventoryScannerCapture(capture)
       .catch((error) => {
         if (capture.generation === inventoryScannerGeneration) {
@@ -2675,7 +2639,6 @@ function drainInventoryScannerQueue() {
       })
       .finally(() => {
         inventoryScannerPendingHashes.delete(capture.captureToken);
-        inventoryScannerPendingCaptures.delete(capture.captureToken);
         inventoryScannerInFlight = Math.max(0, inventoryScannerInFlight - 1);
         drainInventoryScannerQueue();
         if (inventoryScannerStopping && inventoryScannerInFlight === 0 && inventoryScannerQueue.length === 0) {
@@ -2700,10 +2663,6 @@ async function processInventoryScannerCapture(capture) {
   if (payload?.items?.length) {
     inventoryScannerLastHash = capture.hash;
     inventoryScannerLastContextHash = capture.contextHash;
-    // A capture is deduplicated only after OCR succeeds. Transitional frames
-    // that return no item must leave the stable frame eligible for retry.
-    inventoryScannerLastQueuedHash = capture.hash;
-    inventoryScannerLastQueuedContextToken = capture.tileToken || capture.contextHash;
     inventoryScannerEmptyReadStreak = 0;
     const names = payload.items.map((item) => item.name).filter(Boolean);
     inventoryScannerStatus = names.length
@@ -2852,11 +2811,7 @@ async function captureInventoryScannerCrop() {
   canvas.height = targetHeight;
   const context = canvas.getContext("2d");
   context.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-  // Hash the tooltip title band, not the whole shared screen. On a full-screen
-  // capture the title occupies only a few thousand pixels, so ten genuinely
-  // different item names can otherwise produce an almost identical hash and
-  // never enter the OCR queue.
-  const hash = inventoryScannerTitleHash(canvas, requestTitleBox);
+  const hash = imageAverageHash(canvas);
   const contextCanvas = document.createElement("canvas");
   contextCanvas.width = 360;
   contextCanvas.height = 540;
@@ -3053,20 +3008,7 @@ async function submitInventoryImages(files, options = {}) {
   }
   try {
     const requestStartedAt = performance.now();
-    const controller = options.liveScan ? new AbortController() : null;
-    const timeout = controller
-      ? setTimeout(() => controller.abort(), inventoryScannerRequestTimeoutMs)
-      : null;
-    let response;
-    try {
-      response = await fetch(`/api/me/inventory/import/images?${params}`, {
-        method: "POST",
-        body: formData,
-        signal: controller?.signal,
-      });
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
+    const response = await fetch(`/api/me/inventory/import/images?${params}`, { method: "POST", body: formData });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || `Request failed with ${response.status}`);
     if (options.scannerGeneration !== undefined
@@ -3096,10 +3038,7 @@ async function submitInventoryImages(files, options = {}) {
   } catch (error) {
     if (options.scannerGeneration !== undefined
       && options.scannerGeneration !== inventoryScannerGeneration) return null;
-    const message = error?.name === "AbortError"
-      ? "Scanner request timed out. Hold the current item to retry."
-      : error.message;
-    outputs.inventoryImport.innerHTML = errorMessage(message);
+    outputs.inventoryImport.innerHTML = errorMessage(error.message);
     return null;
   }
 }
@@ -4104,33 +4043,6 @@ function stateMessage(message) {
 
 function errorMessage(message) {
   return `<div class="error">${escapeHtml(message)}</div>`;
-}
-
-function inventoryScannerTitleHash(sourceCanvas, titleBox = "") {
-  const fallback = [0.30, 0.245, 0.38, 0.0275];
-  const values = titleBox
-    ? titleBox.split(",").map((value) => Number(value))
-    : fallback;
-  const valid = values.length === 4
-    && values.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
-    && values[2] > 0
-    && values[3] > 0;
-  const [x, y, width, height] = valid ? values : fallback;
-  const titleCanvas = document.createElement("canvas");
-  titleCanvas.width = Math.max(1, Math.round(sourceCanvas.width * width));
-  titleCanvas.height = Math.max(1, Math.round(sourceCanvas.height * height));
-  titleCanvas.getContext("2d").drawImage(
-    sourceCanvas,
-    Math.round(sourceCanvas.width * x),
-    Math.round(sourceCanvas.height * y),
-    titleCanvas.width,
-    titleCanvas.height,
-    0,
-    0,
-    titleCanvas.width,
-    titleCanvas.height,
-  );
-  return imageAverageHash(titleCanvas);
 }
 
 async function loadRsiImportHealth() {
