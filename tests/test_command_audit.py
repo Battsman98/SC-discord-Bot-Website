@@ -103,6 +103,16 @@ def test_deployment_history_entry_deduplicates_a_revision() -> None:
     )
 
 
+def test_website_deployment_monitor_runs_without_discord_restart() -> None:
+    source = inspect.getsource(GameAssistBot)
+
+    assert "_website_deployment_monitor_loop" in source
+    assert "_record_current_website_deployment" in source
+    assert 'changelog:last-observed-website-revision:v1' in source
+    assert "await asyncio.sleep(60)" in source
+    assert '"Website deployed"' in source
+
+
 def test_interaction_command_name_handles_grouped_commands() -> None:
     interaction = SimpleNamespace(
         data={
