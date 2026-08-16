@@ -66,6 +66,10 @@ LOOT_REVIEW_CHANNEL_NAME = "loot-report-reviews"
 WEBSITE_CHANGELOG_CHANNEL_NAME = "website-changelog"
 DISCORD_CHANGELOG_CHANNEL_NAME = "discord-changelog"
 CHANGELOG_GITHUB_REPOSITORY = "Battsman98/SC-discord-Bot-Website"
+WEBSITE_HEALTH_URL = os.getenv(
+    "WEBSITE_HEALTH_URL",
+    "https://star-citizen-game-assist.onrender.com/api/health",
+).strip()
 VISITOR_CHANNEL_SPECS = {
     "bot-start-here": "text",
     "member-applications": "text",
@@ -475,6 +479,7 @@ class GameAssistBot(commands.Bot):
         self._cz_timers_task: asyncio.Task | None = None
         self._hub_recovery_task: asyncio.Task | None = None
         self._item_catalog_task: asyncio.Task | None = None
+        self._website_deployment_task: asyncio.Task | None = None
         self._hub_last_recovery_monotonic = 0.0
         self._hub_incident_count = 0
         self._hub_pending_incident: tuple[str, discord.AuditLogAction | None, int | None] | None = None
@@ -544,6 +549,44 @@ class GameAssistBot(commands.Bot):
             self._cz_timers_task = asyncio.create_task(self._cz_timers_loop())
         if self._item_catalog_task is None:
             self._item_catalog_task = asyncio.create_task(self._item_catalog_sync_loop())
+        if self._website_deployment_task is None:
+            self._website_deployment_task = asyncio.create_task(self._website_deployment_monitor_loop())
+
+    async def _website_deployment_monitor_loop(self) -> None:
+        """Record website-only Render revisions without restarting Discord."""
+        while not self.is_closed():
+            try:
+                await self._record_current_website_deployment()
+            except Exception:
+                logging.exception("Could not monitor the website deployment revision")
+            await asyncio.sleep(60)
+
+    async def _record_current_website_deployment(self) -> None:
+        if not WEBSITE_HEALTH_URL:
+            return
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(WEBSITE_HEALTH_URL) as response:
+                    if response.status != 200:
+                        return
+                    payload = await response.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+            return
+        revision = str(payload.get("revision") or "").strip()
+        if not re.fullmatch(r"[0-9a-fA-F]{7,40}", revision):
+            return
+        cache_key = "changelog:last-observed-website-revision:v1"
+        if await self.cache.get(cache_key) == revision:
+            return
+        if not await self._deployment_already_recorded(WEBSITE_CHANGELOG_CHANNEL_NAME, revision):
+            summary = await self._deployment_change_summary(revision)
+            await self._send_changelog(
+                WEBSITE_CHANGELOG_CHANNEL_NAME,
+                "Website deployed",
+                f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nApplication: `Website`",
+            )
+        await self.cache.set(cache_key, revision, 315360000)
 
     async def _item_catalog_sync_loop(self) -> None:
         while not self.is_closed():
@@ -2173,6 +2216,8 @@ class GameAssistBot(commands.Bot):
             self._cz_timers_task.cancel()
         if self._hub_recovery_task:
             self._hub_recovery_task.cancel()
+        if self._website_deployment_task:
+            self._website_deployment_task.cancel()
         await self.sources.close()
         await self.cache.close()
         await super().close()
