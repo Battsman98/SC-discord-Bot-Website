@@ -52,6 +52,7 @@ def test_inventory_export_filters_categories_blanks_notes_and_adds_sell_prices(m
             query=None,
             sort_by="location",
             selling=True,
+            filename="My Everus / Weapons.xlsx",
             user=SimpleNamespace(id=7),
         )
     )
@@ -78,3 +79,4 @@ def test_inventory_export_filters_categories_blanks_notes_and_adds_sell_prices(m
     assert sheet["M2"].value == 1000
     assert sheet.freeze_panes == "A2"
     assert sheet.auto_filter.ref == "A1:M2"
+    assert response.headers["content-disposition"] == 'attachment; filename="My Everus - Weapons.xlsx"'

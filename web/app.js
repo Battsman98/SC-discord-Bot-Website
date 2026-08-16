@@ -1960,6 +1960,7 @@ async function exportInventory() {
     params.delete("location");
     options.categories.forEach((category) => params.append("category", category));
     if (options.location) params.set("location", options.location);
+    if (options.filename) params.set("filename", options.filename);
     if (options.selling) params.set("selling", "true");
     window.location.href = `/api/me/inventory/export?${params.toString()}`;
   } catch (error) {
@@ -1985,6 +1986,9 @@ function chooseInventoryExportOptions(facets) {
           <option value="">All stations</option>
           ${locations.map((location) => `<option value="${escapeAttribute(location)}">${escapeHtml(location)}</option>`).join("")}
         </select>
+      </label>
+      <label class="inventory-export-station"><span>Excel filename</span>
+        <input type="text" value="station-inventory.xlsx" maxlength="80" autocomplete="off" data-inventory-export-filename>
       </label>
       <fieldset>
         <legend>Categories to include</legend>
@@ -2012,6 +2016,7 @@ function chooseInventoryExportOptions(facets) {
       finish({
         selling: backdrop.querySelector("[data-inventory-export-selling]").checked,
         location: backdrop.querySelector("[data-inventory-export-location]").value,
+        filename: backdrop.querySelector("[data-inventory-export-filename]").value.trim(),
         categories: selected,
       });
     });

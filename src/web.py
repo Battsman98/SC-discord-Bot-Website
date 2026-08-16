@@ -2261,6 +2261,7 @@ async def export_my_inventory(
     query: str | None = None,
     sort_by: str = "location",
     selling: bool = False,
+    filename: str = Query(default="station-inventory.xlsx", max_length=80),
     user=Depends(require_user),
 ) -> Response:
     from openpyxl import Workbook
@@ -2334,10 +2335,15 @@ async def export_my_inventory(
         sheet.column_dimensions[column[0].column_letter].width = min(max(max_length + 2, 12), 48)
     output = BytesIO()
     workbook.save(output)
+    safe_filename = filename.strip().encode("ascii", "ignore").decode("ascii")
+    safe_filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", safe_filename).strip(" .")
+    if safe_filename.casefold().endswith(".xlsx"):
+        safe_filename = safe_filename[:-5].strip(" .")
+    safe_filename = (safe_filename or "station-inventory")[:75].rstrip(" .") + ".xlsx"
     return Response(
         content=output.getvalue(),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="station-inventory.xlsx"'},
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
     )
 
 

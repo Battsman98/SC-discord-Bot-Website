@@ -1746,7 +1746,8 @@ body.hangar-modal-open {
   color: var(--accent-2);
   font-weight: 700;
 }
-.inventory-export-station select { width: 100%; min-height: 46px; }
+.inventory-export-station select,
+.inventory-export-station input { width: 100%; min-height: 46px; }
 .inventory-export-dialog fieldset { margin-top: 20px; padding: 16px; border: 1px solid var(--line); }
 .inventory-export-dialog legend { padding: 0 6px; color: var(--accent-2); font-weight: 700; }
 .inventory-export-category-actions, .inventory-export-actions { display: flex; gap: 10px; }
