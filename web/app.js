@@ -268,6 +268,7 @@ let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
 let inventoryScannerLastQueuedHash = "";
 let inventoryScannerLastQueuedContextToken = "";
+let inventoryScannerRetryBudget = 0;
 let inventoryScannerLastCountedKey = "";
 let inventoryScannerLastCountedCaptureToken = "";
 let inventoryScannerTitleBox = "";
@@ -2508,6 +2509,7 @@ async function startInventoryScanner() {
   inventoryScannerLastContextHash = "";
   inventoryScannerLastQueuedHash = "";
   inventoryScannerLastQueuedContextToken = "";
+  inventoryScannerRetryBudget = 0;
   inventoryScannerLastCountedKey = "";
   inventoryScannerLastCountedCaptureToken = "";
   inventoryScannerTitleBox = "";
@@ -2610,7 +2612,15 @@ async function scanInventoryHover() {
     );
     const alreadyQueued = inventoryScannerPendingHashes.has(captureToken)
       || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken);
-    if (alreadyQueued || (!titleChanged && !contextChanged)) return;
+    if (alreadyQueued || (!titleChanged && !contextChanged && inventoryScannerRetryBudget <= 0)) return;
+    if (titleChanged || contextChanged) {
+      // The first frame after a hover transition can contain partially drawn
+      // text. Keep two bounded follow-up attempts so the stable tooltip is not
+      // discarded as a duplicate when that transitional OCR read is empty.
+      inventoryScannerRetryBudget = 2;
+    } else {
+      inventoryScannerRetryBudget -= 1;
+    }
     inventoryScannerLastQueuedHash = capture.hash;
     inventoryScannerLastQueuedContextToken = contextToken;
     inventoryScannerQueue.push({
@@ -2664,6 +2674,7 @@ async function processInventoryScannerCapture(capture) {
     inventoryScannerLastHash = capture.hash;
     inventoryScannerLastContextHash = capture.contextHash;
     inventoryScannerEmptyReadStreak = 0;
+    inventoryScannerRetryBudget = 0;
     const names = payload.items.map((item) => item.name).filter(Boolean);
     inventoryScannerStatus = names.length
       ? `Recognized: ${names.join(", ")}. Move to the next item.`

@@ -610,6 +610,9 @@ def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames
     assert "inventoryScannerPendingHashes.has(captureToken)" in javascript
     assert "inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)" in javascript
     assert "inventoryScannerLastQueuedAt" not in javascript
+    assert "inventoryScannerRetryBudget = 2" in javascript
+    assert "inventoryScannerRetryBudget -= 1" in javascript
+    assert "inventoryScannerRetryBudget <= 0" in javascript
 
 
 def test_scanner_review_queue_has_individual_and_bulk_remove_actions() -> None:
