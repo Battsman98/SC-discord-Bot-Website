@@ -2515,8 +2515,6 @@ def _read_inventory_title_candidates(
 
 
 def _inventory_title_boxes(title_box: str | None) -> tuple[str, ...]:
-    if title_box == "0,0,1,1":
-        return (title_box,)
     boxes: list[str] = []
     for candidate_box in (
         _DEFAULT_INVENTORY_TITLE_BOX,

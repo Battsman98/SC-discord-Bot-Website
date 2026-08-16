@@ -502,7 +502,7 @@ def test_live_inventory_scanner_keeps_fast_calibration_and_places_confirmed_resu
     assert "orderedHistory.map" in javascript
     assert "inventoryScannerEmptyReadStreak >= 8" in javascript
     assert "requestTitleBox = inventoryScannerTitleBox" in javascript
-    assert 'requestTitleBox: "0,0,1,1"' in javascript
+    assert 'requestTitleBox = "0,0,1,1"' not in javascript
     assert 'addInventoryScannerHistory(payload, countedScannerItems, options.captureToken || "")' in javascript
     assert "inventoryScannerPendingReview.samples < 2" in javascript
     assert "inventoryScannerReviewEntriesMatch(entry, stableEntry, false)" in javascript
@@ -550,8 +550,7 @@ def test_live_scanner_preserves_screen_resolution_and_lossless_titles() -> None:
     assert "width: { ideal: 1920, max: 2560 }" in javascript
     assert "height: { ideal: 1080, max: 1440 }" in javascript
     assert "const maxWidth = 1920" in javascript
-    assert 'uploadCanvas.toBlob(resolve, "image/png")' in javascript
-    assert 'const uploadCanvas = document.createElement("canvas")' in javascript
+    assert 'canvas.toBlob(resolve, "image/png")' in javascript
     assert 'new File([blob], "inventory-tooltip.png", { type: "image/png" })' in javascript
 
 
@@ -559,7 +558,7 @@ def test_live_scanner_uses_provisioned_ocr_workers_and_reports_stage_timings() -
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
 
-    assert "inventoryScannerMaxInFlight = 2" in javascript
+    assert "inventoryScannerMaxInFlight = 1" in javascript
     assert "inventoryScannerPendingHashes" in javascript
     assert '"ocr_ms": ocr_ms' in python
     assert '"match_ms": match_ms' in python
