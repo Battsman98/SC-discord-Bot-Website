@@ -256,7 +256,7 @@ let inventoryScannerStatus = "";
 let inventoryScannerInFlight = 0;
 // Keep one request in flight per browser. Two concurrent PNG uploads plus OCR
 // can saturate a small production instance and make every request slower.
-const inventoryScannerMaxInFlight = 1;
+const inventoryScannerMaxInFlight = 2;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
@@ -2839,16 +2839,43 @@ async function captureInventoryScannerCrop() {
   );
   const contextHash = imageAverageHash(contextCanvas, 24);
   const tileToken = detectInventoryScannerTileToken(contextCanvas);
+  // Upload only the title strip. Keep the full frame local for change and tile
+  // detection instead of transferring megabytes for every hover transition.
+  const fallbackTitleBox = [0.30, 0.245, 0.38, 0.0275];
+  const titleValues = requestTitleBox
+    ? requestTitleBox.split(",").map((value) => Number(value))
+    : fallbackTitleBox;
+  const validTitleValues = titleValues.length === 4
+    && titleValues.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+    && titleValues[2] > 0
+    && titleValues[3] > 0;
+  const [titleX, titleY, titleWidth, titleHeight] = validTitleValues
+    ? titleValues
+    : fallbackTitleBox;
+  const uploadCanvas = document.createElement("canvas");
+  uploadCanvas.width = Math.max(1, Math.round(canvas.width * titleWidth));
+  uploadCanvas.height = Math.max(1, Math.round(canvas.height * titleHeight));
+  uploadCanvas.getContext("2d").drawImage(
+    canvas,
+    Math.round(canvas.width * titleX),
+    Math.round(canvas.height * titleY),
+    uploadCanvas.width,
+    uploadCanvas.height,
+    0,
+    0,
+    uploadCanvas.width,
+    uploadCanvas.height,
+  );
   // Inventory titles are small, thin, low-contrast text. PNG avoids the extra
   // ringing and blur that WebP introduces before server-side OCR.
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  const blob = await new Promise((resolve) => uploadCanvas.toBlob(resolve, "image/png"));
   if (!blob) throw new Error("Could not encode the inventory capture.");
   return {
     file: new File([blob], "inventory-tooltip.png", { type: "image/png" }),
     hash,
     contextHash,
     tileToken,
-    requestTitleBox,
+    requestTitleBox: "0,0,1,1",
   };
 }
 

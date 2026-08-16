@@ -577,6 +577,7 @@ def test_inventory_title_regions_prioritize_one_second_tooltip_geometry() -> Non
     assert web_module._inventory_title_boxes(None) == (
         web_module._DEFAULT_INVENTORY_TITLE_BOX,
     )
+    assert web_module._inventory_title_boxes("0,0,1,1") == ("0,0,1,1",)
 
 
 def test_inventory_scanner_rejects_suffix_driven_wrong_item_family() -> None:
