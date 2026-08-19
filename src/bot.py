@@ -4,6 +4,7 @@ import os
 import re
 import time
 from contextlib import suppress
+from datetime import timedelta
 from pathlib import Path
 
 import aiohttp
@@ -116,6 +117,10 @@ HUB_PERMANENT_MESSAGE_PREFIXES = (
 )
 MEMBER_ROLE_ID = 1409117152795168799
 MEMBER_ROLE_NAME = "Members"
+ANNIVERSARY_ROLE_NAME = "1 Year Member"
+ANNIVERSARY_CHANNEL_NAME = "welcome"
+ANNIVERSARY_AGE = timedelta(days=365)
+ANNIVERSARY_CHECK_INTERVAL_SECONDS = 24 * 60 * 60
 APPLICATION_REVIEW_CHANNEL_NAME = "membership-application-reviews"
 APPLICATION_PENDING_CACHE_PREFIX = "discord:membership-application-pending"
 VISITOR_COMMAND_CHANNELS = {
@@ -480,6 +485,7 @@ class GameAssistBot(commands.Bot):
         self._hub_recovery_task: asyncio.Task | None = None
         self._item_catalog_task: asyncio.Task | None = None
         self._website_deployment_task: asyncio.Task | None = None
+        self._anniversary_task: asyncio.Task | None = None
         self._hub_last_recovery_monotonic = 0.0
         self._hub_incident_count = 0
         self._hub_pending_incident: tuple[str, discord.AuditLogAction | None, int | None] | None = None
@@ -541,6 +547,7 @@ class GameAssistBot(commands.Bot):
         await self._run_startup_step("restore pending loot reviews", self.restore_pending_loot_reviews)
         await self._run_startup_step("sync Executive Hangar status", self.sync_exec_status_message)
         await self._run_startup_step("sync contested-zone timers", self.sync_cz_timers_message)
+        await self._run_startup_step("assign one-year member roles", self.sync_anniversary_roles)
         self._commands_reference_synced = True
 
         if (self.settings.exec_status_channel_id or self.visitor_channels.get("executive-hangar-status")) and self._exec_status_task is None:
@@ -551,6 +558,8 @@ class GameAssistBot(commands.Bot):
             self._item_catalog_task = asyncio.create_task(self._item_catalog_sync_loop())
         if self._website_deployment_task is None:
             self._website_deployment_task = asyncio.create_task(self._website_deployment_monitor_loop())
+        if self._anniversary_task is None:
+            self._anniversary_task = asyncio.create_task(self._anniversary_role_loop())
 
     async def _website_deployment_monitor_loop(self) -> None:
         """Record website-only Render revisions without restarting Discord."""
@@ -587,6 +596,56 @@ class GameAssistBot(commands.Bot):
                 f"**Summary:** {summary}\n\nRevision: `{revision[:12]}`\nApplication: `Website`",
             )
         await self.cache.set(cache_key, revision, 315360000)
+
+    async def _anniversary_role_loop(self) -> None:
+        while not self.is_closed():
+            await asyncio.sleep(ANNIVERSARY_CHECK_INTERVAL_SECONDS)
+            try:
+                await self.sync_anniversary_roles()
+            except Exception:
+                logging.exception("One-year member role synchronization failed")
+
+    async def sync_anniversary_roles(self) -> None:
+        """Create and award the one-year role, announcing each new milestone."""
+        guild = self.get_guild(self.settings.discord_guild_id or 0)
+        if guild is None or guild.me is None:
+            logging.error("Could not resolve the configured guild for anniversary roles")
+            return
+        if not guild.me.guild_permissions.manage_roles:
+            logging.warning("Manage Roles is required to assign anniversary roles")
+            return
+
+        role = discord.utils.find(
+            lambda item: item.name.casefold() == ANNIVERSARY_ROLE_NAME.casefold(),
+            guild.roles,
+        )
+        if role is None:
+            role = await guild.create_role(
+                name=ANNIVERSARY_ROLE_NAME,
+                permissions=discord.Permissions.none(),
+                colour=discord.Colour.default(),
+                hoist=False,
+                mentionable=False,
+                reason="Create automatic one-year membership milestone role",
+            )
+
+        welcome = discord.utils.find(
+            lambda channel: channel.name.casefold() == ANNIVERSARY_CHANNEL_NAME.casefold(),
+            guild.text_channels,
+        )
+        cutoff = discord.utils.utcnow() - ANNIVERSARY_AGE
+        for member in guild.members:
+            if member.bot or member.joined_at is None or member.joined_at > cutoff or role in member.roles:
+                continue
+            try:
+                await member.add_roles(role, reason="Member reached one year in the server")
+                if welcome is not None:
+                    await welcome.send(
+                        f"{member.mention} just hit one year in the server — welcome to the **{ANNIVERSARY_ROLE_NAME}** role! 🎉",
+                        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                    )
+            except (discord.Forbidden, discord.HTTPException):
+                logging.exception("Could not award the one-year role to member %s", member.id)
 
     async def _item_catalog_sync_loop(self) -> None:
         while not self.is_closed():
