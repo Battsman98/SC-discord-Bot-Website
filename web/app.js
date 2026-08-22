@@ -274,6 +274,9 @@ let inventoryScannerLastCountedCaptureToken = "";
 let inventoryScannerTitleBox = "";
 let inventoryScannerEmptyReadStreak = 0;
 let inventoryScannerReadyToCount = true;
+let inventoryScannerDiagnosticSessionId = "";
+let inventoryScannerDiagnosticStartedAt = 0;
+let inventoryScannerCaptureIndex = 0;
 const inventoryScannerSpacingInput = document.querySelector("#inventoryScannerSpacing");
 if (inventoryScannerSpacingInput?.value === "3500") inventoryScannerSpacingInput.value = "350";
 if (inventoryScannerSpacingInput) inventoryScannerSpacingInput.min = "250";
@@ -2520,6 +2523,10 @@ async function startInventoryScanner() {
   inventoryScannerTitleBox = "";
   inventoryScannerEmptyReadStreak = 0;
   inventoryScannerReadyToCount = true;
+  inventoryScannerDiagnosticSessionId = globalThis.crypto?.randomUUID?.().replaceAll("-", "")
+    || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  inventoryScannerDiagnosticStartedAt = performance.now();
+  inventoryScannerCaptureIndex = 0;
   inventoryScannerStream = await navigator.mediaDevices.getDisplayMedia({
     video: {
       frameRate: { ideal: 5, max: 8 },
@@ -2632,6 +2639,9 @@ async function scanInventoryHover() {
       ...capture,
       captureToken,
       captureMs,
+      captureIndex: inventoryScannerCaptureIndex++,
+      clientElapsedMs: Math.round(performance.now() - inventoryScannerDiagnosticStartedAt),
+      clientQueueDepth: inventoryScannerQueue.length + inventoryScannerInFlight,
       generation: inventoryScannerGeneration,
     });
     if (inventoryScannerQueue.length > inventoryScannerQueueLimit) inventoryScannerQueue.shift();
@@ -2671,6 +2681,10 @@ async function processInventoryScannerCapture(capture) {
     captureMs: capture.captureMs,
     captureToken: capture.captureToken,
     scannerGeneration: capture.generation,
+    diagnosticSessionId: inventoryScannerDiagnosticSessionId,
+    captureIndex: capture.captureIndex,
+    clientElapsedMs: capture.clientElapsedMs,
+    clientQueueDepth: capture.clientQueueDepth,
     deferRender: true,
     titleBox: capture.requestTitleBox,
   });
@@ -3017,6 +3031,11 @@ async function submitInventoryImages(files, options = {}) {
         ? options.titleBox
         : inventoryScannerTitleBox;
       if (requestTitleBox) params.set("title_box", requestTitleBox);
+      if (options.diagnosticSessionId) params.set("diagnostic_session_id", options.diagnosticSessionId);
+      if (options.captureIndex !== undefined) params.set("capture_index", String(options.captureIndex));
+      if (options.captureToken) params.set("capture_token", options.captureToken);
+      if (options.clientElapsedMs !== undefined) params.set("client_elapsed_ms", String(options.clientElapsedMs));
+      if (options.clientQueueDepth !== undefined) params.set("client_queue_depth", String(options.clientQueueDepth));
     }
     params.set("min_score", String(Number(document.querySelector("#inventoryScannerMinScore")?.value || 0.72)));
     const excludeWords = document.querySelector("#inventoryScannerExcludeWords")?.value.trim();

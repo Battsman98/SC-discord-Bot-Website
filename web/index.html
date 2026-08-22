@@ -471,7 +471,8 @@
           <strong>Scanning timing:</strong> Keep the first item steady while the scanner finds its tooltip and the
           <em>Volume</em> line beneath the title. After the first confirmation, hover each item until its recognized
           name appears, then move to the next tile. The scanner keeps only the newest waiting frame so old captures
-          cannot build up behind your current item.
+          cannot build up behind your current item. For troubleshooting, cropped tooltip images and processing
+          diagnostics are stored securely for 24 hours, then automatically deleted.
         </p>
         <div class="scanner-preview">
           <video id="inventoryScannerVideo" muted playsinline></video>
@@ -800,6 +801,6 @@
   </div>
 
   <script src="/assets/hotfix-overlay.js?v=20260815-scanner-errors" defer></script>
-  <script src="/assets/app.js?v=20260815-scanner-stable-retry" defer></script>
+  <script src="/assets/app.js?v=20260822-scanner-diagnostics" defer></script>
 </body>
 </html>

@@ -256,6 +256,42 @@ class SQLiteCache:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_loot_sightings_item_status ON loot_sighting_reports(normalized_item_name, status, reviewed_at)"
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS inventory_scan_diagnostics (
+                diagnostic_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                capture_index INTEGER NOT NULL,
+                capture_token TEXT,
+                category TEXT,
+                item_type TEXT,
+                ocr_text TEXT,
+                matched_items_json TEXT NOT NULL,
+                attempted_titles_json TEXT NOT NULL,
+                diagnostics_json TEXT NOT NULL,
+                calibration_json TEXT,
+                error_text TEXT,
+                queue_ms INTEGER NOT NULL DEFAULT 0,
+                ocr_ms INTEGER NOT NULL DEFAULT 0,
+                match_ms INTEGER NOT NULL DEFAULT 0,
+                server_ms INTEGER NOT NULL DEFAULT 0,
+                client_elapsed_ms INTEGER,
+                client_queue_depth INTEGER,
+                image_content_type TEXT NOT NULL,
+                image_data BYTEA NOT NULL,
+                image_size INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_inventory_scan_diagnostics_session ON inventory_scan_diagnostics(user_id, session_id, capture_index)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_inventory_scan_diagnostics_expiry ON inventory_scan_diagnostics(expires_at)"
+        )
         cls._ensure_column(connection, "user_ships", "image_url", "TEXT")
         cls._ensure_column(connection, "user_ships", "notes", "TEXT")
         cls._ensure_column(connection, "user_ships", "loaner_for", "TEXT")
@@ -272,6 +308,148 @@ class SQLiteCache:
         cls._backfill_audit_action_types(connection)
         connection.commit()
         return cls(connection)
+
+    async def save_inventory_scan_diagnostic(
+        self,
+        *,
+        diagnostic_id: str,
+        session_id: str,
+        user_id: int,
+        capture_index: int,
+        capture_token: str | None,
+        category: str | None,
+        item_type: str | None,
+        ocr_text: str,
+        matched_items: list[str],
+        attempted_titles: list[tuple[str, str]],
+        diagnostics: dict[str, Any],
+        calibration: dict[str, Any] | None,
+        error_text: str | None,
+        queue_ms: int,
+        ocr_ms: int,
+        match_ms: int,
+        server_ms: int,
+        client_elapsed_ms: int | None,
+        client_queue_depth: int | None,
+        image_content_type: str,
+        image_data: bytes,
+        ttl_seconds: int = 86400,
+    ) -> None:
+        now = int(time.time())
+        self._connection.execute(
+            """
+            INSERT INTO inventory_scan_diagnostics (
+                diagnostic_id, session_id, user_id, capture_index, capture_token,
+                category, item_type, ocr_text, matched_items_json,
+                attempted_titles_json, diagnostics_json, calibration_json,
+                error_text, queue_ms, ocr_ms, match_ms, server_ms,
+                client_elapsed_ms, client_queue_depth, image_content_type,
+                image_data, image_size, created_at, expires_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(diagnostic_id) DO UPDATE SET
+                ocr_text = excluded.ocr_text,
+                matched_items_json = excluded.matched_items_json,
+                attempted_titles_json = excluded.attempted_titles_json,
+                diagnostics_json = excluded.diagnostics_json,
+                calibration_json = excluded.calibration_json,
+                error_text = excluded.error_text,
+                queue_ms = excluded.queue_ms,
+                ocr_ms = excluded.ocr_ms,
+                match_ms = excluded.match_ms,
+                server_ms = excluded.server_ms,
+                image_data = excluded.image_data,
+                image_size = excluded.image_size,
+                expires_at = excluded.expires_at
+            """,
+            (
+                diagnostic_id, session_id, user_id, capture_index, capture_token,
+                category, item_type, ocr_text, json.dumps(matched_items),
+                json.dumps(attempted_titles), json.dumps(diagnostics),
+                json.dumps(calibration) if calibration is not None else None,
+                error_text, queue_ms, ocr_ms, match_ms, server_ms,
+                client_elapsed_ms, client_queue_depth, image_content_type,
+                image_data, len(image_data), now, now + ttl_seconds,
+            ),
+        )
+        self._connection.commit()
+
+    async def purge_expired_inventory_scan_diagnostics(self) -> int:
+        cursor = self._connection.execute(
+            "DELETE FROM inventory_scan_diagnostics WHERE expires_at <= ?",
+            (int(time.time()),),
+        )
+        self._connection.commit()
+        return cursor.rowcount
+
+    async def list_inventory_scan_sessions(self, user_id: int, limit: int = 10) -> list[dict[str, Any]]:
+        await self.purge_expired_inventory_scan_diagnostics()
+        rows = self._connection.execute(
+            """
+            SELECT session_id, MIN(created_at), MAX(created_at), COUNT(*),
+                   SUM(image_size), SUM(CASE WHEN matched_items_json <> '[]' THEN 1 ELSE 0 END),
+                   MAX(expires_at)
+            FROM inventory_scan_diagnostics
+            WHERE user_id = ?
+            GROUP BY session_id
+            ORDER BY MAX(created_at) DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+        return [
+            {
+                "session_id": row[0], "started_at": row[1], "last_capture_at": row[2],
+                "capture_count": row[3], "storage_bytes": row[4] or 0,
+                "matched_capture_count": row[5] or 0, "expires_at": row[6],
+            }
+            for row in rows
+        ]
+
+    async def get_inventory_scan_session(self, user_id: int, session_id: str) -> list[dict[str, Any]]:
+        await self.purge_expired_inventory_scan_diagnostics()
+        rows = self._connection.execute(
+            """
+            SELECT diagnostic_id, capture_index, capture_token, category, item_type,
+                   ocr_text, matched_items_json, attempted_titles_json, diagnostics_json,
+                   calibration_json, error_text, queue_ms, ocr_ms, match_ms, server_ms,
+                   client_elapsed_ms, client_queue_depth, image_content_type, image_size,
+                   created_at, expires_at
+            FROM inventory_scan_diagnostics
+            WHERE user_id = ? AND session_id = ?
+            ORDER BY capture_index, created_at
+            """,
+            (user_id, session_id),
+        ).fetchall()
+        return [
+            {
+                "diagnostic_id": row[0], "capture_index": row[1], "capture_token": row[2],
+                "category": row[3], "item_type": row[4], "ocr_text": row[5],
+                "matched_items": json.loads(row[6]), "attempted_titles": json.loads(row[7]),
+                "diagnostics": json.loads(row[8]),
+                "calibration": json.loads(row[9]) if row[9] else None,
+                "error": row[10], "performance": {
+                    "queue_ms": row[11], "ocr_ms": row[12], "match_ms": row[13],
+                    "server_ms": row[14], "client_elapsed_ms": row[15],
+                    "client_queue_depth": row[16],
+                },
+                "image_content_type": row[17], "image_size": row[18],
+                "created_at": row[19], "expires_at": row[20],
+                "image_url": f"/api/me/inventory/scans/images/{row[0]}",
+            }
+            for row in rows
+        ]
+
+    async def get_inventory_scan_image(self, user_id: int, diagnostic_id: str) -> tuple[str, bytes] | None:
+        await self.purge_expired_inventory_scan_diagnostics()
+        row = self._connection.execute(
+            """
+            SELECT image_content_type, image_data
+            FROM inventory_scan_diagnostics
+            WHERE user_id = ? AND diagnostic_id = ?
+            """,
+            (user_id, diagnostic_id),
+        ).fetchone()
+        return (str(row[0]), bytes(row[1])) if row else None
 
     @staticmethod
     def _ensure_column(connection: sqlite3.Connection, table: str, column: str, column_type: str) -> None:
