@@ -26,6 +26,57 @@ from src.web import (
 )
 
 
+def test_inventory_scanner_diagnostics_store_crops_and_expire_after_24_hours(tmp_path) -> None:
+    async def run() -> None:
+        cache = await SQLiteCache.create(str(tmp_path / "scanner.sqlite3"))
+        image_data = b"\x89PNG\r\n\x1a\nscanner-crop"
+        await cache.save_inventory_scan_diagnostic(
+            diagnostic_id="session-one-0-request",
+            session_id="session-one",
+            user_id=42,
+            capture_index=0,
+            capture_token="hash:tile:1:1",
+            category="Armor",
+            item_type="Helmet",
+            ocr_text="Overlord Helmet Flashback",
+            matched_items=["Overlord Helmet Flashback"],
+            attempted_titles=[("Overlord Helmet Flashback", "0.3,0.2,0.4,0.03")],
+            diagnostics={"candidates": [{"text": "Overlord Helmet Flashback"}]},
+            calibration={"fast_title": True},
+            error_text=None,
+            queue_ms=12,
+            ocr_ms=340,
+            match_ms=18,
+            server_ms=370,
+            client_elapsed_ms=5100,
+            client_queue_depth=2,
+            image_content_type="image/png",
+            image_data=image_data,
+        )
+
+        sessions = await cache.list_inventory_scan_sessions(42)
+        assert sessions[0]["capture_count"] == 1
+        assert sessions[0]["storage_bytes"] == len(image_data)
+        captures = await cache.get_inventory_scan_session(42, "session-one")
+        assert captures[0]["matched_items"] == ["Overlord Helmet Flashback"]
+        assert captures[0]["performance"]["client_elapsed_ms"] == 5100
+        assert await cache.get_inventory_scan_image(42, captures[0]["diagnostic_id"]) == (
+            "image/png", image_data,
+        )
+        assert await cache.get_inventory_scan_session(7, "session-one") == []
+
+        cache._connection.execute(
+            "UPDATE inventory_scan_diagnostics SET expires_at = ?",
+            (int(time.time()) - 1,),
+        )
+        cache._connection.commit()
+        assert await cache.purge_expired_inventory_scan_diagnostics() == 1
+        assert await cache.get_inventory_scan_session(42, "session-one") == []
+        await cache.close()
+
+    asyncio.run(run())
+
+
 def test_user_inventory_round_trip_and_transfer(tmp_path) -> None:
     async def run() -> None:
         cache = await SQLiteCache.create(str(tmp_path / "bot.sqlite3"))
