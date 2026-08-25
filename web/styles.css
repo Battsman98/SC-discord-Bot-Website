@@ -2448,6 +2448,51 @@ body.hangar-modal-open {
 
 .connector-steps code {
   color: var(--accent-2);
+  overflow-wrap: anywhere;
+}
+
+.connector-browser-chooser {
+  display: grid;
+  gap: 12px;
+}
+
+.connector-browser-chooser[hidden] {
+  display: none;
+}
+
+.connector-browser-intro {
+  margin: 0;
+}
+
+.connector-browser-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.connector-browser-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.connector-browser-card h4 {
+  margin: 0;
+}
+
+.connector-browser-card .button-link {
+  justify-self: start;
+}
+
+@media (max-width: 880px) {
+  .connector-browser-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .blueprint-import textarea {

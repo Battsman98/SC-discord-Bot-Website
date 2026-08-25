@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Game Assist RSI Hangar Importer",
+  "version": "0.4.9",
+  "description": "Imports only pledged ships and vehicles from your RSI hangar using your browser session.",
+  "host_permissions": [
+    "https://robertsspaceindustries.com/*"
+  ],
+  "permissions": [],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "rsi-hangar-importer@sccompanion.org",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://sccompanion.org/*",
+        "https://star-citizen-game-assist.onrender.com/*",
+        "http://127.0.0.1:8000/*",
+        "http://localhost:8000/*"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_title": "Game Assist RSI Hangar Importer",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  }
+}

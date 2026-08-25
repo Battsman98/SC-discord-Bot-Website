@@ -30,4 +30,16 @@ using your existing browser RSI login session. It does not ask for, display, sto
 6. Open [SC Companion](https://sccompanion.org/).
 7. Click `Ships`, then `Import RSI Hangar`.
 
+## Install in Firefox
+
+Use the packaged Firefox ZIP from `web/rsi-connector-extension-firefox-v0.4.9.zip`:
+
+1. Open `about:debugging#/runtime/this-firefox`.
+2. Choose `Load Temporary Add-on`.
+3. Select the Firefox ZIP.
+4. Sign into RSI in the same Firefox profile.
+5. Open [SC Companion](https://sccompanion.org/), click `Ships`, then `Import RSI Hangar`.
+
+Temporary add-ons are removed when Firefox closes. A permanent installation requires a Mozilla-signed package.
+
 Version 0.4.9 reports pledge-page scan progress, imports only RSI items explicitly typed as ships or vehicles, and sends privacy-safe parser health metrics and a structural fingerprint to SC Companion.
