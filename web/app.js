@@ -1259,17 +1259,47 @@ function connectorInstallPrompt(message) {
       <p>${escapeHtml(message)} Install the local importer once, then click Import RSI Hangar again.</p>
     </div>
     <div class="connector-actions">
-      <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.9.zip">Download connector v0.4.9</a>
-      <button type="button" data-open-extension-help>Install steps</button>
+      <button type="button" data-open-extension-downloads aria-expanded="false">Choose browser &amp; download</button>
       <button type="button" data-import-rsi-files>Use saved HTML</button>
     </div>
-    <ol class="connector-steps" hidden>
-      <li>Unzip the downloaded connector folder.</li>
-      <li>Open <a href="chrome://extensions">chrome://extensions</a> or <a href="edge://extensions">edge://extensions</a>. If your browser blocks internal links, copy and paste the address.</li>
-      <li>Turn on Developer mode.</li>
-      <li>Choose <strong>Load unpacked</strong> and select the unzipped folder.</li>
-      <li>Sign into RSI in this browser, then click <strong>Import RSI Hangar</strong> again.</li>
-    </ol>
+    <div class="connector-browser-chooser" data-extension-downloads hidden>
+      <p class="connector-browser-intro"><strong>Select your browser</strong> and follow its installation steps.</p>
+      <div class="connector-browser-grid">
+        <section class="connector-browser-card">
+          <h4>Google Chrome</h4>
+          <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.9.zip">Download for Chrome</a>
+          <ol class="connector-steps">
+            <li>Unzip the downloaded file.</li>
+            <li>Copy <code>chrome://extensions</code> into the address bar.</li>
+            <li>Turn on <strong>Developer mode</strong>.</li>
+            <li>Choose <strong>Load unpacked</strong> and select the unzipped folder.</li>
+            <li>Sign into RSI in Chrome, then try the import again.</li>
+          </ol>
+        </section>
+        <section class="connector-browser-card">
+          <h4>Microsoft Edge</h4>
+          <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-v0.4.9.zip">Download for Edge</a>
+          <ol class="connector-steps">
+            <li>Unzip the downloaded file.</li>
+            <li>Copy <code>edge://extensions</code> into the address bar.</li>
+            <li>Turn on <strong>Developer mode</strong>.</li>
+            <li>Choose <strong>Load unpacked</strong> and select the unzipped folder.</li>
+            <li>Sign into RSI in Edge, then try the import again.</li>
+          </ol>
+        </section>
+        <section class="connector-browser-card">
+          <h4>Mozilla Firefox</h4>
+          <a class="button-link" href="https://github.com/Battsman98/SC-discord-Bot-Website/raw/main/web/rsi-connector-extension-firefox-v0.4.9.zip">Download for Firefox</a>
+          <ol class="connector-steps">
+            <li>Keep the downloaded ZIP file; do not unzip it.</li>
+            <li>Copy <code>about:debugging#/runtime/this-firefox</code> into the address bar.</li>
+            <li>Choose <strong>Load Temporary Add-on</strong> and select the ZIP.</li>
+            <li>Sign into RSI in Firefox, then try the import again.</li>
+            <li>Firefox removes temporary add-ons when the browser closes, so repeat these steps after restarting Firefox.</li>
+          </ol>
+        </section>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -3445,10 +3475,12 @@ function bindConnectorPromptButtons(target) {
   target.querySelectorAll("[data-import-rsi-files]").forEach((button) => {
     button.addEventListener("click", () => document.querySelector("#rsiPledgeImport").click());
   });
-  target.querySelectorAll("[data-open-extension-help]").forEach((button) => {
+  target.querySelectorAll("[data-open-extension-downloads]").forEach((button) => {
     button.addEventListener("click", () => {
-      const steps = button.closest(".connector-prompt")?.querySelector(".connector-steps");
-      if (steps) steps.hidden = !steps.hidden;
+      const chooser = button.closest(".connector-prompt")?.querySelector("[data-extension-downloads]");
+      if (!chooser) return;
+      chooser.hidden = !chooser.hidden;
+      button.setAttribute("aria-expanded", String(!chooser.hidden));
     });
   });
 }

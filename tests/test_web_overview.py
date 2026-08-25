@@ -415,6 +415,13 @@ def test_rsi_hangar_import_shows_page_scan_progress() -> None:
     assert 'direction === "from-game-assist-rsi-progress"' in javascript
     assert ".rsi-import-progress-track" in css
     assert "rsi-connector-extension-v0.4.9.zip" in javascript
+    assert "rsi-connector-extension-firefox-v0.4.9.zip" in javascript
+    assert "Download for Chrome" in javascript
+    assert "Download for Edge" in javascript
+    assert "Download for Firefox" in javascript
+    assert "data-open-extension-downloads" in javascript
+    assert "about:debugging#/runtime/this-firefox" in javascript
+    assert ".connector-browser-grid" in css
     assert 'outputs.savedShips.insertAdjacentHTML("afterbegin", summary)' in javascript
     assert 'outputs.lookup.innerHTML = `<div class="state">' not in javascript.split("function showRsiImportResult", 1)[1].split("function showRsiImportProgress", 1)[0]
     assert "No recognized ships were saved, and the existing hangar was left unchanged." in javascript

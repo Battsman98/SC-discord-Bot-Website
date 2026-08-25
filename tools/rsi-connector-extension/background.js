@@ -1,14 +1,21 @@
 async function rsiHTMLGet(url) {
-  const response = await fetch(url, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "accept-language": "en-US,en;q=0.9",
-      "cache-control": "max-age=0"
-    },
-    signal: AbortSignal.timeout(20000)
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "max-age=0"
+      },
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
   return { code: response.status, payload: await response.text(), url: response.url };
 }
 
@@ -152,7 +159,7 @@ async function importHangar(reportProgress = () => {}) {
     return {
       code: 422,
       error: signedOut
-        ? "RSI redirected to sign-in. Sign into RSI in this Chrome profile, then try again."
+        ? "RSI redirected to sign-in. Sign into RSI in this browser profile, then try again."
         : "RSI returned the hangar page, but no ship records were recognized. Reload the extension and report this message so the parser can be updated.",
       diagnostics,
     };
@@ -189,7 +196,7 @@ chrome.runtime.onMessage.addListener((rawMessage, sender, sendResponse) => {
       direction: "from-game-assist-rsi-progress",
       requestId,
       progress,
-    }).catch(() => {});
+    }, () => void chrome.runtime.lastError);
   };
   handleMessage(rawMessage, reportProgress).then((response) => {
     sendResponse(JSON.stringify(response));
