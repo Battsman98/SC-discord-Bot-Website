@@ -1317,7 +1317,7 @@ def test_lookup_items_filters_items_and_purchases_by_location() -> None:
     assert [purchase.terminal_name for purchase in results[0].purchases] == ["Platinum Bay"]
 
 
-def test_item_location_autocomplete_includes_all_purchase_location_levels() -> None:
+def test_item_location_autocomplete_groups_shops_under_physical_locations() -> None:
     source = UEXSource.__new__(UEXSource)
     source._fetch_all_item_prices = AsyncMock(return_value=[
         {"id_item": 1, "id_terminal": 10, "price_buy": 100},
@@ -1333,4 +1333,4 @@ def test_item_location_autocomplete_includes_all_purchase_location_levels() -> N
 
     results = asyncio.run(source.autocomplete_item_filter("location", "", limit=25))
 
-    assert results == ["microTech", "Platinum Bay", "Port Tressler", "Stanton"]
+    assert results == ["Port Tressler"]

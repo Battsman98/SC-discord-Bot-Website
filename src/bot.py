@@ -3599,15 +3599,15 @@ async def loot_report_autocomplete(
     return await loot_search_autocomplete(interaction, current)
 
 
-@item_group.command(name="locator", description="Find in-game buyable Star Citizen items.")
+@item_group.command(name="search", description="Search for in-game buyable Star Citizen items.")
 @app_commands.describe(
     name="Item name to search.",
     category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
     section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
     size="Optional item size.",
-    location="Optional purchase location, station, planet, or star system.",
+    location="Optional station, city, outpost, or point of interest.",
 )
-async def item_locator_command(
+async def item_search_command(
     interaction: discord.Interaction,
     name: str | None = None,
     category: str | None = None,
@@ -3664,27 +3664,7 @@ async def item_locator_command(
     )
 
 
-@item_group.command(name="search", description="Search for in-game buyable Star Citizen items.")
-@app_commands.describe(
-    name="Item name to search.",
-    category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
-    section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
-    size="Optional item size.",
-    location="Optional purchase location, station, planet, or star system.",
-)
-async def item_search_command(
-    interaction: discord.Interaction,
-    name: str | None = None,
-    category: str | None = None,
-    section: str | None = None,
-    size: str | None = None,
-    location: str | None = None,
-) -> None:
-    await item_locator_command.callback(interaction, name, category, section, size, location)
-
-
 @item_search_command.autocomplete("name")
-@item_locator_command.autocomplete("name")
 async def item_locator_name_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -3700,10 +3680,6 @@ async def item_locator_name_autocomplete(
 @item_search_command.autocomplete("section")
 @item_search_command.autocomplete("size")
 @item_search_command.autocomplete("location")
-@item_locator_command.autocomplete("category")
-@item_locator_command.autocomplete("section")
-@item_locator_command.autocomplete("size")
-@item_locator_command.autocomplete("location")
 async def item_locator_filter_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -4351,8 +4327,8 @@ def build_visitor_command_example_embeds() -> dict[str, discord.Embed]:
         ),
         "item-locator": _visitor_example_embed(
             "Example Item Locator Response",
-            "/item locator name: FS-9 LMG",
-            "Type `/item`, select `locator`, choose the `name` option, enter or choose `FS-9 LMG`, then submit. Optional `category`, `section`, and `size` options narrow the results.",
+            "/item search name: FS-9 LMG",
+            "Type `/item`, select `search`, choose the `name` option, enter or choose `FS-9 LMG`, then submit. Optional `category`, `section`, `size`, and `location` options narrow the results.",
             (("FS-9 LMG", "Personal Weapons · Light machine gun"), ("Purchase locations", "CenterMass, Area18 · Live Fire Weapons, Port Tressler"), ("Details", "Price, stock status, manufacturer, size, and source link when available")),
         ),
         "inventory-search": _visitor_example_embed(

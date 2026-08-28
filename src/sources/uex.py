@@ -277,8 +277,7 @@ class UEXSource:
                     value
                     for row in rows
                     for key in (
-                        "terminal_name", "star_system_name", "planet_name", "orbit_name", "moon_name",
-                        "outpost_name", "city_name", "space_station_name", "poi_name",
+                        "space_station_name", "city_name", "outpost_name", "poi_name",
                     )
                     if (value := self._string_or_none(row.get(key)))
                 },
@@ -318,8 +317,7 @@ class UEXSource:
         return any(
             self._normalize(row.get(key)) == wanted
             for key in (
-                "terminal_name", "star_system_name", "planet_name", "orbit_name", "moon_name",
-                "outpost_name", "city_name", "space_station_name", "poi_name",
+                "space_station_name", "city_name", "outpost_name", "poi_name",
             )
         )
 
