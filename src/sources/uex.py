@@ -26,6 +26,47 @@ class UEXSource:
     name = "UEX"
     base_url = "https://api.uexcorp.uk/2.0"
     wiki_api_url = "https://api.star-citizen.wiki/api"
+    # Patch 4.10 scan values verified against STARVEIN's in-game signature
+    # reference. Ship-mined materials have a unique base signature. Ground
+    # deposits use a size signature (3,000 FPS, 4,000 ROC).
+    _canonical_mining_signatures = {
+        "aphorite": 3000,
+        "beradom": 4000,
+        "caranite": 3000,
+        "carinite": 3000,
+        "dolivine": 3000,
+        "feynmaline": 4000,
+        "glacosite": 4000,
+        "hadanite": 3000,
+        "janalite": 4000,
+        "sadaryx": 3000,
+        "quantainium": 3170,
+        "stileron": 3185,
+        "savrilium": 3200,
+        "ouratite": 3370,
+        "riccite": 3385,
+        "lindinium": 3400,
+        "beryl": 3540,
+        "taranite": 3555,
+        "borase": 3570,
+        "gold": 3585,
+        "bexalite": 3600,
+        "laranite": 3825,
+        "aslarite": 3840,
+        "titanium": 3855,
+        "tungsten": 3870,
+        "agricium": 3885,
+        "torite": 3900,
+        "hephaestanite": 4180,
+        "tin": 4195,
+        "quartz": 4210,
+        "corundum": 4225,
+        "copper": 4240,
+        "silicon": 4255,
+        "iron": 4270,
+        "aluminum": 4285,
+        "ice": 4300,
+    }
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -477,6 +518,10 @@ class UEXSource:
 
     async def _get_mining_material_names_for_signature(self, signature: int) -> set[str]:
         signatures = await self._get_mining_signature_map()
+        signatures = {**signatures}
+        signatures.update(
+            {material: [value] for material, value in self._canonical_mining_signatures.items()}
+        )
         matches = {
             material
             for material, values in signatures.items()
@@ -489,6 +534,8 @@ class UEXSource:
             self._normalize(str(material.get("material_name") or ""))
             for material in self._get_mining_fallbacks().values()
             if isinstance(material, dict)
+            and self._normalize(str(material.get("material_name") or ""))
+            not in self._canonical_mining_signatures
             and any(
                 self._mining_signature_matches_cluster(signature, base_signature)
                 for value in material.get("rock_signatures") or []
@@ -956,6 +1003,9 @@ class UEXSource:
     async def _get_mining_signatures(self, material_name: str) -> list[int]:
         signatures = await self._get_mining_signature_map()
         normalized_name = self._normalize(material_name)
+        canonical = self._canonical_mining_signatures.get(normalized_name)
+        if canonical is not None:
+            return [canonical]
         values = set(signatures.get(normalized_name, []))
 
         # The Wiki commodities index currently omits signatures for a number of
@@ -972,22 +1022,6 @@ class UEXSource:
             )
             break
 
-        # Ground deposits share a size-based signature rather than identifying
-        # the contained gem. Ice is a ship-mineable rock with its own signature.
-        supplemental = {
-            "aphorite": 3000,
-            "beradom": 3000,
-            "caranite": 3000,
-            "dolivine": 3000,
-            "feynmaline": 3000,
-            "glacosite": 3000,
-            "hadanite": 3000,
-            "janalite": 3000,
-            "sadaryx": 3000,
-            "ice": 4300,
-        }
-        if normalized_name in supplemental:
-            values.add(supplemental[normalized_name])
         return sorted(values)
 
     async def _get_mining_signature_map(self) -> dict[str, list[int]]:

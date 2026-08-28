@@ -373,6 +373,37 @@ def test_mining_signatures_supply_current_ground_deposit_and_ice_values() -> Non
     assert asyncio.run(source._get_mining_signatures("Ice")) == [4300]
 
 
+def test_all_canonical_mining_signatures_override_contaminated_source_values() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {
+        material: [4195, value]
+        for material, value in source._canonical_mining_signatures.items()
+    }
+    source._mining_fallbacks = {}
+
+    resolved = {
+        material: asyncio.run(source._get_mining_signatures(material))
+        for material in source._canonical_mining_signatures
+    }
+
+    assert resolved == {
+        material: [value]
+        for material, value in source._canonical_mining_signatures.items()
+    }
+    assert resolved["copper"] == [4240]
+
+
+def test_copper_does_not_match_tin_signature_from_contaminated_live_data() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {"copper": [4195, 4240], "tin": [4195]}
+    source._mining_fallbacks = {}
+
+    matches = asyncio.run(source._get_mining_material_names_for_signature(4195))
+
+    assert "tin" in matches
+    assert "copper" not in matches
+
+
 def test_filter_items_accepts_medpen_alias() -> None:
     source = UEXSource.__new__(UEXSource)
     items = [
@@ -694,7 +725,7 @@ def test_autocomplete_mining_materials_accepts_rock_signature() -> None:
     assert matches == ["Iron (Ore) (IRON)"]
 
 
-def test_autocomplete_mining_materials_accepts_cluster_signature() -> None:
+def test_autocomplete_mining_materials_uses_canonical_cluster_signature() -> None:
     source = UEXSource.__new__(UEXSource)
     source._mining_signatures = {
         "bexalite": [3570, 3585, 3600],
@@ -730,9 +761,7 @@ def test_autocomplete_mining_materials_accepts_cluster_signature() -> None:
 
     matches = asyncio.run(source.autocomplete_mining_materials("10710"))
 
-    assert "Gold (Ore) (GOLD)" in matches
-    assert "Borase (Ore) (BORA)" in matches
-    assert "Bexalite (Raw) (BEXA)" in matches
+    assert matches == ["Borase (Ore) (BORA)"]
 
 
 def test_parse_commodity_filters_by_system_before_limiting() -> None:
