@@ -598,6 +598,7 @@ class GameAssistBot(commands.Bot):
         await self.cache.set(cache_key, revision, 315360000)
 
     async def _anniversary_role_loop(self) -> None:
+        """Run the membership anniversary reconciliation once per day."""
         while not self.is_closed():
             await asyncio.sleep(ANNIVERSARY_CHECK_INTERVAL_SECONDS)
             try:
