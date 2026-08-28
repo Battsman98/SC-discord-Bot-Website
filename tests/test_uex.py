@@ -1215,6 +1215,24 @@ def test_enrich_price_rows_adds_terminal_location_details() -> None:
     assert rows[0]["city_name"] == "Area 18"
 
 
+def test_terminal_directory_loads_all_types_for_item_location_parents() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source.base_url = "https://example.test"
+    source._terminals_by_id = None
+    source._terminals_loaded_at = 0.0
+    source._cache = AsyncMock()
+    source._cache.get.return_value = None
+    source._fetch_json = AsyncMock(return_value={
+        "data": [{"id": 716, "displayname": "Seraphim Station", "space_station_name": "Seraphim Station"}],
+    })
+
+    terminals = asyncio.run(source._fetch_terminals_by_id())
+
+    source._fetch_json.assert_awaited_once_with("https://example.test/terminals")
+    source._cache.set.assert_awaited_once_with("uex:terminals-all:v2", terminals, 86400)
+    assert terminals["716"]["space_station_name"] == "Seraphim Station"
+
+
 def test_trade_location_value_accepts_autocomplete_display() -> None:
     source = UEXSource.__new__(UEXSource)
 
@@ -1315,6 +1333,23 @@ def test_lookup_items_filters_items_and_purchases_by_location() -> None:
 
     assert [result.name for result in results] == ["Atlas"]
     assert [purchase.terminal_name for purchase in results[0].purchases] == ["Platinum Bay"]
+
+
+def test_item_purchase_location_shows_actual_store_inside_parent_station() -> None:
+    source = UEXSource.__new__(UEXSource)
+
+    purchase = source._item_purchase_location({
+        "name": "FPS Armor - Seraphim",
+        "terminal_name": "FPS Armor Seraphim",
+        "space_station_name": "Seraphim Station",
+        "city_name": "Orison",
+        "planet_name": "Crusader",
+        "star_system_name": "Stanton",
+        "price_buy": 1250,
+    })
+
+    assert purchase.terminal_name == "FPS Armor - Seraphim"
+    assert purchase.location == "Seraphim Station"
 
 
 def test_item_location_autocomplete_groups_shops_under_physical_locations() -> None:

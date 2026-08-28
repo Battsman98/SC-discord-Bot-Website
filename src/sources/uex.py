@@ -760,7 +760,7 @@ class UEXSource:
             return self._terminals_by_id
         self._terminals_by_id = None
 
-        cached = await self._cache.get("uex:commodity-terminals:v1")
+        cached = await self._cache.get("uex:terminals-all:v2")
         if isinstance(cached, dict):
             self._terminals_by_id = {
                 str(terminal_id): terminal
@@ -770,7 +770,7 @@ class UEXSource:
             self._terminals_loaded_at = now
             return self._terminals_by_id
 
-        payload = await self._fetch_json(f"{self.base_url}/terminals?type=commodity")
+        payload = await self._fetch_json(f"{self.base_url}/terminals")
         rows = payload.get("data") if isinstance(payload, dict) else []
         self._terminals_by_id = {
             str(row.get("id")): row
@@ -778,7 +778,7 @@ class UEXSource:
             if isinstance(row, dict) and row.get("id") is not None
         }
         self._terminals_loaded_at = now
-        await self._cache.set("uex:commodity-terminals:v1", self._terminals_by_id, 86400)
+        await self._cache.set("uex:terminals-all:v2", self._terminals_by_id, 86400)
         return self._terminals_by_id
 
     async def _fetch_json(self, url: str) -> dict | None:
@@ -1543,7 +1543,7 @@ class UEXSource:
 
     def _item_purchase_location(self, row: dict) -> ItemPurchaseLocation:
         return ItemPurchaseLocation(
-            terminal_name=str(row.get("terminal_name") or "Unknown terminal"),
+            terminal_name=str(row.get("name") or row.get("terminal_name") or "Unknown store"),
             system=self._string_or_none(row.get("star_system_name")),
             planet=self._string_or_none(row.get("planet_name") or row.get("orbit_name") or row.get("moon_name")),
             location=self._location(row),
@@ -1933,9 +1933,9 @@ class UEXSource:
 
     def _location(self, row: dict) -> str | None:
         return self._string_or_none(
-            row.get("outpost_name")
+            row.get("space_station_name")
             or row.get("city_name")
-            or row.get("space_station_name")
+            or row.get("outpost_name")
             or row.get("poi_name")
             or row.get("terminal_name")
         )
