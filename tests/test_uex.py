@@ -1269,3 +1269,44 @@ def test_lookup_items_includes_purchase_locations() -> None:
     assert len(results[0].purchases) == 1
     assert results[0].purchases[0].price == 84000
     assert results[0].purchases[0].system == "Stanton"
+
+
+def test_lookup_items_filters_items_and_purchases_by_location() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._get_buyable_items = AsyncMock(return_value=[
+        {"id": 1, "name": "Atlas", "section": "Systems", "category": "Quantum Drives", "size": "1"},
+        {"id": 2, "name": "VK-00", "section": "Systems", "category": "Quantum Drives", "size": "1"},
+    ])
+    source._fetch_all_item_prices = AsyncMock(return_value=[
+        {"id_item": 1, "id_terminal": 10, "price_buy": 100},
+        {"id_item": 1, "id_terminal": 20, "price_buy": 200},
+        {"id_item": 2, "id_terminal": 20, "price_buy": 300},
+    ])
+    source._fetch_terminals_by_id = AsyncMock(return_value={
+        "10": {"displayname": "Platinum Bay", "space_station_name": "Port Tressler", "star_system_name": "Stanton"},
+        "20": {"displayname": "Dumpers Depot", "city_name": "Area 18", "star_system_name": "Stanton"},
+    })
+
+    results = asyncio.run(source.lookup_items(location="Port Tressler"))
+
+    assert [result.name for result in results] == ["Atlas"]
+    assert [purchase.terminal_name for purchase in results[0].purchases] == ["Platinum Bay"]
+
+
+def test_item_location_autocomplete_includes_all_purchase_location_levels() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._fetch_all_item_prices = AsyncMock(return_value=[
+        {"id_item": 1, "id_terminal": 10, "price_buy": 100},
+    ])
+    source._fetch_terminals_by_id = AsyncMock(return_value={
+        "10": {
+            "displayname": "Platinum Bay",
+            "space_station_name": "Port Tressler",
+            "planet_name": "microTech",
+            "star_system_name": "Stanton",
+        },
+    })
+
+    results = asyncio.run(source.autocomplete_item_filter("location", "", limit=25))
+
+    assert results == ["microTech", "Platinum Bay", "Port Tressler", "Stanton"]

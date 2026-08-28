@@ -370,6 +370,7 @@ Options:
 | `category` | No | Item category, such as Quantum Drives, Guns, Helmets, or Undersuits. |
 | `section` | No | Item section, such as Systems, Vehicle Weapons, Armor, or Utility. |
 | `size` | No | Item size, usually for ship components and vehicle weapons. |
+| `location` | No | Purchase terminal, station, planet, or star system. Autocomplete includes all known item-sale locations. |
 
 At least one option is required.
 
@@ -380,6 +381,7 @@ Examples:
 /item search category:Quantum Drives size:1
 /item search section:Armor category:Helmets
 /item search section:Vehicle Weapons category:Guns
+/item locator category:Helmets location:Port Tressler
 ```
 
 ## `/loot search`

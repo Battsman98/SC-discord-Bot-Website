@@ -4297,10 +4297,11 @@ async def items(
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
     limit: int = Query(default=25, ge=1, le=100),
     page: int = Query(default=1, ge=1),
 ) -> list[dict[str, Any]]:
-    return encode(await state().sources.lookup_items(query, category, section, size, limit, page))
+    return encode(await state().sources.lookup_items(query, category, section, size, location, limit, page))
 
 
 @app.get("/api/items/{item_id}")

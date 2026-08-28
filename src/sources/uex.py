@@ -201,26 +201,28 @@ class UEXSource:
         category: str | None = None,
         section: str | None = None,
         size: str | None = None,
+        location: str | None = None,
         limit: int = 25,
         page: int = 1,
     ) -> list[ItemLocatorResult]:
         items = await self._get_buyable_items()
         filtered = self._filter_items(items, query, category, section, size)
+        all_prices = [row for row in await self._fetch_all_item_prices() if self._positive(row.get("price_buy"))]
+        terminals_by_id = await self._fetch_terminals_by_id()
+        enriched_prices = self._enrich_price_rows(all_prices, terminals_by_id)
+        if location:
+            enriched_prices = [row for row in enriched_prices if self._item_location_matches(row, location)]
+            available_ids = {self._int_or_none(row.get("id_item")) for row in enriched_prices}
+            filtered = [row for row in filtered if self._int_or_none(row.get("id")) in available_ids]
         start = max(0, page - 1) * limit
         page_items = filtered[start : start + limit]
         if not page_items:
             return []
 
         item_ids = {self._int_or_none(row.get("id")) for row in page_items}
-        prices = [
-            row
-            for row in await self._fetch_all_item_prices()
-            if self._int_or_none(row.get("id_item")) in item_ids
-            and self._positive(row.get("price_buy"))
-        ]
-        terminals_by_id = await self._fetch_terminals_by_id()
+        prices = [row for row in enriched_prices if self._int_or_none(row.get("id_item")) in item_ids]
         prices_by_item: dict[int, list[ItemPurchaseLocation]] = {}
-        for row in self._enrich_price_rows(prices, terminals_by_id):
+        for row in prices:
             item_id = self._int_or_none(row.get("id_item"))
             if item_id is None:
                 continue
@@ -234,7 +236,7 @@ class UEXSource:
             for row in page_items
         ]
 
-    async def lookup_item_by_id(self, item_id: int) -> ItemLocatorResult | None:
+    async def lookup_item_by_id(self, item_id: int, location: str | None = None) -> ItemLocatorResult | None:
         items = await self._get_buyable_items()
         item = next((row for row in items if self._int_or_none(row.get("id")) == item_id), None)
         if item is None:
@@ -245,6 +247,7 @@ class UEXSource:
             self._item_purchase_location(row)
             for row in prices
             if self._positive(row.get("price_buy"))
+            and (not location or self._item_location_matches(row, location))
         ]
         purchases.sort(key=lambda purchase: (float(purchase.price), purchase.terminal_name.lower()))
         return self._item_result(item, purchases)
@@ -266,6 +269,23 @@ class UEXSource:
         return (starts + contains)[:limit]
 
     async def autocomplete_item_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        if filter_name == "location":
+            prices = [row for row in await self._fetch_all_item_prices() if self._positive(row.get("price_buy"))]
+            rows = self._enrich_price_rows(prices, await self._fetch_terminals_by_id())
+            values = sorted(
+                {
+                    value
+                    for row in rows
+                    for key in (
+                        "terminal_name", "star_system_name", "planet_name", "orbit_name", "moon_name",
+                        "outpost_name", "city_name", "space_station_name", "poi_name",
+                    )
+                    if (value := self._string_or_none(row.get(key)))
+                },
+                key=str.lower,
+            )
+            return self._autocomplete_values(values, query, limit)
+
         items = await self._get_buyable_items()
         key_map = {"category": "category", "section": "section", "size": "size"}
         key = key_map.get(filter_name)
@@ -279,6 +299,9 @@ class UEXSource:
                 values.append(value)
         values.sort(key=str.lower)
 
+        return self._autocomplete_values(values, query, limit)
+
+    def _autocomplete_values(self, values: list[str], query: str, limit: int) -> list[str]:
         normalized_query = self._normalize(query)
         if not normalized_query:
             return values[:limit]
@@ -289,6 +312,16 @@ class UEXSource:
             if normalized_query in self._normalize(value) and value not in starts
         ]
         return (starts + contains)[:limit]
+
+    def _item_location_matches(self, row: dict, location: str) -> bool:
+        wanted = self._normalize(location)
+        return any(
+            self._normalize(row.get(key)) == wanted
+            for key in (
+                "terminal_name", "star_system_name", "planet_name", "orbit_name", "moon_name",
+                "outpost_name", "city_name", "space_station_name", "poi_name",
+            )
+        )
 
     async def lookup_trade_routes(
         self,

@@ -3605,6 +3605,7 @@ async def loot_report_autocomplete(
     category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
     section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
     size="Optional item size.",
+    location="Optional purchase location, station, planet, or star system.",
 )
 async def item_locator_command(
     interaction: discord.Interaction,
@@ -3612,13 +3613,14 @@ async def item_locator_command(
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
 ) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
 
-    if not any([name, category, section, size]):
+    if not any([name, category, section, size, location]):
         await interaction.response.send_message("Add an item name or at least one filter.", ephemeral=True)
         return
 
@@ -3628,6 +3630,7 @@ async def item_locator_command(
         category=category,
         section=section,
         size=size,
+        location=location,
         limit=BLUEPRINT_PAGE_SIZE,
         page=1,
     )
@@ -3636,9 +3639,9 @@ async def item_locator_command(
         return
 
     if name and len(results) == 1:
-        detail = await bot.sources.lookup_item_by_id(results[0].id)
+        detail = await bot.sources.lookup_item_by_id(results[0].id, location)
         await interaction.followup.send(
-            embed=build_item_locator_embed(detail or results[0], name, category, section, size),
+            embed=build_item_locator_embed(detail or results[0], name, category, section, size, location),
             ephemeral=True,
         )
         return
@@ -3649,13 +3652,14 @@ async def item_locator_command(
             category=category,
             section=section,
             size=size,
+            location=location,
             limit=BLUEPRINT_PAGE_SIZE,
             page=2,
         )
     )
     await interaction.followup.send(
-        embed=build_item_locator_selection_embed(results, name, category, section, size, page=1, has_next=has_next),
-        view=ItemLocatorSelectView(results, name, category, section, size, page=1, has_next=has_next),
+        embed=build_item_locator_selection_embed(results, name, category, section, size, location, page=1, has_next=has_next),
+        view=ItemLocatorSelectView(results, name, category, section, size, location, page=1, has_next=has_next),
         ephemeral=True,
     )
 
@@ -3666,6 +3670,7 @@ async def item_locator_command(
     category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
     section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
     size="Optional item size.",
+    location="Optional purchase location, station, planet, or star system.",
 )
 async def item_search_command(
     interaction: discord.Interaction,
@@ -3673,8 +3678,9 @@ async def item_search_command(
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
 ) -> None:
-    await item_locator_command.callback(interaction, name, category, section, size)
+    await item_locator_command.callback(interaction, name, category, section, size, location)
 
 
 @item_search_command.autocomplete("name")
@@ -3693,9 +3699,11 @@ async def item_locator_name_autocomplete(
 @item_search_command.autocomplete("category")
 @item_search_command.autocomplete("section")
 @item_search_command.autocomplete("size")
+@item_search_command.autocomplete("location")
 @item_locator_command.autocomplete("category")
 @item_locator_command.autocomplete("section")
 @item_locator_command.autocomplete("size")
+@item_locator_command.autocomplete("location")
 async def item_locator_filter_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -3708,7 +3716,8 @@ async def item_locator_filter_autocomplete(
 
 
 class ItemLocatorSelect(discord.ui.Select):
-    def __init__(self, results: list[ItemLocatorResult]) -> None:
+    def __init__(self, results: list[ItemLocatorResult], location: str | None = None) -> None:
+        self.location = location
         self.results = results[:25]
         options = [
             discord.SelectOption(
@@ -3732,7 +3741,7 @@ class ItemLocatorSelect(discord.ui.Select):
             return
 
         await interaction.response.defer()
-        result = await bot.sources.lookup_item_by_id(int(self.values[0]))
+        result = await bot.sources.lookup_item_by_id(int(self.values[0]), self.location)
         if result is None:
             await interaction.edit_original_response(content="That item is no longer available in UEX.", embed=None, view=None)
             return
@@ -3747,6 +3756,7 @@ class ItemLocatorSelectView(discord.ui.View):
         category: str | None = None,
         section: str | None = None,
         size: str | None = None,
+        location: str | None = None,
         page: int = 1,
         has_next: bool = False,
     ) -> None:
@@ -3755,9 +3765,10 @@ class ItemLocatorSelectView(discord.ui.View):
         self.category = category
         self.section = section
         self.size = size
+        self.location = location
         self.page = page
         self.has_next = has_next
-        self.add_item(ItemLocatorSelect(results))
+        self.add_item(ItemLocatorSelect(results, location))
         self.previous_page.disabled = page <= 1
         self.next_page.disabled = not has_next
 
@@ -3783,6 +3794,7 @@ class ItemLocatorSelectView(discord.ui.View):
             category=self.category,
             section=self.section,
             size=self.size,
+            location=self.location,
             limit=BLUEPRINT_PAGE_SIZE,
             page=page,
         )
@@ -3792,6 +3804,7 @@ class ItemLocatorSelectView(discord.ui.View):
                 category=self.category,
                 section=self.section,
                 size=self.size,
+                location=self.location,
                 limit=BLUEPRINT_PAGE_SIZE,
                 page=page + 1,
             )
@@ -3803,6 +3816,7 @@ class ItemLocatorSelectView(discord.ui.View):
                 self.category,
                 self.section,
                 self.size,
+                self.location,
                 page=page,
                 has_next=has_next,
             ),
@@ -3812,6 +3826,7 @@ class ItemLocatorSelectView(discord.ui.View):
                 self.category,
                 self.section,
                 self.size,
+                self.location,
                 page=page,
                 has_next=has_next,
             ),
@@ -4984,6 +4999,7 @@ def build_item_locator_selection_embed(
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
     page: int = 1,
     has_next: bool = False,
 ) -> discord.Embed:
@@ -4992,6 +5008,7 @@ def build_item_locator_selection_embed(
         _line("Category Filter", category),
         _line("Section Filter", section),
         _line("Size Filter", size),
+        _line("Location Filter", location),
     ]
     embed = discord.Embed(
         title="Item Locator Results",
@@ -5016,6 +5033,7 @@ def build_item_locator_embed(
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
 ) -> discord.Embed:
     description = [
         _line("Section", result.section),
@@ -5026,6 +5044,7 @@ def build_item_locator_embed(
         _line("Category Filter", category),
         _line("Section Filter", section),
         _line("Size Filter", size),
+        _line("Location Filter", location),
     ]
     embed = discord.Embed(
         title=result.name,

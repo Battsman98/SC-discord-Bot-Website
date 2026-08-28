@@ -296,6 +296,7 @@ class SourceRegistry:
         category: str | None = None,
         section: str | None = None,
         size: str | None = None,
+        location: str | None = None,
         limit: int = 25,
         page: int = 1,
     ) -> list[ItemLocatorResult]:
@@ -303,7 +304,7 @@ class SourceRegistry:
             lookup = getattr(source, "lookup_items", None)
             if lookup is None:
                 continue
-            results = await lookup(query, category, section, size, limit, page)
+            results = await lookup(query, category, section, size, location, limit, page)
             if results:
                 return results
         return []
@@ -332,12 +333,12 @@ class SourceRegistry:
                 return results
         return []
 
-    async def lookup_item_by_id(self, item_id: int) -> ItemLocatorResult | None:
+    async def lookup_item_by_id(self, item_id: int, location: str | None = None) -> ItemLocatorResult | None:
         for source in self._sources:
             lookup = getattr(source, "lookup_item_by_id", None)
             if lookup is None:
                 continue
-            result = await lookup(item_id)
+            result = await lookup(item_id, location)
             if result is not None:
                 return result
         return None
