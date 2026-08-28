@@ -957,7 +957,40 @@ class UEXSource:
 
     async def _get_mining_signatures(self, material_name: str) -> list[int]:
         signatures = await self._get_mining_signature_map()
-        return signatures.get(self._normalize(material_name), [])
+        normalized_name = self._normalize(material_name)
+        values = set(signatures.get(normalized_name, []))
+
+        # The Wiki commodities index currently omits signatures for a number of
+        # otherwise valid mineables. Keep the generated mining catalog as a
+        # second source instead of allowing a partial live response to erase
+        # known signatures.
+        for material in self._get_mining_fallbacks().values():
+            if self._normalize(str(material.get("material_name") or "")) != normalized_name:
+                continue
+            values.update(
+                signature
+                for value in material.get("rock_signatures") or []
+                if (signature := self._int_or_none(value)) is not None
+            )
+            break
+
+        # Ground deposits share a size-based signature rather than identifying
+        # the contained gem. Ice is a ship-mineable rock with its own signature.
+        supplemental = {
+            "aphorite": 3000,
+            "beradom": 3000,
+            "caranite": 3000,
+            "dolivine": 3000,
+            "feynmaline": 3000,
+            "glacosite": 3000,
+            "hadanite": 3000,
+            "janalite": 3000,
+            "sadaryx": 3000,
+            "ice": 4300,
+        }
+        if normalized_name in supplemental:
+            values.add(supplemental[normalized_name])
+        return sorted(values)
 
     async def _get_mining_signature_map(self) -> dict[str, list[int]]:
         if self._mining_signatures is not None:

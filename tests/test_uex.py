@@ -349,6 +349,30 @@ def test_autocomplete_mining_materials_accepts_quantanium_alias() -> None:
     assert matches == ["Quantainium (Raw) (QUAN)"]
 
 
+def test_mining_signatures_merge_bundled_data_when_live_index_is_incomplete() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {}
+    source._mining_fallbacks = {
+        "QUAN": {"material_name": "Quantainium", "rock_signatures": [3170]},
+    }
+
+    signatures = asyncio.run(source._get_mining_signatures("Quantainium"))
+
+    assert signatures == [3170]
+
+
+def test_mining_signatures_supply_current_ground_deposit_and_ice_values() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {}
+    source._mining_fallbacks = {
+        "APHO": {"material_name": "Aphorite", "rock_signatures": []},
+        "ICEW": {"material_name": "Ice", "rock_signatures": []},
+    }
+
+    assert asyncio.run(source._get_mining_signatures("Aphorite")) == [3000]
+    assert asyncio.run(source._get_mining_signatures("Ice")) == [4300]
+
+
 def test_filter_items_accepts_medpen_alias() -> None:
     source = UEXSource.__new__(UEXSource)
     items = [
