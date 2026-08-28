@@ -628,24 +628,54 @@ class GameAssistBot(commands.Bot):
                 mentionable=False,
                 reason="Create automatic one-year membership milestone role",
             )
+        if role >= guild.me.top_role:
+            logging.error(
+                "Cannot assign anniversary role %s because it is not below the bot's top role",
+                role.id,
+            )
+            return
 
         welcome = discord.utils.find(
             lambda channel: channel.name.casefold() == ANNIVERSARY_CHANNEL_NAME.casefold(),
             guild.text_channels,
         )
         cutoff = discord.utils.utcnow() - ANNIVERSARY_AGE
-        for member in guild.members:
+        try:
+            members = [member async for member in guild.fetch_members(limit=None)]
+        except (discord.Forbidden, discord.HTTPException):
+            logging.exception(
+                "Could not fetch the complete guild member list; using the local cache"
+            )
+            members = list(guild.members)
+
+        awarded = 0
+        for member in members:
             if member.bot or member.joined_at is None or member.joined_at > cutoff or role in member.roles:
                 continue
             try:
                 await member.add_roles(role, reason="Member reached one year in the server")
-                if welcome is not None:
+                awarded += 1
+            except (discord.Forbidden, discord.HTTPException):
+                logging.exception("Could not award the one-year role to member %s", member.id)
+                continue
+
+            if welcome is not None:
+                try:
                     await welcome.send(
                         f"{member.mention} just hit one year in the server — welcome to the **{ANNIVERSARY_ROLE_NAME}** role! 🎉",
                         allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
                     )
-            except (discord.Forbidden, discord.HTTPException):
-                logging.exception("Could not award the one-year role to member %s", member.id)
+                except (discord.Forbidden, discord.HTTPException):
+                    logging.exception(
+                        "Awarded the one-year role but could not announce member %s",
+                        member.id,
+                    )
+        logging.info(
+            "Anniversary role scan complete: checked=%s awarded=%s cutoff=%s",
+            len(members),
+            awarded,
+            cutoff.isoformat(),
+        )
 
     async def _item_catalog_sync_loop(self) -> None:
         while not self.is_closed():
