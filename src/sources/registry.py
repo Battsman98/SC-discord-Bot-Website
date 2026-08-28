@@ -35,8 +35,10 @@ class SourceRegistry:
                 return result
         return None
 
-    async def lookup_wikelo(self, query: str, limit: int = 25) -> list[WikeloMissionResult]:
-        return await self._wikelo.lookup_wikelo(query, limit)
+    async def lookup_wikelo(
+        self, query: str | None = None, limit: int = 25, page: int = 1,
+    ) -> list[WikeloMissionResult]:
+        return await self._wikelo.lookup_wikelo(query, limit, page)
 
     async def autocomplete_wikelo(self, query: str, limit: int = 25) -> list[str]:
         return await self._wikelo.autocomplete_wikelo(query, limit)

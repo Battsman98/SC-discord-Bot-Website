@@ -296,17 +296,20 @@ Examples:
 
 ## `/wikelo`
 
-Finds Wikelo offers by reward item, mission name, or required turn-in item. Results show the mission name, rewards, exact quantities to deposit, reputation requirement, release status, and game version.
+Finds Wikelo offers by reward item, mission name, or required turn-in item. Run the command without an item to browse every contract in pages, then select a contract to view its full requirements.
 
 Response visibility: private to the user.
 
 | Option | Required | Purpose |
 | --- | --- | --- |
-| `item` | Yes | Wikelo reward, mission, or turn-in item to search for. Autocomplete is available. |
+| `item` | No | Wikelo reward, mission, or turn-in item to search for. Leave empty to browse all contracts. |
+| `show_all` | No | Set to `True` to browse every Wikelo contract in paginated lists. |
 
 Examples:
 
 ```text
+/wikelo
+/wikelo show_all:True
 /wikelo item:Polaris
 /wikelo item:Wikelo Favor
 /wikelo item:Red Fight Armor

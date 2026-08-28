@@ -3035,18 +3035,32 @@ async def my_blueprints_command(
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@app_commands.command(name="wikelo", description="Find a Wikelo offer and its required turn-in items.")
-@app_commands.describe(item="Reward item, mission name, or required turn-in item.")
-async def wikelo_command(interaction: discord.Interaction, item: str) -> None:
+@app_commands.command(name="wikelo", description="Search or browse Wikelo contracts and requirements.")
+@app_commands.describe(
+    item="Optional reward, contract, or turn-in item.",
+    show_all="Browse every Wikelo contract in pages.",
+)
+async def wikelo_command(
+    interaction: discord.Interaction, item: str | None = None, show_all: bool = False,
+) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
     await interaction.response.defer(thinking=True, ephemeral=True)
     try:
-        results = await bot.sources.lookup_wikelo(item, limit=10)
+        browse_all = show_all or not item or not item.strip()
+        results = await bot.sources.lookup_wikelo(item, limit=25 if browse_all else 10, page=1)
         if not results:
             await interaction.followup.send("No Wikelo missions found for that item.", ephemeral=True)
+            return
+        if browse_all:
+            next_results = await bot.sources.lookup_wikelo(None, limit=25, page=2)
+            await interaction.followup.send(
+                embed=build_wikelo_browse_embed(results, page=1, has_next=bool(next_results)),
+                view=WikeloBrowseView(bot.sources, results, page=1, has_next=bool(next_results)),
+                ephemeral=True,
+            )
             return
         await interaction.followup.send(
             embeds=[build_wikelo_embed(result) for result in results], ephemeral=True,
@@ -3065,6 +3079,54 @@ async def wikelo_autocomplete(
         return []
     values = await bot.sources.autocomplete_wikelo(current)
     return [app_commands.Choice(name=value[:100], value=value[:100]) for value in values[:25]]
+
+
+class WikeloContractSelect(discord.ui.Select):
+    def __init__(self, results: list[WikeloMissionResult]) -> None:
+        self.results = results[:25]
+        options = [
+            discord.SelectOption(
+                label=result.name[:100],
+                description=_wikelo_reward_summary(result)[:100],
+                value=str(index),
+            )
+            for index, result in enumerate(self.results)
+        ]
+        super().__init__(placeholder="Select a contract to view its requirements", options=options)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        result = self.results[int(self.values[0])]
+        await interaction.response.edit_message(embed=build_wikelo_embed(result), view=None)
+
+
+class WikeloBrowseView(discord.ui.View):
+    def __init__(self, sources, results: list[WikeloMissionResult], page: int, has_next: bool) -> None:
+        super().__init__(timeout=300)
+        self.sources = sources
+        self.page = page
+        self.has_next = has_next
+        self.add_item(WikeloContractSelect(results))
+        self.previous_page.disabled = page <= 1
+        self.next_page.disabled = not has_next
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary, row=1)
+    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page - 1)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary, row=1)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page + 1)
+
+    async def _show_page(self, interaction: discord.Interaction, page: int) -> None:
+        await interaction.response.defer()
+        results = await self.sources.lookup_wikelo(None, limit=25, page=page)
+        has_next = bool(await self.sources.lookup_wikelo(None, limit=25, page=page + 1))
+        await interaction.edit_original_response(
+            embed=build_wikelo_browse_embed(results, page=page, has_next=has_next),
+            view=WikeloBrowseView(self.sources, results, page=page, has_next=has_next),
+        )
 
 
 @app_commands.command(name="mission", description="Search Star Citizen missions and blueprint rewards.")
@@ -5078,6 +5140,31 @@ def build_loot_item_embed(
     if result.image_url:
         embed.set_thumbnail(url=result.image_url)
     embed.set_footer(text="Item data: Star Citizen Wiki API • Prices: UEX • Unofficial community tool")
+    return embed
+
+
+def _wikelo_reward_summary(result: WikeloMissionResult) -> str:
+    names = [reward.name for reward in result.rewards]
+    return ", ".join(names) if names else "Reward details unavailable"
+
+
+def build_wikelo_browse_embed(
+    results: list[WikeloMissionResult], page: int, has_next: bool,
+) -> discord.Embed:
+    lines = [
+        f"{index}. **{discord.utils.escape_markdown(result.name)}** — "
+        f"{discord.utils.escape_markdown(_wikelo_reward_summary(result))}"
+        for index, result in enumerate(results, start=(page - 1) * 25 + 1)
+    ]
+    embed = discord.Embed(
+        title="Wikelo Contracts",
+        description=_limit_lines(lines, 3900),
+        color=discord.Color.gold(),
+    )
+    page_hint = f"Page {page}"
+    if has_next:
+        page_hint += " · More contracts available"
+    embed.set_footer(text=f"{page_hint} · Select a contract below to view requirements")
     return embed
 
 
