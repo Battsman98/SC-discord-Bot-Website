@@ -254,8 +254,8 @@ let inventoryScannerHistory = [];
 let inventoryScannerPendingReview = null;
 let inventoryScannerStatus = "";
 let inventoryScannerInFlight = 0;
-// Keep one request in flight per browser. Two concurrent PNG uploads plus OCR
-// can saturate a small production instance and make every request slower.
+// Keep one request in flight per browser. Each ONNX OCR engine uses the
+// service's CPU threads internally, so overlapping engines increase latency.
 const inventoryScannerMaxInFlight = 1;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
