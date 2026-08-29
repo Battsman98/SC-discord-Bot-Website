@@ -2664,8 +2664,10 @@ function stopInventoryScanner(clearOutput = true) {
   }
   inventoryScannerStopping = true;
   const remaining = inventoryScannerQueue.length + inventoryScannerInFlight;
-  inventoryScannerDrainTotal = remaining;
-  inventoryScannerDrainCompleted = 0;
+  // Freeze the full session total when capture stops. Do not make the visible
+  // count jump backward by replacing it with only the unfinished queue.
+  inventoryScannerDrainTotal = inventoryScannerSessionCompleted + remaining;
+  inventoryScannerDrainCompleted = inventoryScannerSessionCompleted;
   inventoryScannerProcessingStartedAt = performance.now();
   if (!remaining) {
     finishInventoryScannerReview();

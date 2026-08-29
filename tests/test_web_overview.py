@@ -650,7 +650,8 @@ def test_inventory_scanner_shows_progress_and_restricts_diagnostics() -> None:
     assert "data-scanner-progress-percent" in javascript
     assert "data-scanner-progress-time" in javascript
     assert "data-scanner-progress-bar" in javascript
-    assert "inventoryScannerDrainTotal = remaining" in javascript
+    assert "inventoryScannerDrainTotal = inventoryScannerSessionCompleted + remaining" in javascript
+    assert "inventoryScannerDrainCompleted = inventoryScannerSessionCompleted" in javascript
     assert "captures processed · ${remaining} remaining" in javascript
 
 
