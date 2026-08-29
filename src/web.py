@@ -3529,6 +3529,7 @@ def _inventory_scanner_catalog_supplements(candidate: str) -> list[ItemLocatorRe
         (("xdl", "mark", "monocular", "rangefinder"), 'XDL "Mark I" Monocular Rangefinder', "Gadgets", "Utility", "Behring Applied Technology"),
         (("maxlift", "aa", "support", "tractor", "beam"), "MaxLift AA Support Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
         (("maxlift", "aa", "transport", "tractor", "beam"), "MaxLift AA Transport Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
+        (("bul", "h4", "armor", "steeltek"), "BUL-H4 Armor SteelTek", "Heavy", "Armor", "Clark Defense Systems"),
         (("tumbril", "cargo", "plushie"), "Tumbril Cargo Plushie", "Flair", "Other", "Tumbril Land Systems"),
         (("redimake", "item", "fabricator", "aa", "support"), "RediMake Item Fabricator AA Support", "Crafter", "Other", "RediMake"),
     )

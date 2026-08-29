@@ -603,25 +603,25 @@ def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     assert "inventoryScannerPendingMatchCount >= requiredConfirmations" not in javascript
     assert "deferRender: true" in javascript
     assert "Recognized: ${names.join" in javascript
-    assert "inventoryScannerQueue.length > inventoryScannerQueueLimit" in javascript
-    assert "inventoryScannerQueue.shift()" in javascript
+    assert "inventoryScannerQueue.length >= inventoryScannerQueueLimit" in javascript
+    assert "pause briefly before moving on" in javascript
+    assert "inventoryScannerQueue.length > inventoryScannerQueueLimit" not in javascript
 
 
 def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "inventoryScannerLastQueuedHash" in javascript
-    assert "inventoryScannerLastQueuedContextToken" in javascript
-    assert "const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 4" in javascript
+    assert "inventoryScannerStableCandidate" in javascript
+    assert "inventoryScannerLastStableCapture" in javascript
+    assert "candidateIsSameHover" in javascript
+    assert "repeatsLastStableCapture" in javascript
+    assert "following frame to agree" in javascript
     assert "const hash = imageAverageHash(canvas)" in javascript
-    assert "inventoryScannerLastQueuedHash = capture.hash" in javascript
-    assert "const contextChanged = inventoryScannerCaptureChanged" in javascript
+    assert "inventoryScannerCaptureChanged(inventoryScannerStableCandidate.contextToken" in javascript
     assert "inventoryScannerPendingHashes.has(captureToken)" in javascript
     assert "inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)" in javascript
     assert "inventoryScannerLastQueuedAt" not in javascript
-    assert "inventoryScannerRetryBudget = 2" in javascript
-    assert "inventoryScannerRetryBudget -= 1" in javascript
-    assert "inventoryScannerRetryBudget <= 0" in javascript
+    assert "end of a scan must never evict earlier hovered items" in javascript
 
 
 def test_scanner_review_queue_has_individual_and_bulk_remove_actions() -> None:
@@ -642,15 +642,18 @@ def test_stopping_scanner_drains_queued_captures_before_review() -> None:
     assert "inventoryScannerStopping && inventoryScannerInFlight === 0" in javascript
 
 
-def test_inventory_scanner_shows_progress_and_restricts_diagnostics() -> None:
+def test_inventory_scanner_shows_progress_without_exposing_retained_diagnostics() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
 
-    assert 'class="scanner-retained-diagnostics" data-change-admin-only hidden' in html
+    assert "Recent scan diagnostics" not in html
+    assert "inventoryScanDiagnosticsOutput" not in html
+    assert 'data-action-button="loadInventoryScanDiagnostics"' not in html
     assert "data-scanner-progress-percent" in javascript
     assert "data-scanner-progress-time" in javascript
     assert "data-scanner-progress-bar" in javascript
-    assert "inventoryScannerDrainTotal = remaining" in javascript
+    assert "inventoryScannerDrainTotal = inventoryScannerSessionCompleted + remaining" in javascript
+    assert "inventoryScannerDrainCompleted = inventoryScannerSessionCompleted" in javascript
     assert "captures processed · ${remaining} remaining" in javascript
 
 
@@ -715,18 +718,14 @@ def test_missed_scans_can_be_opened_for_manual_review() -> None:
     assert "stopInventoryScanner(false)" in javascript
 
 
-def test_retained_scanner_diagnostics_can_be_reviewed_from_inventory() -> None:
+def test_retained_scanner_diagnostics_stay_backend_only() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
-    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
 
-    assert 'data-action-button="loadInventoryScanDiagnostics"' in html
-    assert 'id="inventoryScanDiagnosticsOutput"' in html
-    assert 'api("/api/me/inventory/scans/recent")' in javascript
-    assert "/api/me/inventory/scans/${encodeURIComponent(session.session_id)}" in javascript
-    assert "Dropped before upload:" in javascript
-    assert "capture.image_url" in javascript
-    assert ".scanner-retained-capture" in css
+    assert "Recent scan diagnostics" not in html
+    assert "inventoryScanDiagnosticsOutput" not in html
+    assert "loadLatestInventoryScanDiagnostics" not in javascript
+    assert 'api("/api/me/inventory/scans/recent")' not in javascript
 
 
 def test_save_all_returns_to_station_inventory_after_one_refresh() -> None:

@@ -229,7 +229,6 @@ document.querySelector("[data-action-button='clearAllInventory']").addEventListe
 document.querySelector("[data-action-button='matchInventoryText']").addEventListener("click", importInventoryText);
 document.querySelector("[data-action-button='startInventoryScanner']").addEventListener("click", startInventoryScanner);
 document.querySelector("[data-action-button='stopInventoryScanner']").addEventListener("click", stopInventoryScanner);
-document.querySelector("[data-action-button='loadInventoryScanDiagnostics']")?.addEventListener("click", loadLatestInventoryScanDiagnostics);
 document.querySelector("[data-action-button='importRsiPledges']").addEventListener("click", importRsiPledgesFromBrowser);
 document.querySelector("#rsiPledgeImport").addEventListener("change", importRsiPledgeFiles);
 document.querySelector("#blueprintImageImport").addEventListener("change", importBlueprintImages);
@@ -264,6 +263,9 @@ let inventoryScannerQueue = [];
 const inventoryScannerQueueLimit = 50;
 let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
+let inventoryScannerStableCandidate = null;
+let inventoryScannerLastStableCapture = null;
+let inventoryScannerQueueFullCount = 0;
 let inventoryScannerProgressTimer = null;
 let inventoryScannerProcessingStartedAt = 0;
 let inventoryScannerSessionCompleted = 0;
@@ -272,9 +274,6 @@ let inventoryScannerDrainCompleted = 0;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
-let inventoryScannerLastQueuedHash = "";
-let inventoryScannerLastQueuedContextToken = "";
-let inventoryScannerRetryBudget = 0;
 let inventoryScannerLastCountedKey = "";
 let inventoryScannerLastCountedCaptureToken = "";
 let inventoryScannerTitleBox = "";
@@ -2586,15 +2585,15 @@ async function startInventoryScanner() {
   inventoryScannerCaptureBusy = false;
   inventoryScannerQueue = [];
   inventoryScannerStopping = false;
+  inventoryScannerStableCandidate = null;
+  inventoryScannerLastStableCapture = null;
+  inventoryScannerQueueFullCount = 0;
   inventoryScannerSessionCompleted = 0;
   inventoryScannerDrainTotal = 0;
   inventoryScannerDrainCompleted = 0;
   inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
   inventoryScannerLastContextHash = "";
-  inventoryScannerLastQueuedHash = "";
-  inventoryScannerLastQueuedContextToken = "";
-  inventoryScannerRetryBudget = 0;
   inventoryScannerLastCountedKey = "";
   inventoryScannerLastCountedCaptureToken = "";
   inventoryScannerTitleBox = "";
@@ -2654,6 +2653,8 @@ function stopInventoryScanner(clearOutput = true) {
     inventoryScannerGeneration += 1;
     inventoryScannerStopping = false;
     inventoryScannerQueue = [];
+    inventoryScannerStableCandidate = null;
+    inventoryScannerLastStableCapture = null;
     inventoryScannerPendingHashes.clear();
     if (inventoryScannerProgressTimer) clearInterval(inventoryScannerProgressTimer);
     inventoryScannerProgressTimer = null;
@@ -2662,8 +2663,10 @@ function stopInventoryScanner(clearOutput = true) {
   }
   inventoryScannerStopping = true;
   const remaining = inventoryScannerQueue.length + inventoryScannerInFlight;
-  inventoryScannerDrainTotal = remaining;
-  inventoryScannerDrainCompleted = 0;
+  // Freeze the full session total when capture stops. Do not make the visible
+  // count jump backward by replacing it with only the unfinished queue.
+  inventoryScannerDrainTotal = inventoryScannerSessionCompleted + remaining;
+  inventoryScannerDrainCompleted = inventoryScannerSessionCompleted;
   inventoryScannerProcessingStartedAt = performance.now();
   if (!remaining) {
     finishInventoryScannerReview();
@@ -2707,24 +2710,33 @@ async function scanInventoryHover() {
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const contextToken = capture.tileToken || capture.contextHash;
     const captureToken = `${capture.hash}:${contextToken}`;
-    const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 4;
-    const contextChanged = inventoryScannerCaptureChanged(
-      inventoryScannerLastQueuedContextToken,
-      contextToken,
-    );
-    const alreadyQueued = inventoryScannerPendingHashes.has(captureToken)
-      || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken);
-    if (alreadyQueued || (!titleChanged && !contextChanged && inventoryScannerRetryBudget <= 0)) return;
-    if (titleChanged || contextChanged) {
-      // The first frame after a hover transition can contain partially drawn
-      // text. Keep two bounded follow-up attempts so the stable tooltip is not
-      // discarded as a duplicate when that transitional OCR read is empty.
-      inventoryScannerRetryBudget = 2;
-    } else {
-      inventoryScannerRetryBudget -= 1;
+    const candidateIsSameHover = inventoryScannerStableCandidate
+      && !inventoryScannerCaptureChanged(inventoryScannerStableCandidate.contextToken, contextToken)
+      && imageHashDistance(inventoryScannerStableCandidate.hash, capture.hash) <= 4;
+    if (!candidateIsSameHover) {
+      // The first frame after moving to an item often contains a half-drawn
+      // tooltip. Hold it locally and require the following frame to agree.
+      inventoryScannerStableCandidate = { hash: capture.hash, contextToken };
+      return;
     }
-    inventoryScannerLastQueuedHash = capture.hash;
-    inventoryScannerLastQueuedContextToken = contextToken;
+    inventoryScannerStableCandidate = { hash: capture.hash, contextToken };
+    const repeatsLastStableCapture = inventoryScannerLastStableCapture
+      && !inventoryScannerCaptureChanged(inventoryScannerLastStableCapture.contextToken, contextToken)
+      && imageHashDistance(inventoryScannerLastStableCapture.hash, capture.hash) <= 4;
+    if (repeatsLastStableCapture
+      || inventoryScannerPendingHashes.has(captureToken)
+      || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)) return;
+    if (inventoryScannerQueue.length >= inventoryScannerQueueLimit) {
+      // Preserve the distinct items already waiting. Repeated frames near the
+      // end of a scan must never evict earlier hovered items.
+      inventoryScannerQueueFullCount += 1;
+      inventoryScannerStatus = `Scanner queue full. Processing ${inventoryScannerQueue.length + inventoryScannerInFlight} captures; pause briefly before moving on.`;
+      const empty = document.querySelector(".scanner-empty");
+      if (empty) empty.textContent = inventoryScannerStatus;
+      refreshInventoryScannerProgress();
+      return;
+    }
+    inventoryScannerLastStableCapture = { hash: capture.hash, contextToken };
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
@@ -2734,7 +2746,6 @@ async function scanInventoryHover() {
       clientQueueDepth: inventoryScannerQueue.length + inventoryScannerInFlight,
       generation: inventoryScannerGeneration,
     });
-    if (inventoryScannerQueue.length > inventoryScannerQueueLimit) inventoryScannerQueue.shift();
     drainInventoryScannerQueue();
   } finally {
     inventoryScannerCaptureBusy = false;
@@ -2786,7 +2797,6 @@ async function processInventoryScannerCapture(capture) {
     inventoryScannerLastHash = capture.hash;
     inventoryScannerLastContextHash = capture.contextHash;
     inventoryScannerEmptyReadStreak = 0;
-    inventoryScannerRetryBudget = 0;
     const names = payload.items.map((item) => item.name).filter(Boolean);
     inventoryScannerStatus = names.length
       ? `Recognized: ${names.join(", ")}. Move to the next item.`
@@ -3168,48 +3178,6 @@ async function submitInventoryImages(files, options = {}) {
       && options.scannerGeneration !== inventoryScannerGeneration) return null;
     outputs.inventoryImport.innerHTML = errorMessage(error.message);
     return null;
-  }
-}
-
-async function loadLatestInventoryScanDiagnostics() {
-  const target = document.querySelector("#inventoryScanDiagnosticsOutput");
-  if (!target) return;
-  target.innerHTML = stateMessage("Loading retained scanner captures...");
-  try {
-    const sessions = await api("/api/me/inventory/scans/recent");
-    if (!sessions.length) {
-      target.innerHTML = stateMessage("No scanner diagnostics remain from the last 24 hours.");
-      return;
-    }
-    const session = sessions[0];
-    const details = await api(`/api/me/inventory/scans/${encodeURIComponent(session.session_id)}`);
-    const captures = details.captures || [];
-    const submittedIndexes = new Set(captures.map((capture) => Number(capture.capture_index)));
-    const missingIndexes = [];
-    if (captures.length) {
-      const highestIndex = Math.max(...submittedIndexes);
-      for (let index = 0; index <= highestIndex; index += 1) {
-        if (!submittedIndexes.has(index)) missingIndexes.push(index);
-      }
-    }
-    const rows = captures.map((capture) => {
-      const performance = capture.performance || {};
-      const matched = (capture.matched_items || []).join(", ") || "No match";
-      const ocr = capture.ocr_text || "No readable title";
-      return `<article class="scanner-retained-capture ${capture.matched_items?.length ? "accepted" : "rejected"}">
-        <img src="${escapeAttribute(capture.image_url)}" alt="Retained tooltip crop ${Number(capture.capture_index) + 1}">
-        <div>
-          <strong>Capture ${Number(capture.capture_index) + 1}: ${escapeHtml(matched)}</strong>
-          <small>${escapeHtml(ocr)}</small>
-          <small>${Number(performance.server_ms || 0).toLocaleString()} ms server · ${Number(performance.ocr_ms || 0).toLocaleString()} ms OCR · ${Number(performance.match_ms || 0).toLocaleString()} ms match · queue depth ${Number(performance.client_queue_depth || 0)}</small>
-        </div>
-      </article>`;
-    }).join("");
-    target.innerHTML = `<p><strong>${captures.length} submitted capture${captures.length === 1 ? "" : "s"}</strong> · ${Number(session.storage_bytes || 0).toLocaleString()} bytes retained · expires ${escapeHtml(new Date(Number(session.expires_at) * 1000).toLocaleString())}</p>
-      ${missingIndexes.length ? `<p class="warning">Dropped before upload: capture ${missingIndexes.map((index) => index + 1).join(", ")}</p>` : ""}
-      <div class="scanner-retained-list">${rows}</div>`;
-  } catch (error) {
-    target.innerHTML = errorMessage(error.message);
   }
 }
 
