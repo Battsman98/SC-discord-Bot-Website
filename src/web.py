@@ -4210,6 +4210,7 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         # L. Restrict this to numbered Sion attachments so ordinary words
         # ending in L remain untouched.
         r"\bsion\s+compensatorl\b": "Sion Compensator1",
+        r"^focus\s+illl\s+module$": "Focus III Module",
         # The thin "III" in the Deadbolt title commonly collapses into "i" or
         # "im" at screen-share resolution. Keep VI untouched so the two cannon
         # variants remain distinguishable.

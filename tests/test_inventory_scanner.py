@@ -517,9 +517,11 @@ def test_inventory_scanner_corrects_common_weapon_ocr_typos() -> None:
     assert _normalize_inventory_tooltip_name("Deadboltim Cannon") == "Deadbolt III Cannon"
     assert _normalize_inventory_tooltip_name("Deadboltvicannon") == "Deadboltvicannon"
     assert _normalize_inventory_tooltip_name("Sion Compensatorl") == "Sion Compensator1"
+    assert _normalize_inventory_tooltip_name("Focus Illl Module") == "Focus III Module"
     assert _inventory_match_confidence("Kilshot Rrie", "Killshot Rifle") >= 0.72
     assert _inventory_match_confidence("Deedbolticannon", "Deadbolt III Cannon") >= 0.88
     assert _inventory_match_confidence("Sion Compensatorl", "Sion Compensator1") == 1
+    assert _inventory_match_confidence("Focus Illl Module", "Focus III Module") == 1
 
 
 def test_inventory_scanner_corrects_saved_screen_share_title_distortions() -> None:

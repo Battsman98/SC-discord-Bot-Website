@@ -2753,7 +2753,8 @@ async function scanInventoryHover() {
     const contextToken = capture.tileToken || capture.contextHash;
     const captureToken = `${capture.hash}:${contextToken}`;
     const candidateIsSameHover = inventoryScannerStableCandidate
-      && inventoryScannerSameHover(inventoryScannerStableCandidate, capture);
+      && (inventoryScannerSameHover(inventoryScannerStableCandidate, capture)
+        || inventoryScannerStrongTitleTransition(inventoryScannerStableCandidate, capture));
     if (!candidateIsSameHover) {
       // The first frame after moving to an item often contains a half-drawn
       // tooltip. Hold it locally and require the following frame to agree.
@@ -3120,7 +3121,12 @@ function inventoryScannerSameHover(left, right) {
   const titleDistance = imageHashDistance(left.titleHash, right.titleHash);
   const contextDistance = imageHashDistance(left.contextHash, right.contextHash);
   if (left.tileToken && right.tileToken) {
-    if (left.tileToken !== right.tileToken) return false;
+    if (left.tileToken !== right.tileToken) {
+      // Selection-border detection can jump to a neighboring cell while the
+      // tooltip itself remains stationary. Collapse only exceptionally close
+      // jumps so identical items on genuinely different tiles still count.
+      return titleDistance < 25 && contextDistance <= 30;
+    }
     // A stable title or stable surrounding inventory grid identifies another
     // frame of the same hovered tile. Requiring both to change preserves a new
     // item that occupies the same screen position after scrolling.
@@ -3129,6 +3135,17 @@ function inventoryScannerSameHover(left, right) {
   // Tile detection can briefly fail during motion. In that case require both
   // visual signatures to agree before discarding a capture.
   return titleDistance < 40 && contextDistance <= 30;
+}
+
+function inventoryScannerStrongTitleTransition(left, right) {
+  if (!left || !right) return false;
+  if (document.querySelector("#inventoryImportCategory")?.value !== "Components") return false;
+  if (!left.tileToken || left.tileToken !== right.tileToken) return false;
+  // A short hover can disappear before two fully stable frames arrive. Treat a
+  // large, simultaneous title-and-tooltip change on the same tile as the
+  // confirmation frame, while ordinary animation remains deduplicated.
+  return imageHashDistance(left.titleHash, right.titleHash) >= 48
+    && imageHashDistance(left.contextHash, right.contextHash) > 40;
 }
 
 async function importInventoryText() {

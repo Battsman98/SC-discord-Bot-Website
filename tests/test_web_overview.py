@@ -623,7 +623,7 @@ def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames
     assert "repeatsLastStableCapture" in javascript
     assert "following frame to agree" in javascript
     assert "const hash = imageAverageHash(canvas)" in javascript
-    assert "inventoryScannerSameHover(inventoryScannerStableCandidate, capture)" in javascript
+    assert "inventoryScannerStrongTitleTransition(inventoryScannerStableCandidate, capture)" in javascript
     assert "inventoryScannerPendingHashes.has(captureToken)" in javascript
     assert "inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)" in javascript
     assert "inventoryScannerLastQueuedAt" not in javascript
@@ -670,10 +670,13 @@ def test_scanner_uses_inventory_tile_context_to_count_duplicate_titles() -> None
     assert "inventoryScannerLastCountedCaptureToken" in javascript
     assert "contextHash = imageAverageHash(contextCanvas, 24)" in javascript
     assert "titleHash = imageAverageHash(titleCanvas, 32)" in javascript
-    assert "inventoryScannerSameHover(inventoryScannerStableCandidate, capture)" in javascript
+    assert "inventoryScannerStrongTitleTransition(inventoryScannerStableCandidate, capture)" in javascript
     assert "inventoryScannerSameHover(inventoryScannerLastStableCapture, capture)" in javascript
-    assert "if (left.tileToken !== right.tileToken) return false" in javascript
+    assert "return titleDistance < 25 && contextDistance <= 30" in javascript
     assert "return titleDistance < 40 || contextDistance <= 20" in javascript
+    assert "imageHashDistance(left.titleHash, right.titleHash) >= 48" in javascript
+    assert "imageHashDistance(left.contextHash, right.contextHash) > 40" in javascript
+    assert 'document.querySelector("#inventoryImportCategory")?.value !== "Components"' in javascript
 
 
 def test_manual_inventory_entry_uses_hybrid_catalog_autocomplete() -> None:
