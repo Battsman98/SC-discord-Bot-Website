@@ -26,6 +26,47 @@ class UEXSource:
     name = "UEX"
     base_url = "https://api.uexcorp.uk/2.0"
     wiki_api_url = "https://api.star-citizen.wiki/api"
+    # Patch 4.10 scan values verified against STARVEIN's in-game signature
+    # reference. Ship-mined materials have a unique base signature. Ground
+    # deposits use a size signature (3,000 FPS, 4,000 ROC).
+    _canonical_mining_signatures = {
+        "aphorite": 3000,
+        "beradom": 4000,
+        "caranite": 3000,
+        "carinite": 3000,
+        "dolivine": 3000,
+        "feynmaline": 4000,
+        "glacosite": 4000,
+        "hadanite": 3000,
+        "janalite": 4000,
+        "sadaryx": 3000,
+        "quantainium": 3170,
+        "stileron": 3185,
+        "savrilium": 3200,
+        "ouratite": 3370,
+        "riccite": 3385,
+        "lindinium": 3400,
+        "beryl": 3540,
+        "taranite": 3555,
+        "borase": 3570,
+        "gold": 3585,
+        "bexalite": 3600,
+        "laranite": 3825,
+        "aslarite": 3840,
+        "titanium": 3855,
+        "tungsten": 3870,
+        "agricium": 3885,
+        "torite": 3900,
+        "hephaestanite": 4180,
+        "tin": 4195,
+        "quartz": 4210,
+        "corundum": 4225,
+        "copper": 4240,
+        "silicon": 4255,
+        "iron": 4270,
+        "aluminum": 4285,
+        "ice": 4300,
+    }
 
     def __init__(self, settings: Settings, cache: SQLiteCache, session: aiohttp.ClientSession) -> None:
         self._settings = settings
@@ -201,26 +242,28 @@ class UEXSource:
         category: str | None = None,
         section: str | None = None,
         size: str | None = None,
+        location: str | None = None,
         limit: int = 25,
         page: int = 1,
     ) -> list[ItemLocatorResult]:
         items = await self._get_buyable_items()
         filtered = self._filter_items(items, query, category, section, size)
+        all_prices = [row for row in await self._fetch_all_item_prices() if self._positive(row.get("price_buy"))]
+        terminals_by_id = await self._fetch_terminals_by_id()
+        enriched_prices = self._enrich_price_rows(all_prices, terminals_by_id)
+        if location:
+            enriched_prices = [row for row in enriched_prices if self._item_location_matches(row, location)]
+            available_ids = {self._int_or_none(row.get("id_item")) for row in enriched_prices}
+            filtered = [row for row in filtered if self._int_or_none(row.get("id")) in available_ids]
         start = max(0, page - 1) * limit
         page_items = filtered[start : start + limit]
         if not page_items:
             return []
 
         item_ids = {self._int_or_none(row.get("id")) for row in page_items}
-        prices = [
-            row
-            for row in await self._fetch_all_item_prices()
-            if self._int_or_none(row.get("id_item")) in item_ids
-            and self._positive(row.get("price_buy"))
-        ]
-        terminals_by_id = await self._fetch_terminals_by_id()
+        prices = [row for row in enriched_prices if self._int_or_none(row.get("id_item")) in item_ids]
         prices_by_item: dict[int, list[ItemPurchaseLocation]] = {}
-        for row in self._enrich_price_rows(prices, terminals_by_id):
+        for row in prices:
             item_id = self._int_or_none(row.get("id_item"))
             if item_id is None:
                 continue
@@ -234,7 +277,7 @@ class UEXSource:
             for row in page_items
         ]
 
-    async def lookup_item_by_id(self, item_id: int) -> ItemLocatorResult | None:
+    async def lookup_item_by_id(self, item_id: int, location: str | None = None) -> ItemLocatorResult | None:
         items = await self._get_buyable_items()
         item = next((row for row in items if self._int_or_none(row.get("id")) == item_id), None)
         if item is None:
@@ -245,6 +288,7 @@ class UEXSource:
             self._item_purchase_location(row)
             for row in prices
             if self._positive(row.get("price_buy"))
+            and (not location or self._item_location_matches(row, location))
         ]
         purchases.sort(key=lambda purchase: (float(purchase.price), purchase.terminal_name.lower()))
         return self._item_result(item, purchases)
@@ -266,6 +310,22 @@ class UEXSource:
         return (starts + contains)[:limit]
 
     async def autocomplete_item_filter(self, filter_name: str, query: str, limit: int = 25) -> list[str]:
+        if filter_name == "location":
+            prices = [row for row in await self._fetch_all_item_prices() if self._positive(row.get("price_buy"))]
+            rows = self._enrich_price_rows(prices, await self._fetch_terminals_by_id())
+            values = sorted(
+                {
+                    value
+                    for row in rows
+                    for key in (
+                        "space_station_name", "city_name", "outpost_name", "poi_name",
+                    )
+                    if (value := self._string_or_none(row.get(key)))
+                },
+                key=str.lower,
+            )
+            return self._autocomplete_values(values, query, limit)
+
         items = await self._get_buyable_items()
         key_map = {"category": "category", "section": "section", "size": "size"}
         key = key_map.get(filter_name)
@@ -279,6 +339,9 @@ class UEXSource:
                 values.append(value)
         values.sort(key=str.lower)
 
+        return self._autocomplete_values(values, query, limit)
+
+    def _autocomplete_values(self, values: list[str], query: str, limit: int) -> list[str]:
         normalized_query = self._normalize(query)
         if not normalized_query:
             return values[:limit]
@@ -289,6 +352,15 @@ class UEXSource:
             if normalized_query in self._normalize(value) and value not in starts
         ]
         return (starts + contains)[:limit]
+
+    def _item_location_matches(self, row: dict, location: str) -> bool:
+        wanted = self._normalize(location)
+        return any(
+            self._normalize(row.get(key)) == wanted
+            for key in (
+                "space_station_name", "city_name", "outpost_name", "poi_name",
+            )
+        )
 
     async def lookup_trade_routes(
         self,
@@ -446,6 +518,10 @@ class UEXSource:
 
     async def _get_mining_material_names_for_signature(self, signature: int) -> set[str]:
         signatures = await self._get_mining_signature_map()
+        signatures = {**signatures}
+        signatures.update(
+            {material: [value] for material, value in self._canonical_mining_signatures.items()}
+        )
         matches = {
             material
             for material, values in signatures.items()
@@ -458,6 +534,8 @@ class UEXSource:
             self._normalize(str(material.get("material_name") or ""))
             for material in self._get_mining_fallbacks().values()
             if isinstance(material, dict)
+            and self._normalize(str(material.get("material_name") or ""))
+            not in self._canonical_mining_signatures
             and any(
                 self._mining_signature_matches_cluster(signature, base_signature)
                 for value in material.get("rock_signatures") or []
@@ -729,7 +807,7 @@ class UEXSource:
             return self._terminals_by_id
         self._terminals_by_id = None
 
-        cached = await self._cache.get("uex:commodity-terminals:v1")
+        cached = await self._cache.get("uex:terminals-all:v2")
         if isinstance(cached, dict):
             self._terminals_by_id = {
                 str(terminal_id): terminal
@@ -739,7 +817,7 @@ class UEXSource:
             self._terminals_loaded_at = now
             return self._terminals_by_id
 
-        payload = await self._fetch_json(f"{self.base_url}/terminals?type=commodity")
+        payload = await self._fetch_json(f"{self.base_url}/terminals")
         rows = payload.get("data") if isinstance(payload, dict) else []
         self._terminals_by_id = {
             str(row.get("id")): row
@@ -747,7 +825,7 @@ class UEXSource:
             if isinstance(row, dict) and row.get("id") is not None
         }
         self._terminals_loaded_at = now
-        await self._cache.set("uex:commodity-terminals:v1", self._terminals_by_id, 86400)
+        await self._cache.set("uex:terminals-all:v2", self._terminals_by_id, 86400)
         return self._terminals_by_id
 
     async def _fetch_json(self, url: str) -> dict | None:
@@ -924,7 +1002,27 @@ class UEXSource:
 
     async def _get_mining_signatures(self, material_name: str) -> list[int]:
         signatures = await self._get_mining_signature_map()
-        return signatures.get(self._normalize(material_name), [])
+        normalized_name = self._normalize(material_name)
+        canonical = self._canonical_mining_signatures.get(normalized_name)
+        if canonical is not None:
+            return [canonical]
+        values = set(signatures.get(normalized_name, []))
+
+        # The Wiki commodities index currently omits signatures for a number of
+        # otherwise valid mineables. Keep the generated mining catalog as a
+        # second source instead of allowing a partial live response to erase
+        # known signatures.
+        for material in self._get_mining_fallbacks().values():
+            if self._normalize(str(material.get("material_name") or "")) != normalized_name:
+                continue
+            values.update(
+                signature
+                for value in material.get("rock_signatures") or []
+                if (signature := self._int_or_none(value)) is not None
+            )
+            break
+
+        return sorted(values)
 
     async def _get_mining_signature_map(self) -> dict[str, list[int]]:
         if self._mining_signatures is not None:
@@ -1479,7 +1577,7 @@ class UEXSource:
 
     def _item_purchase_location(self, row: dict) -> ItemPurchaseLocation:
         return ItemPurchaseLocation(
-            terminal_name=str(row.get("terminal_name") or "Unknown terminal"),
+            terminal_name=str(row.get("name") or row.get("terminal_name") or "Unknown store"),
             system=self._string_or_none(row.get("star_system_name")),
             planet=self._string_or_none(row.get("planet_name") or row.get("orbit_name") or row.get("moon_name")),
             location=self._location(row),
@@ -1869,9 +1967,9 @@ class UEXSource:
 
     def _location(self, row: dict) -> str | None:
         return self._string_or_none(
-            row.get("outpost_name")
+            row.get("space_station_name")
             or row.get("city_name")
-            or row.get("space_station_name")
+            or row.get("outpost_name")
             or row.get("poi_name")
             or row.get("terminal_name")
         )

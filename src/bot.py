@@ -598,6 +598,7 @@ class GameAssistBot(commands.Bot):
         await self.cache.set(cache_key, revision, 315360000)
 
     async def _anniversary_role_loop(self) -> None:
+        """Run the membership anniversary reconciliation once per day."""
         while not self.is_closed():
             await asyncio.sleep(ANNIVERSARY_CHECK_INTERVAL_SECONDS)
             try:
@@ -628,24 +629,54 @@ class GameAssistBot(commands.Bot):
                 mentionable=False,
                 reason="Create automatic one-year membership milestone role",
             )
+        if role >= guild.me.top_role:
+            logging.error(
+                "Cannot assign anniversary role %s because it is not below the bot's top role",
+                role.id,
+            )
+            return
 
         welcome = discord.utils.find(
             lambda channel: channel.name.casefold() == ANNIVERSARY_CHANNEL_NAME.casefold(),
             guild.text_channels,
         )
         cutoff = discord.utils.utcnow() - ANNIVERSARY_AGE
-        for member in guild.members:
+        try:
+            members = [member async for member in guild.fetch_members(limit=None)]
+        except (discord.Forbidden, discord.HTTPException):
+            logging.exception(
+                "Could not fetch the complete guild member list; using the local cache"
+            )
+            members = list(guild.members)
+
+        awarded = 0
+        for member in members:
             if member.bot or member.joined_at is None or member.joined_at > cutoff or role in member.roles:
                 continue
             try:
                 await member.add_roles(role, reason="Member reached one year in the server")
-                if welcome is not None:
+                awarded += 1
+            except (discord.Forbidden, discord.HTTPException):
+                logging.exception("Could not award the one-year role to member %s", member.id)
+                continue
+
+            if welcome is not None:
+                try:
                     await welcome.send(
                         f"{member.mention} just hit one year in the server — welcome to the **{ANNIVERSARY_ROLE_NAME}** role! 🎉",
                         allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
                     )
-            except (discord.Forbidden, discord.HTTPException):
-                logging.exception("Could not award the one-year role to member %s", member.id)
+                except (discord.Forbidden, discord.HTTPException):
+                    logging.exception(
+                        "Awarded the one-year role but could not announce member %s",
+                        member.id,
+                    )
+        logging.info(
+            "Anniversary role scan complete: checked=%s awarded=%s cutoff=%s",
+            len(members),
+            awarded,
+            cutoff.isoformat(),
+        )
 
     async def _item_catalog_sync_loop(self) -> None:
         while not self.is_closed():
@@ -3004,18 +3035,32 @@ async def my_blueprints_command(
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-@app_commands.command(name="wikelo", description="Find a Wikelo offer and its required turn-in items.")
-@app_commands.describe(item="Reward item, mission name, or required turn-in item.")
-async def wikelo_command(interaction: discord.Interaction, item: str) -> None:
+@app_commands.command(name="wikelo", description="Search or browse Wikelo contracts and requirements.")
+@app_commands.describe(
+    item="Optional reward, contract, or turn-in item.",
+    show_all="Browse every Wikelo contract in pages.",
+)
+async def wikelo_command(
+    interaction: discord.Interaction, item: str | None = None, show_all: bool = False,
+) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
     await interaction.response.defer(thinking=True, ephemeral=True)
     try:
-        results = await bot.sources.lookup_wikelo(item, limit=10)
+        browse_all = show_all or not item or not item.strip()
+        results = await bot.sources.lookup_wikelo(item, limit=25 if browse_all else 10, page=1)
         if not results:
             await interaction.followup.send("No Wikelo missions found for that item.", ephemeral=True)
+            return
+        if browse_all:
+            next_results = await bot.sources.lookup_wikelo(None, limit=25, page=2)
+            await interaction.followup.send(
+                embed=build_wikelo_browse_embed(results, page=1, has_next=bool(next_results)),
+                view=WikeloBrowseView(bot.sources, results, page=1, has_next=bool(next_results)),
+                ephemeral=True,
+            )
             return
         await interaction.followup.send(
             embeds=[build_wikelo_embed(result) for result in results], ephemeral=True,
@@ -3034,6 +3079,54 @@ async def wikelo_autocomplete(
         return []
     values = await bot.sources.autocomplete_wikelo(current)
     return [app_commands.Choice(name=value[:100], value=value[:100]) for value in values[:25]]
+
+
+class WikeloContractSelect(discord.ui.Select):
+    def __init__(self, results: list[WikeloMissionResult]) -> None:
+        self.results = results[:25]
+        options = [
+            discord.SelectOption(
+                label=result.name[:100],
+                description=_wikelo_reward_summary(result)[:100],
+                value=str(index),
+            )
+            for index, result in enumerate(self.results)
+        ]
+        super().__init__(placeholder="Select a contract to view its requirements", options=options)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        result = self.results[int(self.values[0])]
+        await interaction.response.edit_message(embed=build_wikelo_embed(result), view=None)
+
+
+class WikeloBrowseView(discord.ui.View):
+    def __init__(self, sources, results: list[WikeloMissionResult], page: int, has_next: bool) -> None:
+        super().__init__(timeout=300)
+        self.sources = sources
+        self.page = page
+        self.has_next = has_next
+        self.add_item(WikeloContractSelect(results))
+        self.previous_page.disabled = page <= 1
+        self.next_page.disabled = not has_next
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary, row=1)
+    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page - 1)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary, row=1)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        del button
+        await self._show_page(interaction, self.page + 1)
+
+    async def _show_page(self, interaction: discord.Interaction, page: int) -> None:
+        await interaction.response.defer()
+        results = await self.sources.lookup_wikelo(None, limit=25, page=page)
+        has_next = bool(await self.sources.lookup_wikelo(None, limit=25, page=page + 1))
+        await interaction.edit_original_response(
+            embed=build_wikelo_browse_embed(results, page=page, has_next=has_next),
+            view=WikeloBrowseView(self.sources, results, page=page, has_next=has_next),
+        )
 
 
 @app_commands.command(name="mission", description="Search Star Citizen missions and blueprint rewards.")
@@ -3568,26 +3661,28 @@ async def loot_report_autocomplete(
     return await loot_search_autocomplete(interaction, current)
 
 
-@item_group.command(name="locator", description="Find in-game buyable Star Citizen items.")
+@item_group.command(name="search", description="Search for in-game buyable Star Citizen items.")
 @app_commands.describe(
     name="Item name to search.",
     category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
     section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
     size="Optional item size.",
+    location="Optional station, city, outpost, or point of interest.",
 )
-async def item_locator_command(
+async def item_search_command(
     interaction: discord.Interaction,
     name: str | None = None,
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
 ) -> None:
     bot = interaction.client
     if not isinstance(bot, GameAssistBot):
         await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
         return
 
-    if not any([name, category, section, size]):
+    if not any([name, category, section, size, location]):
         await interaction.response.send_message("Add an item name or at least one filter.", ephemeral=True)
         return
 
@@ -3597,6 +3692,7 @@ async def item_locator_command(
         category=category,
         section=section,
         size=size,
+        location=location,
         limit=BLUEPRINT_PAGE_SIZE,
         page=1,
     )
@@ -3605,9 +3701,9 @@ async def item_locator_command(
         return
 
     if name and len(results) == 1:
-        detail = await bot.sources.lookup_item_by_id(results[0].id)
+        detail = await bot.sources.lookup_item_by_id(results[0].id, location)
         await interaction.followup.send(
-            embed=build_item_locator_embed(detail or results[0], name, category, section, size),
+            embed=build_item_locator_embed(detail or results[0], name, category, section, size, location),
             ephemeral=True,
         )
         return
@@ -3618,36 +3714,19 @@ async def item_locator_command(
             category=category,
             section=section,
             size=size,
+            location=location,
             limit=BLUEPRINT_PAGE_SIZE,
             page=2,
         )
     )
     await interaction.followup.send(
-        embed=build_item_locator_selection_embed(results, name, category, section, size, page=1, has_next=has_next),
-        view=ItemLocatorSelectView(results, name, category, section, size, page=1, has_next=has_next),
+        embed=build_item_locator_selection_embed(results, name, category, section, size, location, page=1, has_next=has_next),
+        view=ItemLocatorSelectView(results, name, category, section, size, location, page=1, has_next=has_next),
         ephemeral=True,
     )
 
 
-@item_group.command(name="search", description="Search for in-game buyable Star Citizen items.")
-@app_commands.describe(
-    name="Item name to search.",
-    category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
-    section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
-    size="Optional item size.",
-)
-async def item_search_command(
-    interaction: discord.Interaction,
-    name: str | None = None,
-    category: str | None = None,
-    section: str | None = None,
-    size: str | None = None,
-) -> None:
-    await item_locator_command.callback(interaction, name, category, section, size)
-
-
 @item_search_command.autocomplete("name")
-@item_locator_command.autocomplete("name")
 async def item_locator_name_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -3662,9 +3741,7 @@ async def item_locator_name_autocomplete(
 @item_search_command.autocomplete("category")
 @item_search_command.autocomplete("section")
 @item_search_command.autocomplete("size")
-@item_locator_command.autocomplete("category")
-@item_locator_command.autocomplete("section")
-@item_locator_command.autocomplete("size")
+@item_search_command.autocomplete("location")
 async def item_locator_filter_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -3677,7 +3754,8 @@ async def item_locator_filter_autocomplete(
 
 
 class ItemLocatorSelect(discord.ui.Select):
-    def __init__(self, results: list[ItemLocatorResult]) -> None:
+    def __init__(self, results: list[ItemLocatorResult], location: str | None = None) -> None:
+        self.location = location
         self.results = results[:25]
         options = [
             discord.SelectOption(
@@ -3701,7 +3779,7 @@ class ItemLocatorSelect(discord.ui.Select):
             return
 
         await interaction.response.defer()
-        result = await bot.sources.lookup_item_by_id(int(self.values[0]))
+        result = await bot.sources.lookup_item_by_id(int(self.values[0]), self.location)
         if result is None:
             await interaction.edit_original_response(content="That item is no longer available in UEX.", embed=None, view=None)
             return
@@ -3716,6 +3794,7 @@ class ItemLocatorSelectView(discord.ui.View):
         category: str | None = None,
         section: str | None = None,
         size: str | None = None,
+        location: str | None = None,
         page: int = 1,
         has_next: bool = False,
     ) -> None:
@@ -3724,9 +3803,10 @@ class ItemLocatorSelectView(discord.ui.View):
         self.category = category
         self.section = section
         self.size = size
+        self.location = location
         self.page = page
         self.has_next = has_next
-        self.add_item(ItemLocatorSelect(results))
+        self.add_item(ItemLocatorSelect(results, location))
         self.previous_page.disabled = page <= 1
         self.next_page.disabled = not has_next
 
@@ -3752,6 +3832,7 @@ class ItemLocatorSelectView(discord.ui.View):
             category=self.category,
             section=self.section,
             size=self.size,
+            location=self.location,
             limit=BLUEPRINT_PAGE_SIZE,
             page=page,
         )
@@ -3761,6 +3842,7 @@ class ItemLocatorSelectView(discord.ui.View):
                 category=self.category,
                 section=self.section,
                 size=self.size,
+                location=self.location,
                 limit=BLUEPRINT_PAGE_SIZE,
                 page=page + 1,
             )
@@ -3772,6 +3854,7 @@ class ItemLocatorSelectView(discord.ui.View):
                 self.category,
                 self.section,
                 self.size,
+                self.location,
                 page=page,
                 has_next=has_next,
             ),
@@ -3781,6 +3864,7 @@ class ItemLocatorSelectView(discord.ui.View):
                 self.category,
                 self.section,
                 self.size,
+                self.location,
                 page=page,
                 has_next=has_next,
             ),
@@ -4305,8 +4389,8 @@ def build_visitor_command_example_embeds() -> dict[str, discord.Embed]:
         ),
         "item-locator": _visitor_example_embed(
             "Example Item Locator Response",
-            "/item locator name: FS-9 LMG",
-            "Type `/item`, select `locator`, choose the `name` option, enter or choose `FS-9 LMG`, then submit. Optional `category`, `section`, and `size` options narrow the results.",
+            "/item search name: FS-9 LMG",
+            "Type `/item`, select `search`, choose the `name` option, enter or choose `FS-9 LMG`, then submit. Optional `category`, `section`, `size`, and `location` options narrow the results.",
             (("FS-9 LMG", "Personal Weapons · Light machine gun"), ("Purchase locations", "CenterMass, Area18 · Live Fire Weapons, Port Tressler"), ("Details", "Price, stock status, manufacturer, size, and source link when available")),
         ),
         "inventory-search": _visitor_example_embed(
@@ -4953,6 +5037,7 @@ def build_item_locator_selection_embed(
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
     page: int = 1,
     has_next: bool = False,
 ) -> discord.Embed:
@@ -4961,6 +5046,7 @@ def build_item_locator_selection_embed(
         _line("Category Filter", category),
         _line("Section Filter", section),
         _line("Size Filter", size),
+        _line("Location Filter", location),
     ]
     embed = discord.Embed(
         title="Item Locator Results",
@@ -4985,6 +5071,7 @@ def build_item_locator_embed(
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
 ) -> discord.Embed:
     description = [
         _line("Section", result.section),
@@ -4995,6 +5082,7 @@ def build_item_locator_embed(
         _line("Category Filter", category),
         _line("Section Filter", section),
         _line("Size Filter", size),
+        _line("Location Filter", location),
     ]
     embed = discord.Embed(
         title=result.name,
@@ -5052,6 +5140,31 @@ def build_loot_item_embed(
     if result.image_url:
         embed.set_thumbnail(url=result.image_url)
     embed.set_footer(text="Item data: Star Citizen Wiki API • Prices: UEX • Unofficial community tool")
+    return embed
+
+
+def _wikelo_reward_summary(result: WikeloMissionResult) -> str:
+    names = [reward.name for reward in result.rewards]
+    return ", ".join(names) if names else "Reward details unavailable"
+
+
+def build_wikelo_browse_embed(
+    results: list[WikeloMissionResult], page: int, has_next: bool,
+) -> discord.Embed:
+    lines = [
+        f"{index}. **{discord.utils.escape_markdown(result.name)}** — "
+        f"{discord.utils.escape_markdown(_wikelo_reward_summary(result))}"
+        for index, result in enumerate(results, start=(page - 1) * 25 + 1)
+    ]
+    embed = discord.Embed(
+        title="Wikelo Contracts",
+        description=_limit_lines(lines, 3900),
+        color=discord.Color.gold(),
+    )
+    page_hint = f"Page {page}"
+    if has_next:
+        page_hint += " · More contracts available"
+    embed.set_footer(text=f"{page_hint} · Select a contract below to view requirements")
     return embed
 
 

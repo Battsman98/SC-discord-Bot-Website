@@ -26,10 +26,8 @@ class WikeloSource:
     async def close(self) -> None:
         return None
 
-    async def lookup_wikelo(self, query: str, limit: int = 25) -> list[WikeloMissionResult]:
+    async def lookup_wikelo(self, query: str | None = None, limit: int = 25, page: int = 1) -> list[WikeloMissionResult]:
         needle = " ".join(str(query or "").casefold().split())
-        if not needle:
-            return []
         exact_reward_matches = []
         exact_mission_matches = []
         matches = []
@@ -42,6 +40,9 @@ class WikeloSource:
                 for choice in self._reward_choices(name)
             }
             parsed = self._parse(row)
+            if not needle:
+                matches.append(parsed)
+                continue
             if needle in reward_choices:
                 exact_reward_matches.append(parsed)
                 continue
@@ -59,8 +60,10 @@ class WikeloSource:
             matches = exact_reward_matches
         elif exact_mission_matches:
             matches = exact_mission_matches
-        matches.sort(key=lambda item: self._rank(item, needle))
-        return matches[: max(1, min(limit, 25))]
+        matches.sort(key=lambda item: self._rank(item, needle) if needle else (0, item.name.casefold()))
+        page_size = max(1, min(limit, 25))
+        start = max(0, page - 1) * page_size
+        return matches[start:start + page_size]
 
     async def autocomplete_wikelo(self, query: str, limit: int = 25) -> list[str]:
         needle = " ".join(str(query or "").casefold().split())

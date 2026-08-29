@@ -353,12 +353,13 @@ class GameInfoSource(Protocol):
         category: str | None = None,
         section: str | None = None,
         size: str | None = None,
+        location: str | None = None,
         limit: int = 25,
         page: int = 1,
     ) -> list[ItemLocatorResult]:
         ...
 
-    async def lookup_item_by_id(self, item_id: int) -> ItemLocatorResult | None:
+    async def lookup_item_by_id(self, item_id: int, location: str | None = None) -> ItemLocatorResult | None:
         ...
 
     async def autocomplete_items(self, query: str, limit: int = 25) -> list[str]:

@@ -40,3 +40,26 @@ def test_exact_autocomplete_choice_separates_polaris_from_polaris_bit() -> None:
     bit_results = asyncio.run(source.lookup_wikelo("Polaris Bit"))
     assert [result.name for result in ship_results] == ["Now make Polaris. Short Time Deal."]
     assert [result.name for result in bit_results] == ["Want Polaris? Need something special."]
+
+
+def test_empty_wikelo_lookup_browses_all_contracts_in_pages(tmp_path) -> None:
+    snapshot = tmp_path / "wikelo.json"
+    snapshot.write_text(json.dumps({
+        "missions": [
+            {
+                "mission_id": str(index),
+                "name": f"Contract {index:02d}",
+                "rewards": [{"name": f"Reward {index:02d}", "quantity": 1, "unit": "item"}],
+                "requirements": [{"name": "Wikelo Favor", "quantity": index, "unit": "item"}],
+            }
+            for index in range(27)
+        ],
+    }), encoding="utf-8")
+    source = WikeloSource(snapshot)
+
+    first_page = asyncio.run(source.lookup_wikelo(None, limit=25, page=1))
+    second_page = asyncio.run(source.lookup_wikelo(None, limit=25, page=2))
+
+    assert len(first_page) == 25
+    assert [result.name for result in second_page] == ["Contract 25", "Contract 26"]
+    assert second_page[0].requirements[0].name == "Wikelo Favor"

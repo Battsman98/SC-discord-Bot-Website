@@ -349,6 +349,61 @@ def test_autocomplete_mining_materials_accepts_quantanium_alias() -> None:
     assert matches == ["Quantainium (Raw) (QUAN)"]
 
 
+def test_mining_signatures_merge_bundled_data_when_live_index_is_incomplete() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {}
+    source._mining_fallbacks = {
+        "QUAN": {"material_name": "Quantainium", "rock_signatures": [3170]},
+    }
+
+    signatures = asyncio.run(source._get_mining_signatures("Quantainium"))
+
+    assert signatures == [3170]
+
+
+def test_mining_signatures_supply_current_ground_deposit_and_ice_values() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {}
+    source._mining_fallbacks = {
+        "APHO": {"material_name": "Aphorite", "rock_signatures": []},
+        "ICEW": {"material_name": "Ice", "rock_signatures": []},
+    }
+
+    assert asyncio.run(source._get_mining_signatures("Aphorite")) == [3000]
+    assert asyncio.run(source._get_mining_signatures("Ice")) == [4300]
+
+
+def test_all_canonical_mining_signatures_override_contaminated_source_values() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {
+        material: [4195, value]
+        for material, value in source._canonical_mining_signatures.items()
+    }
+    source._mining_fallbacks = {}
+
+    resolved = {
+        material: asyncio.run(source._get_mining_signatures(material))
+        for material in source._canonical_mining_signatures
+    }
+
+    assert resolved == {
+        material: [value]
+        for material, value in source._canonical_mining_signatures.items()
+    }
+    assert resolved["copper"] == [4240]
+
+
+def test_copper_does_not_match_tin_signature_from_contaminated_live_data() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._mining_signatures = {"copper": [4195, 4240], "tin": [4195]}
+    source._mining_fallbacks = {}
+
+    matches = asyncio.run(source._get_mining_material_names_for_signature(4195))
+
+    assert "tin" in matches
+    assert "copper" not in matches
+
+
 def test_filter_items_accepts_medpen_alias() -> None:
     source = UEXSource.__new__(UEXSource)
     items = [
@@ -670,7 +725,7 @@ def test_autocomplete_mining_materials_accepts_rock_signature() -> None:
     assert matches == ["Iron (Ore) (IRON)"]
 
 
-def test_autocomplete_mining_materials_accepts_cluster_signature() -> None:
+def test_autocomplete_mining_materials_uses_canonical_cluster_signature() -> None:
     source = UEXSource.__new__(UEXSource)
     source._mining_signatures = {
         "bexalite": [3570, 3585, 3600],
@@ -706,9 +761,7 @@ def test_autocomplete_mining_materials_accepts_cluster_signature() -> None:
 
     matches = asyncio.run(source.autocomplete_mining_materials("10710"))
 
-    assert "Gold (Ore) (GOLD)" in matches
-    assert "Borase (Ore) (BORA)" in matches
-    assert "Bexalite (Raw) (BEXA)" in matches
+    assert matches == ["Borase (Ore) (BORA)"]
 
 
 def test_parse_commodity_filters_by_system_before_limiting() -> None:
@@ -1191,6 +1244,24 @@ def test_enrich_price_rows_adds_terminal_location_details() -> None:
     assert rows[0]["city_name"] == "Area 18"
 
 
+def test_terminal_directory_loads_all_types_for_item_location_parents() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source.base_url = "https://example.test"
+    source._terminals_by_id = None
+    source._terminals_loaded_at = 0.0
+    source._cache = AsyncMock()
+    source._cache.get.return_value = None
+    source._fetch_json = AsyncMock(return_value={
+        "data": [{"id": 716, "displayname": "Seraphim Station", "space_station_name": "Seraphim Station"}],
+    })
+
+    terminals = asyncio.run(source._fetch_terminals_by_id())
+
+    source._fetch_json.assert_awaited_once_with("https://example.test/terminals")
+    source._cache.set.assert_awaited_once_with("uex:terminals-all:v2", terminals, 86400)
+    assert terminals["716"]["space_station_name"] == "Seraphim Station"
+
+
 def test_trade_location_value_accepts_autocomplete_display() -> None:
     source = UEXSource.__new__(UEXSource)
 
@@ -1269,3 +1340,61 @@ def test_lookup_items_includes_purchase_locations() -> None:
     assert len(results[0].purchases) == 1
     assert results[0].purchases[0].price == 84000
     assert results[0].purchases[0].system == "Stanton"
+
+
+def test_lookup_items_filters_items_and_purchases_by_location() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._get_buyable_items = AsyncMock(return_value=[
+        {"id": 1, "name": "Atlas", "section": "Systems", "category": "Quantum Drives", "size": "1"},
+        {"id": 2, "name": "VK-00", "section": "Systems", "category": "Quantum Drives", "size": "1"},
+    ])
+    source._fetch_all_item_prices = AsyncMock(return_value=[
+        {"id_item": 1, "id_terminal": 10, "price_buy": 100},
+        {"id_item": 1, "id_terminal": 20, "price_buy": 200},
+        {"id_item": 2, "id_terminal": 20, "price_buy": 300},
+    ])
+    source._fetch_terminals_by_id = AsyncMock(return_value={
+        "10": {"displayname": "Platinum Bay", "space_station_name": "Port Tressler", "star_system_name": "Stanton"},
+        "20": {"displayname": "Dumpers Depot", "city_name": "Area 18", "star_system_name": "Stanton"},
+    })
+
+    results = asyncio.run(source.lookup_items(location="Port Tressler"))
+
+    assert [result.name for result in results] == ["Atlas"]
+    assert [purchase.terminal_name for purchase in results[0].purchases] == ["Platinum Bay"]
+
+
+def test_item_purchase_location_shows_actual_store_inside_parent_station() -> None:
+    source = UEXSource.__new__(UEXSource)
+
+    purchase = source._item_purchase_location({
+        "name": "FPS Armor - Seraphim",
+        "terminal_name": "FPS Armor Seraphim",
+        "space_station_name": "Seraphim Station",
+        "city_name": "Orison",
+        "planet_name": "Crusader",
+        "star_system_name": "Stanton",
+        "price_buy": 1250,
+    })
+
+    assert purchase.terminal_name == "FPS Armor - Seraphim"
+    assert purchase.location == "Seraphim Station"
+
+
+def test_item_location_autocomplete_groups_shops_under_physical_locations() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._fetch_all_item_prices = AsyncMock(return_value=[
+        {"id_item": 1, "id_terminal": 10, "price_buy": 100},
+    ])
+    source._fetch_terminals_by_id = AsyncMock(return_value={
+        "10": {
+            "displayname": "Platinum Bay",
+            "space_station_name": "Port Tressler",
+            "planet_name": "microTech",
+            "star_system_name": "Stanton",
+        },
+    })
+
+    results = asyncio.run(source.autocomplete_item_filter("location", "", limit=25))
+
+    assert results == ["Port Tressler"]

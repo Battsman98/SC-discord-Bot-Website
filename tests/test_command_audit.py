@@ -25,10 +25,15 @@ from src.bot import (
     _hub_role_permissions,
     admin_group,
     inventory_group,
+    item_group,
     industry_group,
 )
 from src.sources.base import CommodityMarket
 from src.sources.base import CommodityResult
+
+
+def test_item_group_exposes_search_without_locator_alias() -> None:
+    assert [command.name for command in item_group.commands] == ["search"]
 
 
 def test_commodity_markets_show_location_update_age() -> None:

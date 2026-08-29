@@ -695,7 +695,7 @@ def test_missed_scans_can_be_opened_for_manual_review() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
 
-    assert '"diagnostics": await _inventory_scanner_diagnostics(' in python
+    assert "diagnostic_details = await _inventory_scanner_diagnostics(" in python
     assert "data-scanner-review-text" in javascript
     assert "name: ocrText" in javascript
     assert "name: button.dataset.scannerReviewName || ocrText" not in javascript

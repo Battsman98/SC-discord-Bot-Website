@@ -296,17 +296,20 @@ Examples:
 
 ## `/wikelo`
 
-Finds Wikelo offers by reward item, mission name, or required turn-in item. Results show the mission name, rewards, exact quantities to deposit, reputation requirement, release status, and game version.
+Finds Wikelo offers by reward item, mission name, or required turn-in item. Run the command without an item to browse every contract in pages, then select a contract to view its full requirements.
 
 Response visibility: private to the user.
 
 | Option | Required | Purpose |
 | --- | --- | --- |
-| `item` | Yes | Wikelo reward, mission, or turn-in item to search for. Autocomplete is available. |
+| `item` | No | Wikelo reward, mission, or turn-in item to search for. Leave empty to browse all contracts. |
+| `show_all` | No | Set to `True` to browse every Wikelo contract in paginated lists. |
 
 Examples:
 
 ```text
+/wikelo
+/wikelo show_all:True
 /wikelo item:Polaris
 /wikelo item:Wikelo Favor
 /wikelo item:Red Fight Armor
@@ -350,7 +353,7 @@ Route behavior:
 - `stay_system` can make a closed loop impossible when UEX does not have a profitable loop inside that system.
 - Does not require a SC Trade Tools API token.
 
-## `/item search` and `/item locator`
+## `/item search`
 
 Finds in-game buyable Star Citizen items using UEX item and item price data.
 
@@ -370,6 +373,7 @@ Options:
 | `category` | No | Item category, such as Quantum Drives, Guns, Helmets, or Undersuits. |
 | `section` | No | Item section, such as Systems, Vehicle Weapons, Armor, or Utility. |
 | `size` | No | Item size, usually for ship components and vehicle weapons. |
+| `location` | No | Station, city, outpost, or point of interest. Individual shops and terminals are grouped under their parent location. |
 
 At least one option is required.
 
@@ -380,6 +384,7 @@ Examples:
 /item search category:Quantum Drives size:1
 /item search section:Armor category:Helmets
 /item search section:Vehicle Weapons category:Guns
+/item search category:Helmets location:Port Tressler
 ```
 
 ## `/loot search`

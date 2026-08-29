@@ -97,7 +97,7 @@ def test_every_visitor_command_channel_has_a_response_example() -> None:
     assert "budget:" not in trade.description
 
     item = examples["item-locator"]
-    assert "/item locator name: FS-9 LMG" in item.description
+    assert "/item search name: FS-9 LMG" in item.description
 
 
 def test_bot_manager_role_name_is_stable_for_discord_and_website_access() -> None:

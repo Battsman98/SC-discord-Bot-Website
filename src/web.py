@@ -182,6 +182,7 @@ class AppState:
     item_catalog_task: asyncio.Task | None
     warbond_task: asyncio.Task | None
     scanner_warmup_task: asyncio.Task | None
+    scanner_diagnostics_cleanup_task: asyncio.Task | None
     scanner_gate: "InventoryScannerGate"
     request_limiter: SlidingWindowLimiter
 
@@ -392,6 +393,24 @@ async def _warm_inventory_scanner(sources: SourceRegistry) -> None:
         )
 
 
+async def _inventory_scanner_diagnostics_cleanup_loop(cache: SQLiteCache) -> None:
+    """Remove expired scanner crops even during quiet periods."""
+    while True:
+        try:
+            removed = await cache.purge_expired_inventory_scan_diagnostics()
+            if removed:
+                logging.getLogger("uvicorn.error").info(
+                    "Purged %d expired inventory scanner diagnostic captures", removed
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logging.getLogger("uvicorn.error").exception(
+                "Could not purge expired inventory scanner diagnostics"
+            )
+        await asyncio.sleep(3600)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     startup_started = time.perf_counter()
@@ -426,6 +445,10 @@ async def lifespan(app: FastAPI):
         _warm_inventory_scanner(sources),
         name="inventory-scanner-warmup",
     )
+    app.state.game_assist.scanner_diagnostics_cleanup_task = asyncio.create_task(
+        _inventory_scanner_diagnostics_cleanup_loop(cache),
+        name="inventory-scanner-diagnostics-cleanup",
+    )
     # Do not advertise the service as ready while the OCR engines are still
     # loading. A request that wins this startup race otherwise pays several
     # seconds of model initialization and holds one of the scarce scan slots.
@@ -440,12 +463,15 @@ async def lifespan(app: FastAPI):
         app.state.game_assist.item_catalog_task.cancel()
         app.state.game_assist.warbond_task.cancel()
         app.state.game_assist.scanner_warmup_task.cancel()
+        app.state.game_assist.scanner_diagnostics_cleanup_task.cancel()
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.item_catalog_task
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.warbond_task
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.scanner_warmup_task
+        with suppress(asyncio.CancelledError):
+            await app.state.game_assist.scanner_diagnostics_cleanup_task
         await warbonds.close()
         await updates.close()
         await sources.close()
@@ -2055,6 +2081,11 @@ async def import_inventory_from_images(
     scanner_mode: bool = False,
     live_scan: bool = False,
     title_box: str | None = None,
+    diagnostic_session_id: str | None = Query(default=None, min_length=8, max_length=80, pattern="^[A-Za-z0-9_-]+$"),
+    capture_index: int = Query(default=0, ge=0, le=10000),
+    capture_token: str | None = Query(default=None, max_length=1200),
+    client_elapsed_ms: int | None = Query(default=None, ge=0, le=86400000),
+    client_queue_depth: int | None = Query(default=None, ge=0, le=1000),
     min_score: float = Query(default=0.72, ge=0, le=1),
     exclude_words: str | None = None,
     user=Depends(require_user),
@@ -2077,6 +2108,12 @@ async def import_inventory_from_images(
                 exclude_words,
                 scan_id,
                 queue_ms,
+                user.id,
+                diagnostic_session_id,
+                capture_index,
+                capture_token,
+                client_elapsed_ms,
+                client_queue_depth,
             )
 
     ocr_text, ocr_error = await _ocr_blueprint_images(files)
@@ -2101,6 +2138,12 @@ async def _import_inventory_scanner_images(
     exclude_words: str | None,
     scan_id: str,
     queue_ms: int,
+    user_id: int,
+    diagnostic_session_id: str | None,
+    capture_index: int,
+    capture_token: str | None,
+    client_elapsed_ms: int | None,
+    client_queue_depth: int | None,
 ) -> dict[str, Any]:
     started_at = time.perf_counter()
     ocr_started_at = time.perf_counter()
@@ -2127,6 +2170,7 @@ async def _import_inventory_scanner_images(
         match_ms = round((time.perf_counter() - match_started_at) * 1000)
         attempted_titles: list[tuple[str, str]] = []
     else:
+        image_content_type = files[0].content_type or "image/png" if files else "image/png"
         image_data, ocr_error = await _read_inventory_scanner_image(files)
         ocr_text = ""
         scanner_lookups: dict[str, list[tuple[Any, float]]] = {}
@@ -2189,6 +2233,39 @@ async def _import_inventory_scanner_images(
         elif calibration is None:
             calibration = {"title_box": None, "fast_title": False}
         match_ms = round((time.perf_counter() - match_started_at) * 1000)
+    diagnostic_details = await _inventory_scanner_diagnostics(
+        ocr_text,
+        effective_min_score,
+        exclude_words,
+        scanner_lookups,
+    ) if ocr_text.strip() else {"candidates": [], "rejected_lines": []}
+    server_ms = round((time.perf_counter() - started_at) * 1000)
+    diagnostic_id: str | None = None
+    if live_scan and diagnostic_session_id and image_data:
+        diagnostic_id = f"{diagnostic_session_id}-{capture_index}-{scan_id}"
+        await state().cache.save_inventory_scan_diagnostic(
+            diagnostic_id=diagnostic_id,
+            session_id=diagnostic_session_id,
+            user_id=user_id,
+            capture_index=capture_index,
+            capture_token=capture_token,
+            category=default_category,
+            item_type=default_item_type,
+            ocr_text=ocr_text,
+            matched_items=[str(item.get("name")) for item in items if item.get("name")],
+            attempted_titles=attempted_titles,
+            diagnostics=diagnostic_details,
+            calibration=calibration,
+            error_text=str(ocr_error) if ocr_error else None,
+            queue_ms=queue_ms,
+            ocr_ms=ocr_ms,
+            match_ms=match_ms,
+            server_ms=server_ms,
+            client_elapsed_ms=client_elapsed_ms,
+            client_queue_depth=client_queue_depth,
+            image_content_type=image_content_type,
+            image_data=image_data,
+        )
     logging.info(
         "Inventory scanner scan_id=%s category=%r type=%r ocr=%r matches=%r attempts=%r queue_ms=%d ocr_ms=%d match_ms=%d",
         scan_id,
@@ -2203,24 +2280,43 @@ async def _import_inventory_scanner_images(
     )
     return {
         "scan_id": scan_id,
+        "diagnostic_session_id": diagnostic_session_id,
+        "diagnostic_id": diagnostic_id,
         "ocr_available": ocr_error is None,
         "ocr_error": ocr_error,
         "ocr_text": ocr_text,
         "items": items,
         "calibration": calibration,
-        "diagnostics": await _inventory_scanner_diagnostics(
-            ocr_text,
-            effective_min_score,
-            exclude_words,
-            scanner_lookups,
-        ) if ocr_text.strip() else {"candidates": [], "rejected_lines": []},
+        "diagnostics": diagnostic_details,
         "performance": {
             "queue_ms": queue_ms,
             "ocr_ms": ocr_ms,
             "match_ms": match_ms,
-            "server_ms": round((time.perf_counter() - started_at) * 1000),
+            "server_ms": server_ms,
         },
     }
+
+
+@app.get("/api/me/inventory/scans/recent")
+async def recent_inventory_scan_sessions(user=Depends(require_user)) -> list[dict[str, Any]]:
+    return await state().cache.list_inventory_scan_sessions(user.id)
+
+
+@app.get("/api/me/inventory/scans/{session_id}")
+async def inventory_scan_session(session_id: str, user=Depends(require_user)) -> dict[str, Any]:
+    captures = await state().cache.get_inventory_scan_session(user.id, session_id)
+    if not captures:
+        raise HTTPException(status_code=404, detail="Scanner diagnostic session not found or expired.")
+    return {"session_id": session_id, "retention_hours": 24, "captures": captures}
+
+
+@app.get("/api/me/inventory/scans/images/{diagnostic_id}")
+async def inventory_scan_diagnostic_image(diagnostic_id: str, user=Depends(require_user)) -> Response:
+    stored = await state().cache.get_inventory_scan_image(user.id, diagnostic_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Scanner diagnostic image not found or expired.")
+    content_type, image_data = stored
+    return Response(content=image_data, media_type=content_type, headers={"Cache-Control": "private, max-age=300"})
 
 
 @app.post("/api/me/inventory")
@@ -4201,10 +4297,11 @@ async def items(
     category: str | None = None,
     section: str | None = None,
     size: str | None = None,
+    location: str | None = None,
     limit: int = Query(default=25, ge=1, le=100),
     page: int = Query(default=1, ge=1),
 ) -> list[dict[str, Any]]:
-    return encode(await state().sources.lookup_items(query, category, section, size, limit, page))
+    return encode(await state().sources.lookup_items(query, category, section, size, location, limit, page))
 
 
 @app.get("/api/items/{item_id}")
