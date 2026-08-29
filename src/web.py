@@ -3530,6 +3530,8 @@ def _inventory_scanner_catalog_supplements(candidate: str) -> list[ItemLocatorRe
         (("maxlift", "aa", "support", "tractor", "beam"), "MaxLift AA Support Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
         (("maxlift", "aa", "transport", "tractor", "beam"), "MaxLift AA Transport Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
         (("bul", "h4", "armor", "steeltek"), "BUL-H4 Armor SteelTek", "Heavy", "Armor", "Clark Defense Systems"),
+        (("c54", "ochelo", "smg"), 'C54 "Ochelo" SMG', "SMG", "Weapons", "Gemini"),
+        (("c54", "0chelo", "smg"), 'C54 "Ochelo" SMG', "SMG", "Weapons", "Gemini"),
         (("tumbril", "cargo", "plushie"), "Tumbril Cargo Plushie", "Flair", "Other", "Tumbril Land Systems"),
         (("redimake", "item", "fabricator", "aa", "support"), "RediMake Item Fabricator AA Support", "Crafter", "Other", "RediMake"),
     )

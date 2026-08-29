@@ -2709,20 +2709,24 @@ async function scanInventoryHover() {
     const capture = await captureInventoryScannerCrop();
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const contextToken = capture.tileToken || capture.contextHash;
-    const captureToken = `${capture.hash}:${contextToken}`;
+    // Use the calibrated title strip as the item identity once it is known.
+    // Animation and stat changes elsewhere in the tooltip should not enqueue
+    // another expensive server OCR request for the same hovered item.
+    const identityHash = capture.titleHash || capture.hash;
+    const captureToken = `${identityHash}:${contextToken}`;
     const candidateIsSameHover = inventoryScannerStableCandidate
       && !inventoryScannerCaptureChanged(inventoryScannerStableCandidate.contextToken, contextToken)
-      && imageHashDistance(inventoryScannerStableCandidate.hash, capture.hash) <= 4;
+      && imageHashDistance(inventoryScannerStableCandidate.identityHash, identityHash) <= capture.identityTolerance;
     if (!candidateIsSameHover) {
       // The first frame after moving to an item often contains a half-drawn
       // tooltip. Hold it locally and require the following frame to agree.
-      inventoryScannerStableCandidate = { hash: capture.hash, contextToken };
+      inventoryScannerStableCandidate = { identityHash, contextToken };
       return;
     }
-    inventoryScannerStableCandidate = { hash: capture.hash, contextToken };
+    inventoryScannerStableCandidate = { identityHash, contextToken };
     const repeatsLastStableCapture = inventoryScannerLastStableCapture
       && !inventoryScannerCaptureChanged(inventoryScannerLastStableCapture.contextToken, contextToken)
-      && imageHashDistance(inventoryScannerLastStableCapture.hash, capture.hash) <= 4;
+      && imageHashDistance(inventoryScannerLastStableCapture.identityHash, identityHash) <= capture.identityTolerance;
     if (repeatsLastStableCapture
       || inventoryScannerPendingHashes.has(captureToken)
       || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)) return;
@@ -2736,7 +2740,7 @@ async function scanInventoryHover() {
       refreshInventoryScannerProgress();
       return;
     }
-    inventoryScannerLastStableCapture = { hash: capture.hash, contextToken };
+    inventoryScannerLastStableCapture = { identityHash, contextToken };
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
@@ -2961,6 +2965,9 @@ async function captureInventoryScannerCrop() {
   );
   const contextHash = imageAverageHash(contextCanvas, 24);
   const tileToken = detectInventoryScannerTileToken(contextCanvas);
+  const titleHash = requestTitleBox
+    ? imageDifferenceHash(canvas, normalizedCanvasBox(requestTitleBox), 32, 8)
+    : "";
   // Inventory titles are small, thin, low-contrast text. PNG avoids the extra
   // ringing and blur that WebP introduces before server-side OCR.
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
@@ -2968,10 +2975,46 @@ async function captureInventoryScannerCrop() {
   return {
     file: new File([blob], "inventory-tooltip.png", { type: "image/png" }),
     hash,
+    titleHash,
+    // Difference hashes tolerate small brightness/animation changes while
+    // remaining selective enough to distinguish compact weapon titles.
+    identityTolerance: titleHash ? 18 : 4,
     contextHash,
     tileToken,
     requestTitleBox,
   };
+}
+
+function normalizedCanvasBox(value) {
+  const parts = String(value || "").split(",").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return null;
+  const [x, y, width, height] = parts;
+  if (width <= 0 || height <= 0) return null;
+  return { x, y, width, height };
+}
+
+function imageDifferenceHash(sourceCanvas, normalizedBox, width = 32, height = 8) {
+  if (!normalizedBox) return "";
+  const canvas = document.createElement("canvas");
+  canvas.width = width + 1;
+  canvas.height = height;
+  const sx = Math.round(normalizedBox.x * sourceCanvas.width);
+  const sy = Math.round(normalizedBox.y * sourceCanvas.height);
+  const sw = Math.max(1, Math.round(normalizedBox.width * sourceCanvas.width));
+  const sh = Math.max(1, Math.round(normalizedBox.height * sourceCanvas.height));
+  const context = canvas.getContext("2d");
+  context.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const luminance = (index) => (data[index] * 0.299) + (data[index + 1] * 0.587) + (data[index + 2] * 0.114);
+  let hash = "";
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const left = ((y * canvas.width) + x) * 4;
+      const right = left + 4;
+      hash += luminance(left) >= luminance(right) ? "1" : "0";
+    }
+  }
+  return hash;
 }
 
 function detectInventoryScannerTileToken(canvas) {
