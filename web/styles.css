@@ -19,54 +19,6 @@
   font-family: Inter, "Segoe UI", Arial, sans-serif;
 }
 
-.scanner-retained-diagnostics {
-  margin-top: 0.8rem;
-}
-
-.scanner-retained-list {
-  display: grid;
-  gap: 0.65rem;
-  margin-top: 0.65rem;
-}
-
-.scanner-retained-capture {
-  display: grid;
-  grid-template-columns: minmax(180px, 34%) 1fr;
-  gap: 0.75rem;
-  align-items: start;
-  padding: 0.65rem;
-  border: 1px solid var(--border-primary);
-  border-left: 4px solid var(--text-faint);
-  border-radius: 0.45rem;
-}
-
-.scanner-retained-capture.accepted {
-  border-left-color: #39c983;
-}
-
-.scanner-retained-capture.rejected {
-  border-left-color: #e6a23c;
-}
-
-.scanner-retained-capture img {
-  display: block;
-  width: 100%;
-  max-height: 190px;
-  object-fit: contain;
-  background: #05080b;
-}
-
-.scanner-retained-capture div {
-  display: grid;
-  gap: 0.35rem;
-}
-
-@media (max-width: 720px) {
-  .scanner-retained-capture {
-    grid-template-columns: 1fr;
-  }
-}
-
 * {
   box-sizing: border-box;
 }
