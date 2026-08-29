@@ -229,6 +229,7 @@ document.querySelector("[data-action-button='clearAllInventory']").addEventListe
 document.querySelector("[data-action-button='matchInventoryText']").addEventListener("click", importInventoryText);
 document.querySelector("[data-action-button='startInventoryScanner']").addEventListener("click", startInventoryScanner);
 document.querySelector("[data-action-button='stopInventoryScanner']").addEventListener("click", stopInventoryScanner);
+document.querySelector("[data-action-button='loadInventoryScanDiagnostics']")?.addEventListener("click", loadLatestInventoryScanDiagnostics);
 document.querySelector("[data-action-button='importRsiPledges']").addEventListener("click", importRsiPledgesFromBrowser);
 document.querySelector("#rsiPledgeImport").addEventListener("change", importRsiPledgeFiles);
 document.querySelector("#blueprintImageImport").addEventListener("change", importBlueprintImages);
@@ -3105,6 +3106,48 @@ async function submitInventoryImages(files, options = {}) {
       && options.scannerGeneration !== inventoryScannerGeneration) return null;
     outputs.inventoryImport.innerHTML = errorMessage(error.message);
     return null;
+  }
+}
+
+async function loadLatestInventoryScanDiagnostics() {
+  const target = document.querySelector("#inventoryScanDiagnosticsOutput");
+  if (!target) return;
+  target.innerHTML = stateMessage("Loading retained scanner captures...");
+  try {
+    const sessions = await api("/api/me/inventory/scans/recent");
+    if (!sessions.length) {
+      target.innerHTML = stateMessage("No scanner diagnostics remain from the last 24 hours.");
+      return;
+    }
+    const session = sessions[0];
+    const details = await api(`/api/me/inventory/scans/${encodeURIComponent(session.session_id)}`);
+    const captures = details.captures || [];
+    const submittedIndexes = new Set(captures.map((capture) => Number(capture.capture_index)));
+    const missingIndexes = [];
+    if (captures.length) {
+      const highestIndex = Math.max(...submittedIndexes);
+      for (let index = 0; index <= highestIndex; index += 1) {
+        if (!submittedIndexes.has(index)) missingIndexes.push(index);
+      }
+    }
+    const rows = captures.map((capture) => {
+      const performance = capture.performance || {};
+      const matched = (capture.matched_items || []).join(", ") || "No match";
+      const ocr = capture.ocr_text || "No readable title";
+      return `<article class="scanner-retained-capture ${capture.matched_items?.length ? "accepted" : "rejected"}">
+        <img src="${escapeAttribute(capture.image_url)}" alt="Retained tooltip crop ${Number(capture.capture_index) + 1}">
+        <div>
+          <strong>Capture ${Number(capture.capture_index) + 1}: ${escapeHtml(matched)}</strong>
+          <small>${escapeHtml(ocr)}</small>
+          <small>${Number(performance.server_ms || 0).toLocaleString()} ms server · ${Number(performance.ocr_ms || 0).toLocaleString()} ms OCR · ${Number(performance.match_ms || 0).toLocaleString()} ms match · queue depth ${Number(performance.client_queue_depth || 0)}</small>
+        </div>
+      </article>`;
+    }).join("");
+    target.innerHTML = `<p><strong>${captures.length} submitted capture${captures.length === 1 ? "" : "s"}</strong> · ${Number(session.storage_bytes || 0).toLocaleString()} bytes retained · expires ${escapeHtml(new Date(Number(session.expires_at) * 1000).toLocaleString())}</p>
+      ${missingIndexes.length ? `<p class="warning">Dropped before upload: capture ${missingIndexes.map((index) => index + 1).join(", ")}</p>` : ""}
+      <div class="scanner-retained-list">${rows}</div>`;
+  } catch (error) {
+    target.innerHTML = errorMessage(error.message);
   }
 }
 
