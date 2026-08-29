@@ -703,6 +703,20 @@ def test_missed_scans_can_be_opened_for_manual_review() -> None:
     assert "stopInventoryScanner(false)" in javascript
 
 
+def test_retained_scanner_diagnostics_can_be_reviewed_from_inventory() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    css = (WEB_DIR / "styles.css").read_text(encoding="utf-8")
+
+    assert 'data-action-button="loadInventoryScanDiagnostics"' in html
+    assert 'id="inventoryScanDiagnosticsOutput"' in html
+    assert 'api("/api/me/inventory/scans/recent")' in javascript
+    assert "/api/me/inventory/scans/${encodeURIComponent(session.session_id)}" in javascript
+    assert "Dropped before upload:" in javascript
+    assert "capture.image_url" in javascript
+    assert ".scanner-retained-capture" in css
+
+
 def test_save_all_returns_to_station_inventory_after_one_refresh() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
