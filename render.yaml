@@ -5,6 +5,7 @@ databases:
     databaseName: game_assist
     user: game_assist
     diskSizeGB: 1
+    storageAutoscalingEnabled: false
 
 services:
   - type: web
@@ -63,6 +64,8 @@ services:
         value: "15"
       - key: CACHE_TTL_SECONDS
         value: "300"
+      - key: DATABASE_STORAGE_LIMIT_BYTES
+        value: "1073741824"
       - key: INVENTORY_SCANNER_WORKERS
         value: "2"
       - key: INVENTORY_SCANNER_CAPACITY

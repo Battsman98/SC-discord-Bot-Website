@@ -13,6 +13,10 @@ AUDIT_ACTION_TYPES = {
     "items", "mining", "other", "ships", "timers", "trade", "updates",
 }
 
+SCANNER_DIAGNOSTIC_RETENTION_SECONDS = 6 * 60 * 60
+WEBSITE_VISIT_RETENTION_DAYS = 90
+WEBSITE_LANGUAGE_RETENTION_DAYS = 180
+
 
 def normalize_audit_action_type(value: object) -> str | None:
     normalized = str(value or "").strip().lower().replace("_", " ").replace("-", " ")
@@ -306,6 +310,12 @@ class SQLiteCache:
         cls._ensure_column(connection, "loot_sighting_reports", "source_url", "TEXT")
         cls._ensure_column(connection, "audit_events", "action_type", "TEXT NOT NULL DEFAULT 'other'")
         cls._backfill_audit_action_types(connection)
+        # Keep the legacy image columns for a backwards-compatible rollout,
+        # but retain only compact OCR/diagnostic metadata going forward.
+        connection.execute(
+            "UPDATE inventory_scan_diagnostics SET image_data = ?, image_size = 0 WHERE image_size > 0",
+            (b"",),
+        )
         connection.commit()
         return cls(connection)
 
@@ -333,7 +343,7 @@ class SQLiteCache:
         client_queue_depth: int | None,
         image_content_type: str,
         image_data: bytes,
-        ttl_seconds: int = 86400,
+        ttl_seconds: int = SCANNER_DIAGNOSTIC_RETENTION_SECONDS,
     ) -> None:
         now = int(time.time())
         self._connection.execute(
@@ -368,7 +378,7 @@ class SQLiteCache:
                 json.dumps(calibration) if calibration is not None else None,
                 error_text, queue_ms, ocr_ms, match_ms, server_ms,
                 client_elapsed_ms, client_queue_depth, image_content_type,
-                image_data, len(image_data), now, now + ttl_seconds,
+                b"", 0, now, now + ttl_seconds,
             ),
         )
         self._connection.commit()
@@ -380,6 +390,65 @@ class SQLiteCache:
         )
         self._connection.commit()
         return cursor.rowcount
+
+    async def purge_expired_data(self, now: int | None = None) -> dict[str, int]:
+        """Bound transient and analytics data without touching user-owned data."""
+        timestamp = int(time.time()) if now is None else int(now)
+        visit_cutoff = datetime.fromtimestamp(
+            timestamp - WEBSITE_VISIT_RETENTION_DAYS * 86400, timezone.utc
+        ).date().isoformat()
+        language_cutoff = datetime.fromtimestamp(
+            timestamp - WEBSITE_LANGUAGE_RETENTION_DAYS * 86400, timezone.utc
+        ).date().isoformat()
+        statements = {
+            "cache_entries": ("DELETE FROM cache_entries WHERE expires_at <= ?", (timestamp,)),
+            "inventory_scan_diagnostics": (
+                "DELETE FROM inventory_scan_diagnostics WHERE expires_at <= ?", (timestamp,),
+            ),
+            "website_active_visitors": (
+                "DELETE FROM website_active_visitors WHERE last_seen_at < ?", (timestamp - 86400,),
+            ),
+            "website_daily_visits": (
+                "DELETE FROM website_daily_visits WHERE visit_day < ?", (visit_cutoff,),
+            ),
+            "website_language_samples": (
+                "DELETE FROM website_language_samples WHERE week_start < ?", (language_cutoff,),
+            ),
+        }
+        removed: dict[str, int] = {}
+        for table, (sql, parameters) in statements.items():
+            removed[table] = max(0, self._connection.execute(sql, parameters).rowcount)
+        self._connection.commit()
+        return removed
+
+    async def storage_usage(self) -> dict[str, Any]:
+        """Return safe database sizing data for health checks and alerting."""
+        if isinstance(self._connection, PostgresConnection):
+            total = self._connection.execute(
+                "SELECT pg_database_size(current_database())"
+            ).fetchone()
+            rows = self._connection.execute(
+                """
+                SELECT relname, pg_total_relation_size(relid)
+                FROM pg_stat_user_tables
+                ORDER BY pg_total_relation_size(relid) DESC
+                LIMIT 5
+                """
+            ).fetchall()
+            return {
+                "engine": "postgresql",
+                "total_bytes": int(total[0]),
+                "largest_tables": [
+                    {"name": str(name), "total_bytes": int(size)} for name, size in rows
+                ],
+            }
+        page_count = self._connection.execute("PRAGMA page_count").fetchone()[0]
+        page_size = self._connection.execute("PRAGMA page_size").fetchone()[0]
+        return {
+            "engine": "sqlite",
+            "total_bytes": int(page_count) * int(page_size),
+            "largest_tables": [],
+        }
 
     async def list_inventory_scan_sessions(self, user_id: int, limit: int = 10) -> list[dict[str, Any]]:
         await self.purge_expired_inventory_scan_diagnostics()
@@ -434,22 +503,9 @@ class SQLiteCache:
                 },
                 "image_content_type": row[17], "image_size": row[18],
                 "created_at": row[19], "expires_at": row[20],
-                "image_url": f"/api/me/inventory/scans/images/{row[0]}",
             }
             for row in rows
         ]
-
-    async def get_inventory_scan_image(self, user_id: int, diagnostic_id: str) -> tuple[str, bytes] | None:
-        await self.purge_expired_inventory_scan_diagnostics()
-        row = self._connection.execute(
-            """
-            SELECT image_content_type, image_data
-            FROM inventory_scan_diagnostics
-            WHERE user_id = ? AND diagnostic_id = ?
-            """,
-            (user_id, diagnostic_id),
-        ).fetchone()
-        return (str(row[0]), bytes(row[1])) if row else None
 
     @staticmethod
     def _ensure_column(connection: sqlite3.Connection, table: str, column: str, column_type: str) -> None:
