@@ -1,6 +1,7 @@
 import asyncio
 from unittest.mock import AsyncMock
 
+from src.sources.base import MiningLocationResult
 from src.sources.uex import UEXSource
 
 
@@ -402,6 +403,34 @@ def test_copper_does_not_match_tin_signature_from_contaminated_live_data() -> No
 
     assert "tin" in matches
     assert "copper" not in matches
+
+
+def test_copper_canonical_signature_overrides_nonempty_wiki_signature() -> None:
+    source = UEXSource.__new__(UEXSource)
+    result = MiningLocationResult(
+        material_name="Copper",
+        code="COPP",
+        kind="Metal",
+        refined_sell_price=3817,
+        raw_sell_price=1200,
+        is_harvestable=False,
+        is_volatile_qt=False,
+        is_volatile_time=False,
+        is_explosive=False,
+        systems=["Stanton"],
+        lagrange_points=[],
+        planets=[],
+        moons=[],
+        points_of_interest=[],
+        source_url="https://api.star-citizen.wiki/commodities/copper-ore",
+        source_name="UEX + Star Citizen Wiki API",
+        rock_signatures=[4900],
+        location_groups=[],
+    )
+
+    corrected = asyncio.run(source._with_mining_signatures(result, {"name": "Copper (Ore)"}))
+
+    assert corrected.rock_signatures == [4240]
 
 
 def test_filter_items_accepts_medpen_alias() -> None:
