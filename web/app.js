@@ -2774,7 +2774,8 @@ async function scanInventoryHover() {
         // Retain only the newest stable repeat locally. It is never sent unless
         // the primary OCR response is blank, so successful hovers cost exactly
         // one server request.
-        inventoryScannerHoverBackups.set(backupKey, {
+        const existingBackup = inventoryScannerHoverBackups.get(backupKey);
+        if (!existingBackup || capture.titleQuality > existingBackup.titleQuality) inventoryScannerHoverBackups.set(backupKey, {
           ...capture,
           captureToken: `retry:${captureToken}`,
           captureMs,
@@ -2861,7 +2862,10 @@ async function processInventoryScannerCapture(capture) {
     : null;
   if (capture.backupKey) inventoryScannerHoverBackups.delete(capture.backupKey);
   const backupLooksImproved = backup
-    && imageHashDistance(capture.titleHash, backup.titleHash) >= 12;
+    && imageHashDistance(capture.titleHash, backup.titleHash) >= 12
+    // A changed hash alone often reflects tooltip animation. Retry only when
+    // the later title band also contains materially stronger, sharper text.
+    && backup.titleQuality >= Math.max(capture.titleQuality + 6, capture.titleQuality * 1.08);
   if (!payload?.ocr_text?.trim()
     && backupLooksImproved
     && backup.generation === inventoryScannerGeneration) {
@@ -3044,6 +3048,7 @@ async function captureInventoryScannerCrop() {
     titleCanvas.height,
   );
   const titleHash = imageAverageHash(titleCanvas, 32);
+  const titleQuality = inventoryScannerTitleQuality(titleCanvas);
   const contextCanvas = document.createElement("canvas");
   contextCanvas.width = 360;
   contextCanvas.height = 540;
@@ -3068,6 +3073,7 @@ async function captureInventoryScannerCrop() {
     file: new File([blob], "inventory-tooltip.png", { type: "image/png" }),
     hash,
     titleHash,
+    titleQuality,
     contextHash,
     tileToken,
     requestTitleBox,
@@ -3133,6 +3139,31 @@ function imageAverageHash(sourceCanvas, size = 16) {
   }
   const average = values.reduce((sum, value) => sum + value, 0) / values.length;
   return values.map((value) => (value >= average ? "1" : "0")).join("");
+}
+
+function inventoryScannerTitleQuality(sourceCanvas) {
+  const context = sourceCanvas.getContext("2d");
+  const { width, height } = sourceCanvas;
+  const data = context.getImageData(0, 0, width, height).data;
+  const luminance = new Float32Array(width * height);
+  let minimum = 255;
+  let maximum = 0;
+  for (let pixel = 0, index = 0; index < data.length; index += 4, pixel += 1) {
+    const value = (data[index] * 0.299) + (data[index + 1] * 0.587) + (data[index + 2] * 0.114);
+    luminance[pixel] = value;
+    minimum = Math.min(minimum, value);
+    maximum = Math.max(maximum, value);
+  }
+  let edgeEnergy = 0;
+  for (let y = 1; y < height; y += 1) {
+    for (let x = 1; x < width; x += 1) {
+      const index = (y * width) + x;
+      edgeEnergy += Math.abs(luminance[index] - luminance[index - 1]);
+      edgeEnergy += Math.abs(luminance[index] - luminance[index - width]);
+    }
+  }
+  const samples = Math.max(1, ((width - 1) * (height - 1)) * 2);
+  return ((maximum - minimum) * 0.35) + ((edgeEnergy / samples) * 0.65);
 }
 
 function imageHashDistance(left, right) {
