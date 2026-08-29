@@ -265,6 +265,7 @@ let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
 let inventoryScannerStableCandidate = null;
 let inventoryScannerLastStableCapture = null;
+let inventoryScannerHoverBackups = new Map();
 let inventoryScannerQueueFullCount = 0;
 let inventoryScannerProgressTimer = null;
 let inventoryScannerProcessingStartedAt = 0;
@@ -2629,6 +2630,7 @@ async function startInventoryScanner() {
   inventoryScannerStopping = false;
   inventoryScannerStableCandidate = null;
   inventoryScannerLastStableCapture = null;
+  inventoryScannerHoverBackups.clear();
   inventoryScannerQueueFullCount = 0;
   inventoryScannerSessionCompleted = 0;
   inventoryScannerDrainTotal = 0;
@@ -2697,6 +2699,7 @@ function stopInventoryScanner(clearOutput = true) {
     inventoryScannerQueue = [];
     inventoryScannerStableCandidate = null;
     inventoryScannerLastStableCapture = null;
+    inventoryScannerHoverBackups.clear();
     inventoryScannerPendingHashes.clear();
     if (inventoryScannerProgressTimer) clearInterval(inventoryScannerProgressTimer);
     inventoryScannerProgressTimer = null;
@@ -2733,6 +2736,7 @@ function finishInventoryScannerReview() {
   refreshInventoryScannerProgress();
   if (inventoryScannerProgressTimer) clearInterval(inventoryScannerProgressTimer);
   inventoryScannerProgressTimer = null;
+  inventoryScannerHoverBackups.clear();
 }
 
 async function scanInventoryHover() {
@@ -2764,8 +2768,24 @@ async function scanInventoryHover() {
     inventoryScannerStableCandidate = capture;
     const repeatsLastStableCapture = inventoryScannerLastStableCapture
       && inventoryScannerSameHover(inventoryScannerLastStableCapture, capture);
-    if (repeatsLastStableCapture
-      || inventoryScannerPendingHashes.has(captureToken)
+    if (repeatsLastStableCapture) {
+      const backupKey = inventoryScannerLastStableCapture.backupKey;
+      if (backupKey) {
+        // Retain only the newest stable repeat locally. It is never sent unless
+        // the primary OCR response is blank, so successful hovers cost exactly
+        // one server request.
+        inventoryScannerHoverBackups.set(backupKey, {
+          ...capture,
+          captureToken: `retry:${captureToken}`,
+          captureMs,
+          clientElapsedMs: Math.round(performance.now() - inventoryScannerDiagnosticStartedAt),
+          generation: inventoryScannerGeneration,
+          isBlankRetry: true,
+        });
+      }
+      return;
+    }
+    if (inventoryScannerPendingHashes.has(captureToken)
       || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)) return;
     if (inventoryScannerQueue.length >= inventoryScannerQueueLimit) {
       // Preserve the distinct items already waiting. Repeated frames near the
@@ -2777,16 +2797,18 @@ async function scanInventoryHover() {
       refreshInventoryScannerProgress();
       return;
     }
-    inventoryScannerLastStableCapture = capture;
-    inventoryScannerQueue.push({
+    const queuedCapture = {
       ...capture,
       captureToken,
+      backupKey: captureToken,
       captureMs,
       captureIndex: inventoryScannerCaptureIndex++,
       clientElapsedMs: Math.round(performance.now() - inventoryScannerDiagnosticStartedAt),
       clientQueueDepth: inventoryScannerQueue.length + inventoryScannerInFlight,
       generation: inventoryScannerGeneration,
-    });
+    };
+    inventoryScannerLastStableCapture = queuedCapture;
+    inventoryScannerQueue.push(queuedCapture);
     drainInventoryScannerQueue();
   } finally {
     inventoryScannerCaptureBusy = false;
@@ -2834,6 +2856,20 @@ async function processInventoryScannerCapture(capture) {
     titleBox: capture.requestTitleBox,
   });
   if (capture.generation !== inventoryScannerGeneration) return;
+  const backup = capture.backupKey
+    ? inventoryScannerHoverBackups.get(capture.backupKey)
+    : null;
+  if (capture.backupKey) inventoryScannerHoverBackups.delete(capture.backupKey);
+  const backupLooksImproved = backup
+    && imageHashDistance(capture.titleHash, backup.titleHash) >= 12;
+  if (!payload?.ocr_text?.trim()
+    && backupLooksImproved
+    && backup.generation === inventoryScannerGeneration) {
+    backup.captureIndex = inventoryScannerCaptureIndex++;
+    backup.clientQueueDepth = inventoryScannerQueue.length + inventoryScannerInFlight;
+    inventoryScannerQueue.unshift(backup);
+    inventoryScannerStatus = "Blank read detected. Retrying the saved stable frame.";
+  }
   if (payload?.items?.length) {
     inventoryScannerLastHash = capture.hash;
     inventoryScannerLastContextHash = capture.contextHash;
