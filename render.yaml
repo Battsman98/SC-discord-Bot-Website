@@ -67,7 +67,7 @@ services:
       - key: DATABASE_STORAGE_LIMIT_BYTES
         value: "1073741824"
       - key: INVENTORY_SCANNER_WORKERS
-        value: "2"
+        value: "1"
       - key: INVENTORY_SCANNER_CAPACITY
         value: "4"
       - key: MAX_UPLOAD_BYTES

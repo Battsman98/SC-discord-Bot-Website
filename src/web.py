@@ -440,7 +440,7 @@ async def lifespan(app: FastAPI):
     app.state.game_assist.updates = updates
     app.state.game_assist.warbonds = warbonds
     app.state.game_assist.scanner_gate = InventoryScannerGate(
-        worker_count=int(os.getenv("INVENTORY_SCANNER_WORKERS", "2")),
+        worker_count=int(os.getenv("INVENTORY_SCANNER_WORKERS", "1")),
         capacity=int(os.getenv("INVENTORY_SCANNER_CAPACITY", "4")),
     )
     app.state.game_assist.request_limiter = SlidingWindowLimiter(
@@ -502,7 +502,7 @@ _RAPID_OCR_LOCK = threading.Lock()
 _RAPID_OCR_POOL_SIZE = 1
 _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_SIZE)
 _RAPID_OCR_POOL_READY = False
-_RAPID_TITLE_OCR_POOL_SIZE = max(1, int(os.getenv("INVENTORY_SCANNER_WORKERS", "2")))
+_RAPID_TITLE_OCR_POOL_SIZE = max(1, int(os.getenv("INVENTORY_SCANNER_WORKERS", "1")))
 _RAPID_TITLE_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_TITLE_OCR_POOL_SIZE)
 _RAPID_TITLE_OCR_POOL_READY = False
 _DEFAULT_INVENTORY_TITLE_BOX = "0.300000,0.245000,0.380000,0.027500"

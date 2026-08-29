@@ -568,6 +568,7 @@ def test_live_scanner_uses_provisioned_ocr_workers_and_reports_stage_timings() -
     python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
 
     assert "inventoryScannerMaxInFlight = 1" in javascript
+    assert "overlapping engines increase latency" in javascript
     assert "inventoryScannerPendingHashes" in javascript
     assert '"ocr_ms": ocr_ms' in python
     assert '"match_ms": match_ms' in python
@@ -575,7 +576,8 @@ def test_live_scanner_uses_provisioned_ocr_workers_and_reports_stage_timings() -
     assert "background_tasks.add_task(" in python
     assert '"diagnostic_write_deferred": bool(background_tasks and diagnostic_id)' in python
     assert "multi-megabyte database write" in python
-    assert 'INVENTORY_SCANNER_WORKERS", "2"' in python
+    assert 'INVENTORY_SCANNER_WORKERS", "1"' in python
+    assert 'value: "1"' in (WEB_DIR.parent / "render.yaml").read_text(encoding="utf-8")
     assert "_RAPID_OCR_POOL_SIZE = 1" in python
     assert '"queue_ms": queue_ms' in python
     assert "result_groups = await asyncio.gather" in python
