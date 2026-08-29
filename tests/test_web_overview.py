@@ -596,7 +596,7 @@ def test_scanner_tool_panels_show_work_in_progress_notice() -> None:
 def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "inventoryScannerQueueLimit = 12" in javascript
+    assert "inventoryScannerQueueLimit = 50" in javascript
     assert "inventoryScannerCaptureBusy" in javascript
     assert "drainInventoryScannerQueue()" in javascript
     assert "processInventoryScannerCapture(capture)" in javascript
