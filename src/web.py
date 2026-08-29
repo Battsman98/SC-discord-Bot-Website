@@ -4206,6 +4206,10 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         r"\bsorguine\b": "Sanguine",
         r"\bsarguine\b": "Sanguine",
         r"\bcompensatora\b": "Compensator",
+        # RapidOCR commonly reads the narrow trailing numeral 1 as a lowercase
+        # L. Restrict this to numbered Sion attachments so ordinary words
+        # ending in L remain untouched.
+        r"\bsion\s+compensatorl\b": "Sion Compensator1",
         # The thin "III" in the Deadbolt title commonly collapses into "i" or
         # "im" at screen-share resolution. Keep VI untouched so the two cannon
         # variants remain distinguishable.
