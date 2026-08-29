@@ -1082,6 +1082,17 @@ function setAdminVisibility(canManageAdmin) {
     return;
   }
 
+  const scannerActions = document.querySelector(".inventory-import .import-actions");
+  if (scannerActions && !scannerActions.querySelector("[data-download-latest-scan]")) {
+    const downloadButton = document.createElement("button");
+    downloadButton.type = "button";
+    downloadButton.dataset.adminOnly = "";
+    downloadButton.dataset.downloadLatestScan = "";
+    downloadButton.textContent = "Download Latest Diagnostics";
+    downloadButton.addEventListener("click", downloadNewestScannerExport);
+    scannerActions.append(downloadButton);
+  }
+
   const tabButton = document.querySelector("#auditTabTemplate")?.content.firstElementChild.cloneNode(true);
   const overviewButton = document.querySelector("#auditOverviewTemplate")?.content.firstElementChild.cloneNode(true);
   if (tabButton) {
@@ -1091,6 +1102,37 @@ function setAdminVisibility(canManageAdmin) {
   if (overviewButton) {
     overviewButton.addEventListener("click", () => activateTab("admin"));
     document.querySelector(".overview-options")?.append(overviewButton);
+  }
+}
+
+async function downloadNewestScannerExport(event) {
+  const button = event?.currentTarget;
+  if (!currentUser.can_manage_admin || !button) return;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Preparing Download...";
+  try {
+    const response = await fetch("/api/admin/inventory/scans/latest/download");
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.detail || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || "inventory-scan-diagnostics.json";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    outputs.inventoryImport.innerHTML = errorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
   }
 }
 

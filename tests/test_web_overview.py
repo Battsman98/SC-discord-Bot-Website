@@ -734,6 +734,26 @@ def test_retained_scanner_diagnostics_stay_backend_only() -> None:
     assert 'api("/api/me/inventory/scans/recent")' not in javascript
 
 
+def test_admin_can_download_latest_scanner_diagnostics_without_exposing_viewer() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+
+    assert 'downloadButton.dataset.adminOnly = ""' in javascript
+    assert 'downloadButton.dataset.downloadLatestScan = ""' in javascript
+    assert 'if (!currentUser.can_manage_admin || !button) return' in javascript
+    assert 'fetch("/api/admin/inventory/scans/latest/download")' in javascript
+    assert 'Depends(require_bot_admin)' in python
+    assert 'headers={"Content-Disposition": f\'attachment; filename="{filename}"\'}' in python
+
+
+def test_scanner_diagnostic_retention_is_6_hours() -> None:
+    python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+    cache_python = (WEB_DIR.parent / "src" / "cache.py").read_text(encoding="utf-8")
+
+    assert "SCANNER_DIAGNOSTIC_RETENTION_SECONDS = 6 * 60 * 60" in cache_python
+    assert '"retention_hours": SCANNER_DIAGNOSTIC_RETENTION_SECONDS // 3600' in python
+
+
 def test_save_all_returns_to_station_inventory_after_one_refresh() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
