@@ -630,6 +630,19 @@ def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames
     assert "end of a scan must never evict earlier hovered items" in javascript
 
 
+def test_live_scanner_retries_one_saved_frame_only_after_blank_ocr() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "inventoryScannerHoverBackups = new Map()" in javascript
+    assert "inventoryScannerHoverBackups.set(backupKey" in javascript
+    assert "isBlankRetry: true" in javascript
+    assert "!payload?.ocr_text?.trim()" in javascript
+    assert "&& backupLooksImproved" in javascript
+    assert "imageHashDistance(capture.titleHash, backup.titleHash) >= 12" in javascript
+    assert "inventoryScannerQueue.unshift(backup)" in javascript
+    assert "Blank read detected. Retrying the saved stable frame." in javascript
+
+
 def test_scanner_review_queue_has_individual_and_bulk_remove_actions() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
