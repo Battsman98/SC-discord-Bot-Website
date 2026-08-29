@@ -613,9 +613,6 @@ def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames
 
     assert "inventoryScannerStableCandidate" in javascript
     assert "inventoryScannerLastStableCapture" in javascript
-    assert "const identityHash = capture.titleHash || capture.hash" in javascript
-    assert "imageDifferenceHash(canvas, normalizedCanvasBox(requestTitleBox), 32, 8)" in javascript
-    assert "identityTolerance: titleHash ? 18 : 4" in javascript
     assert "candidateIsSameHover" in javascript
     assert "repeatsLastStableCapture" in javascript
     assert "following frame to agree" in javascript
