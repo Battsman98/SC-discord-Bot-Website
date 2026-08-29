@@ -264,6 +264,9 @@ let inventoryScannerQueue = [];
 const inventoryScannerQueueLimit = 50;
 let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
+let inventoryScannerStableCandidate = null;
+let inventoryScannerLastStableCapture = null;
+let inventoryScannerQueueFullCount = 0;
 let inventoryScannerProgressTimer = null;
 let inventoryScannerProcessingStartedAt = 0;
 let inventoryScannerSessionCompleted = 0;
@@ -272,9 +275,6 @@ let inventoryScannerDrainCompleted = 0;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
-let inventoryScannerLastQueuedHash = "";
-let inventoryScannerLastQueuedContextToken = "";
-let inventoryScannerRetryBudget = 0;
 let inventoryScannerLastCountedKey = "";
 let inventoryScannerLastCountedCaptureToken = "";
 let inventoryScannerTitleBox = "";
@@ -2586,15 +2586,15 @@ async function startInventoryScanner() {
   inventoryScannerCaptureBusy = false;
   inventoryScannerQueue = [];
   inventoryScannerStopping = false;
+  inventoryScannerStableCandidate = null;
+  inventoryScannerLastStableCapture = null;
+  inventoryScannerQueueFullCount = 0;
   inventoryScannerSessionCompleted = 0;
   inventoryScannerDrainTotal = 0;
   inventoryScannerDrainCompleted = 0;
   inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
   inventoryScannerLastContextHash = "";
-  inventoryScannerLastQueuedHash = "";
-  inventoryScannerLastQueuedContextToken = "";
-  inventoryScannerRetryBudget = 0;
   inventoryScannerLastCountedKey = "";
   inventoryScannerLastCountedCaptureToken = "";
   inventoryScannerTitleBox = "";
@@ -2654,6 +2654,8 @@ function stopInventoryScanner(clearOutput = true) {
     inventoryScannerGeneration += 1;
     inventoryScannerStopping = false;
     inventoryScannerQueue = [];
+    inventoryScannerStableCandidate = null;
+    inventoryScannerLastStableCapture = null;
     inventoryScannerPendingHashes.clear();
     if (inventoryScannerProgressTimer) clearInterval(inventoryScannerProgressTimer);
     inventoryScannerProgressTimer = null;
@@ -2707,24 +2709,33 @@ async function scanInventoryHover() {
     const captureMs = Math.round(performance.now() - captureStartedAt);
     const contextToken = capture.tileToken || capture.contextHash;
     const captureToken = `${capture.hash}:${contextToken}`;
-    const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 4;
-    const contextChanged = inventoryScannerCaptureChanged(
-      inventoryScannerLastQueuedContextToken,
-      contextToken,
-    );
-    const alreadyQueued = inventoryScannerPendingHashes.has(captureToken)
-      || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken);
-    if (alreadyQueued || (!titleChanged && !contextChanged && inventoryScannerRetryBudget <= 0)) return;
-    if (titleChanged || contextChanged) {
-      // The first frame after a hover transition can contain partially drawn
-      // text. Keep two bounded follow-up attempts so the stable tooltip is not
-      // discarded as a duplicate when that transitional OCR read is empty.
-      inventoryScannerRetryBudget = 2;
-    } else {
-      inventoryScannerRetryBudget -= 1;
+    const candidateIsSameHover = inventoryScannerStableCandidate
+      && !inventoryScannerCaptureChanged(inventoryScannerStableCandidate.contextToken, contextToken)
+      && imageHashDistance(inventoryScannerStableCandidate.hash, capture.hash) <= 4;
+    if (!candidateIsSameHover) {
+      // The first frame after moving to an item often contains a half-drawn
+      // tooltip. Hold it locally and require the following frame to agree.
+      inventoryScannerStableCandidate = { hash: capture.hash, contextToken };
+      return;
     }
-    inventoryScannerLastQueuedHash = capture.hash;
-    inventoryScannerLastQueuedContextToken = contextToken;
+    inventoryScannerStableCandidate = { hash: capture.hash, contextToken };
+    const repeatsLastStableCapture = inventoryScannerLastStableCapture
+      && !inventoryScannerCaptureChanged(inventoryScannerLastStableCapture.contextToken, contextToken)
+      && imageHashDistance(inventoryScannerLastStableCapture.hash, capture.hash) <= 4;
+    if (repeatsLastStableCapture
+      || inventoryScannerPendingHashes.has(captureToken)
+      || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)) return;
+    if (inventoryScannerQueue.length >= inventoryScannerQueueLimit) {
+      // Preserve the distinct items already waiting. Repeated frames near the
+      // end of a scan must never evict earlier hovered items.
+      inventoryScannerQueueFullCount += 1;
+      inventoryScannerStatus = `Scanner queue full. Processing ${inventoryScannerQueue.length + inventoryScannerInFlight} captures; pause briefly before moving on.`;
+      const empty = document.querySelector(".scanner-empty");
+      if (empty) empty.textContent = inventoryScannerStatus;
+      refreshInventoryScannerProgress();
+      return;
+    }
+    inventoryScannerLastStableCapture = { hash: capture.hash, contextToken };
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
@@ -2734,7 +2745,6 @@ async function scanInventoryHover() {
       clientQueueDepth: inventoryScannerQueue.length + inventoryScannerInFlight,
       generation: inventoryScannerGeneration,
     });
-    if (inventoryScannerQueue.length > inventoryScannerQueueLimit) inventoryScannerQueue.shift();
     drainInventoryScannerQueue();
   } finally {
     inventoryScannerCaptureBusy = false;
@@ -2786,7 +2796,6 @@ async function processInventoryScannerCapture(capture) {
     inventoryScannerLastHash = capture.hash;
     inventoryScannerLastContextHash = capture.contextHash;
     inventoryScannerEmptyReadStreak = 0;
-    inventoryScannerRetryBudget = 0;
     const names = payload.items.map((item) => item.name).filter(Boolean);
     inventoryScannerStatus = names.length
       ? `Recognized: ${names.join(", ")}. Move to the next item.`

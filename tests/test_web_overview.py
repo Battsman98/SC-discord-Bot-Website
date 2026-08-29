@@ -603,25 +603,25 @@ def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     assert "inventoryScannerPendingMatchCount >= requiredConfirmations" not in javascript
     assert "deferRender: true" in javascript
     assert "Recognized: ${names.join" in javascript
-    assert "inventoryScannerQueue.length > inventoryScannerQueueLimit" in javascript
-    assert "inventoryScannerQueue.shift()" in javascript
+    assert "inventoryScannerQueue.length >= inventoryScannerQueueLimit" in javascript
+    assert "pause briefly before moving on" in javascript
+    assert "inventoryScannerQueue.length > inventoryScannerQueueLimit" not in javascript
 
 
 def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
-    assert "inventoryScannerLastQueuedHash" in javascript
-    assert "inventoryScannerLastQueuedContextToken" in javascript
-    assert "const titleChanged = imageHashDistance(inventoryScannerLastQueuedHash, capture.hash) > 4" in javascript
+    assert "inventoryScannerStableCandidate" in javascript
+    assert "inventoryScannerLastStableCapture" in javascript
+    assert "candidateIsSameHover" in javascript
+    assert "repeatsLastStableCapture" in javascript
+    assert "following frame to agree" in javascript
     assert "const hash = imageAverageHash(canvas)" in javascript
-    assert "inventoryScannerLastQueuedHash = capture.hash" in javascript
-    assert "const contextChanged = inventoryScannerCaptureChanged" in javascript
+    assert "inventoryScannerCaptureChanged(inventoryScannerStableCandidate.contextToken" in javascript
     assert "inventoryScannerPendingHashes.has(captureToken)" in javascript
     assert "inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)" in javascript
     assert "inventoryScannerLastQueuedAt" not in javascript
-    assert "inventoryScannerRetryBudget = 2" in javascript
-    assert "inventoryScannerRetryBudget -= 1" in javascript
-    assert "inventoryScannerRetryBudget <= 0" in javascript
+    assert "end of a scan must never evict earlier hovered items" in javascript
 
 
 def test_scanner_review_queue_has_individual_and_bulk_remove_actions() -> None:
