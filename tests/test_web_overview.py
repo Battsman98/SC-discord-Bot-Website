@@ -642,6 +642,18 @@ def test_stopping_scanner_drains_queued_captures_before_review() -> None:
     assert "inventoryScannerStopping && inventoryScannerInFlight === 0" in javascript
 
 
+def test_inventory_scanner_shows_progress_and_restricts_diagnostics() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+
+    assert 'class="scanner-retained-diagnostics" data-change-admin-only hidden' in html
+    assert "data-scanner-progress-percent" in javascript
+    assert "data-scanner-progress-time" in javascript
+    assert "data-scanner-progress-bar" in javascript
+    assert "inventoryScannerDrainTotal = remaining" in javascript
+    assert "captures processed · ${remaining} remaining" in javascript
+
+
 def test_scanner_uses_inventory_tile_context_to_count_duplicate_titles() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 

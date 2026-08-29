@@ -2606,6 +2606,33 @@ body.hangar-modal-open {
   padding: 10px;
 }
 
+.scanner-work-progress {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid rgba(89, 210, 255, 0.35);
+  border-radius: var(--radius);
+  background: rgba(89, 210, 255, 0.08);
+}
+
+.scanner-work-progress-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scanner-work-progress-heading span,
+.scanner-work-progress small {
+  color: var(--muted);
+}
+
+.scanner-work-progress progress {
+  width: 100%;
+  height: 12px;
+  accent-color: var(--accent);
+}
+
 .scanner-progress-heading {
   display: flex;
   flex-wrap: wrap;

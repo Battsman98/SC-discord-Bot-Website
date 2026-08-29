@@ -264,6 +264,11 @@ let inventoryScannerQueue = [];
 const inventoryScannerQueueLimit = 50;
 let inventoryScannerGeneration = 0;
 let inventoryScannerStopping = false;
+let inventoryScannerProgressTimer = null;
+let inventoryScannerProcessingStartedAt = 0;
+let inventoryScannerSessionCompleted = 0;
+let inventoryScannerDrainTotal = 0;
+let inventoryScannerDrainCompleted = 0;
 let inventoryScannerLastTiming = null;
 let inventoryScannerLastHash = "";
 let inventoryScannerLastContextHash = "";
@@ -2340,17 +2345,36 @@ function betterInventoryScannerReview(left, right) {
 }
 
 function renderInventoryScanProgress() {
+  const remaining = inventoryScannerQueue.length + inventoryScannerInFlight;
+  const drainMode = inventoryScannerStopping || inventoryScannerDrainTotal > 0;
+  const completed = drainMode ? inventoryScannerDrainCompleted : inventoryScannerSessionCompleted;
+  const total = drainMode ? inventoryScannerDrainTotal : completed + remaining;
+  const percent = total ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+  const elapsedSeconds = inventoryScannerProcessingStartedAt
+    ? Math.max(0, Math.floor((performance.now() - inventoryScannerProcessingStartedAt) / 1000))
+    : 0;
+  const elapsed = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+  const activity = inventoryScannerProcessingStartedAt
+    ? `<section class="scanner-work-progress" aria-live="polite">
+        <div class="scanner-work-progress-heading">
+          <strong data-scanner-progress-percent>${percent}% processed</strong>
+          <span data-scanner-progress-time>Elapsed ${elapsed}</span>
+        </div>
+        <progress data-scanner-progress-bar max="100" value="${percent}">${percent}%</progress>
+        <small data-scanner-progress-counts>${completed} of ${total} captures processed · ${remaining} remaining</small>
+      </section>`
+    : "";
   const timing = inventoryScannerLastTiming
     ? `<small class="scanner-timing">Last scan: ${Number(inventoryScannerLastTiming.request_ms || 0).toLocaleString()} ms total · ${Number(inventoryScannerLastTiming.ocr_ms || 0).toLocaleString()} ms OCR · ${Number(inventoryScannerLastTiming.match_ms || 0).toLocaleString()} ms matching</small>`
     : "";
-  if (!inventoryScannerHistory.length) return timing;
+  if (!inventoryScannerHistory.length) return `${activity}${timing}`;
   const acceptedCount = inventoryScannerHistory.filter((entry) => entry.status === "accepted").length;
   const reviewCount = inventoryScannerHistory.filter((entry) => entry.status === "review").length;
   const orderedHistory = [
     ...inventoryScannerHistory.filter((entry) => entry.status !== "accepted"),
     ...inventoryScannerHistory.filter((entry) => entry.status === "accepted"),
   ];
-  return `<section class="scanner-progress">
+  return `${activity}<section class="scanner-progress">
     <div class="scanner-progress-heading">
       <h3>Scanner Results</h3>
       <span>${acceptedCount} found${reviewCount ? ` / ${reviewCount} needs review` : ""}</span>
@@ -2374,6 +2398,25 @@ function renderInventoryScanProgress() {
       </li>`).join("") || `<li class="waiting"><strong>No scanner results yet</strong><small>Keep hovering items while frames are captured.</small></li>`}
     </ul>
   </section>`;
+}
+
+function refreshInventoryScannerProgress() {
+  if (!inventoryScannerProcessingStartedAt) return;
+  const remaining = inventoryScannerQueue.length + inventoryScannerInFlight;
+  const drainMode = inventoryScannerStopping || inventoryScannerDrainTotal > 0;
+  const completed = drainMode ? inventoryScannerDrainCompleted : inventoryScannerSessionCompleted;
+  const total = drainMode ? inventoryScannerDrainTotal : completed + remaining;
+  const percent = total ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+  const elapsedSeconds = Math.max(0, Math.floor((performance.now() - inventoryScannerProcessingStartedAt) / 1000));
+  const elapsed = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
+  const percentElement = document.querySelector("[data-scanner-progress-percent]");
+  const timeElement = document.querySelector("[data-scanner-progress-time]");
+  const bar = document.querySelector("[data-scanner-progress-bar]");
+  const counts = document.querySelector("[data-scanner-progress-counts]");
+  if (percentElement) percentElement.textContent = `${percent}% processed`;
+  if (timeElement) timeElement.textContent = `Elapsed ${elapsed}`;
+  if (bar) bar.value = percent;
+  if (counts) counts.textContent = `${completed} of ${total} captures processed · ${remaining} remaining`;
 }
 
 function firstInventoryOcrLine(text) {
@@ -2543,6 +2586,9 @@ async function startInventoryScanner() {
   inventoryScannerCaptureBusy = false;
   inventoryScannerQueue = [];
   inventoryScannerStopping = false;
+  inventoryScannerSessionCompleted = 0;
+  inventoryScannerDrainTotal = 0;
+  inventoryScannerDrainCompleted = 0;
   inventoryScannerLastTiming = null;
   inventoryScannerLastHash = "";
   inventoryScannerLastContextHash = "";
@@ -2566,6 +2612,9 @@ async function startInventoryScanner() {
     },
     audio: false,
   });
+  inventoryScannerProcessingStartedAt = performance.now();
+  if (inventoryScannerProgressTimer) clearInterval(inventoryScannerProgressTimer);
+  inventoryScannerProgressTimer = setInterval(refreshInventoryScannerProgress, 1000);
   inventoryScannerStream.getTracks().forEach((track) => {
     track.addEventListener("ended", () => stopInventoryScanner(true), { once: true });
   });
@@ -2606,10 +2655,16 @@ function stopInventoryScanner(clearOutput = true) {
     inventoryScannerStopping = false;
     inventoryScannerQueue = [];
     inventoryScannerPendingHashes.clear();
+    if (inventoryScannerProgressTimer) clearInterval(inventoryScannerProgressTimer);
+    inventoryScannerProgressTimer = null;
+    inventoryScannerProcessingStartedAt = 0;
     return;
   }
   inventoryScannerStopping = true;
   const remaining = inventoryScannerQueue.length + inventoryScannerInFlight;
+  inventoryScannerDrainTotal = remaining;
+  inventoryScannerDrainCompleted = 0;
+  inventoryScannerProcessingStartedAt = performance.now();
   if (!remaining) {
     finishInventoryScannerReview();
     return;
@@ -2624,11 +2679,15 @@ function stopInventoryScanner(clearOutput = true) {
 
 function finishInventoryScannerReview() {
   inventoryScannerStopping = false;
+  inventoryScannerDrainCompleted = inventoryScannerDrainTotal;
   inventoryScannerStatus = "Scanner stopped.";
   renderInventoryImportItems(
     { items: inventoryImportItems, scan_status: inventoryScannerStatus },
     { scannerMode: true, recordHistory: false, reviewMode: true },
   );
+  refreshInventoryScannerProgress();
+  if (inventoryScannerProgressTimer) clearInterval(inventoryScannerProgressTimer);
+  inventoryScannerProgressTimer = null;
 }
 
 async function scanInventoryHover() {
@@ -2696,6 +2755,9 @@ function drainInventoryScannerQueue() {
       .finally(() => {
         inventoryScannerPendingHashes.delete(capture.captureToken);
         inventoryScannerInFlight = Math.max(0, inventoryScannerInFlight - 1);
+        inventoryScannerSessionCompleted += 1;
+        if (inventoryScannerStopping) inventoryScannerDrainCompleted += 1;
+        refreshInventoryScannerProgress();
         drainInventoryScannerQueue();
         if (inventoryScannerStopping && inventoryScannerInFlight === 0 && inventoryScannerQueue.length === 0) {
           finishInventoryScannerReview();
