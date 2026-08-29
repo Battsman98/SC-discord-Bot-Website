@@ -678,6 +678,7 @@ def test_inventory_scanner_supplements_catalog_gaps_from_live_video() -> None:
         "MaxLiftAA Transport Tractor Beam": "MaxLift AA Transport Tractor Beam",
         "Pyre RYT'microTechMult-Tol": 'Pyro RYT "microTech" Multi-Tool',
         "Tractorbeam": "TruHold Tractor Beam Attachment",
+        "BUL-H4ArmorSteelTek": "BUL-H4 Armor SteelTek",
     }
 
     for scanned, expected in examples.items():
