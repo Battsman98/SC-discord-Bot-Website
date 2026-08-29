@@ -37,7 +37,7 @@ from src.shared import (
     apply_community_mining_locations,
     get_cz_dashboard_timers,
 )
-from src.cache import AUDIT_ACTION_TYPES, SQLiteCache
+from src.cache import AUDIT_ACTION_TYPES, SCANNER_DIAGNOSTIC_RETENTION_SECONDS, SQLiteCache
 from src.config import Settings
 from src.security import SlidingWindowLimiter, install_secret_redaction
 from src.sources.base import ItemLocatorResult
@@ -2339,7 +2339,36 @@ async def inventory_scan_session(session_id: str, user=Depends(require_user)) ->
     captures = await state().cache.get_inventory_scan_session(user.id, session_id)
     if not captures:
         raise HTTPException(status_code=404, detail="Scanner diagnostic session not found or expired.")
-    return {"session_id": session_id, "retention_hours": 6, "captures": captures}
+    return {
+        "session_id": session_id,
+        "retention_hours": SCANNER_DIAGNOSTIC_RETENTION_SECONDS // 3600,
+        "captures": captures,
+    }
+
+
+@app.get("/api/admin/inventory/scans/latest/download")
+async def download_latest_inventory_scan_diagnostics(
+    user=Depends(require_user),
+    _admin: None = Depends(require_bot_admin),
+) -> Response:
+    sessions = await state().cache.list_inventory_scan_sessions(user.id, limit=1)
+    if not sessions:
+        raise HTTPException(status_code=404, detail="No retained inventory scanner diagnostics were found.")
+    session = sessions[0]
+    session_id = str(session["session_id"])
+    captures = await state().cache.get_inventory_scan_session(user.id, session_id)
+    payload = {
+        "session_id": session_id,
+        "retention_hours": SCANNER_DIAGNOSTIC_RETENTION_SECONDS // 3600,
+        "session": session,
+        "captures": captures,
+    }
+    filename = f"inventory-scan-{session_id}.json"
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.post("/api/me/inventory")
@@ -4177,6 +4206,10 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         r"\bsorguine\b": "Sanguine",
         r"\bsarguine\b": "Sanguine",
         r"\bcompensatora\b": "Compensator",
+        # RapidOCR commonly reads the narrow trailing numeral 1 as a lowercase
+        # L. Restrict this to numbered Sion attachments so ordinary words
+        # ending in L remain untouched.
+        r"\bsion\s+compensatorl\b": "Sion Compensator1",
         # The thin "III" in the Deadbolt title commonly collapses into "i" or
         # "im" at screen-share resolution. Keep VI untouched so the two cannon
         # variants remain distinguishable.

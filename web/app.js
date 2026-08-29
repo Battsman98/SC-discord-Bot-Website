@@ -1082,6 +1082,17 @@ function setAdminVisibility(canManageAdmin) {
     return;
   }
 
+  const scannerActions = document.querySelector(".inventory-import .import-actions");
+  if (scannerActions && !scannerActions.querySelector("[data-download-latest-scan]")) {
+    const downloadButton = document.createElement("button");
+    downloadButton.type = "button";
+    downloadButton.dataset.adminOnly = "";
+    downloadButton.dataset.downloadLatestScan = "";
+    downloadButton.textContent = "Download Latest Diagnostics";
+    downloadButton.addEventListener("click", downloadNewestScannerExport);
+    scannerActions.append(downloadButton);
+  }
+
   const tabButton = document.querySelector("#auditTabTemplate")?.content.firstElementChild.cloneNode(true);
   const overviewButton = document.querySelector("#auditOverviewTemplate")?.content.firstElementChild.cloneNode(true);
   if (tabButton) {
@@ -1091,6 +1102,37 @@ function setAdminVisibility(canManageAdmin) {
   if (overviewButton) {
     overviewButton.addEventListener("click", () => activateTab("admin"));
     document.querySelector(".overview-options")?.append(overviewButton);
+  }
+}
+
+async function downloadNewestScannerExport(event) {
+  const button = event?.currentTarget;
+  if (!currentUser.can_manage_admin || !button) return;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Preparing Download...";
+  try {
+    const response = await fetch("/api/admin/inventory/scans/latest/download");
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.detail || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] || "inventory-scan-diagnostics.json";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    outputs.inventoryImport.innerHTML = errorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
   }
 }
 
@@ -2711,18 +2753,16 @@ async function scanInventoryHover() {
     const contextToken = capture.tileToken || capture.contextHash;
     const captureToken = `${capture.hash}:${contextToken}`;
     const candidateIsSameHover = inventoryScannerStableCandidate
-      && !inventoryScannerCaptureChanged(inventoryScannerStableCandidate.contextToken, contextToken)
-      && imageHashDistance(inventoryScannerStableCandidate.hash, capture.hash) <= 4;
+      && inventoryScannerSameHover(inventoryScannerStableCandidate, capture);
     if (!candidateIsSameHover) {
       // The first frame after moving to an item often contains a half-drawn
       // tooltip. Hold it locally and require the following frame to agree.
-      inventoryScannerStableCandidate = { hash: capture.hash, contextToken };
+      inventoryScannerStableCandidate = capture;
       return;
     }
-    inventoryScannerStableCandidate = { hash: capture.hash, contextToken };
+    inventoryScannerStableCandidate = capture;
     const repeatsLastStableCapture = inventoryScannerLastStableCapture
-      && !inventoryScannerCaptureChanged(inventoryScannerLastStableCapture.contextToken, contextToken)
-      && imageHashDistance(inventoryScannerLastStableCapture.hash, capture.hash) <= 4;
+      && inventoryScannerSameHover(inventoryScannerLastStableCapture, capture);
     if (repeatsLastStableCapture
       || inventoryScannerPendingHashes.has(captureToken)
       || inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)) return;
@@ -2736,7 +2776,7 @@ async function scanInventoryHover() {
       refreshInventoryScannerProgress();
       return;
     }
-    inventoryScannerLastStableCapture = { hash: capture.hash, contextToken };
+    inventoryScannerLastStableCapture = capture;
     inventoryScannerQueue.push({
       ...capture,
       captureToken,
@@ -2945,6 +2985,28 @@ async function captureInventoryScannerCrop() {
   const context = canvas.getContext("2d");
   context.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   const hash = imageAverageHash(canvas);
+  // The tooltip body animates and its stat values can change while the same
+  // item remains hovered. Hash only the calibrated title band for admission
+  // deduplication; tile context still keeps identical items separate.
+  const titleCanvas = document.createElement("canvas");
+  titleCanvas.width = 512;
+  titleCanvas.height = 48;
+  const defaultTitleBox = [0.30, 0.245, 0.38, 0.0275];
+  const titleValues = requestTitleBox
+    ? requestTitleBox.split(",").map((value) => Number(value))
+    : defaultTitleBox;
+  titleCanvas.getContext("2d").drawImage(
+    canvas,
+    Math.round(canvas.width * titleValues[0]),
+    Math.round(canvas.height * titleValues[1]),
+    Math.max(1, Math.round(canvas.width * titleValues[2])),
+    Math.max(1, Math.round(canvas.height * titleValues[3])),
+    0,
+    0,
+    titleCanvas.width,
+    titleCanvas.height,
+  );
+  const titleHash = imageAverageHash(titleCanvas, 32);
   const contextCanvas = document.createElement("canvas");
   contextCanvas.width = 360;
   contextCanvas.height = 540;
@@ -2968,6 +3030,7 @@ async function captureInventoryScannerCrop() {
   return {
     file: new File([blob], "inventory-tooltip.png", { type: "image/png" }),
     hash,
+    titleHash,
     contextHash,
     tileToken,
     requestTitleBox,
@@ -3050,6 +3113,22 @@ function inventoryScannerCaptureChanged(left, right) {
   const rightIsTile = right.startsWith("tile:");
   if (leftIsTile || rightIsTile) return left !== right;
   return imageHashDistance(left, right) > 4;
+}
+
+function inventoryScannerSameHover(left, right) {
+  if (!left || !right) return false;
+  const titleDistance = imageHashDistance(left.titleHash, right.titleHash);
+  const contextDistance = imageHashDistance(left.contextHash, right.contextHash);
+  if (left.tileToken && right.tileToken) {
+    if (left.tileToken !== right.tileToken) return false;
+    // A stable title or stable surrounding inventory grid identifies another
+    // frame of the same hovered tile. Requiring both to change preserves a new
+    // item that occupies the same screen position after scrolling.
+    return titleDistance < 40 || contextDistance <= 20;
+  }
+  // Tile detection can briefly fail during motion. In that case require both
+  // visual signatures to agree before discarding a capture.
+  return titleDistance < 40 && contextDistance <= 30;
 }
 
 async function importInventoryText() {

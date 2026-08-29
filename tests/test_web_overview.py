@@ -623,7 +623,7 @@ def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames
     assert "repeatsLastStableCapture" in javascript
     assert "following frame to agree" in javascript
     assert "const hash = imageAverageHash(canvas)" in javascript
-    assert "inventoryScannerCaptureChanged(inventoryScannerStableCandidate.contextToken" in javascript
+    assert "inventoryScannerSameHover(inventoryScannerStableCandidate, capture)" in javascript
     assert "inventoryScannerPendingHashes.has(captureToken)" in javascript
     assert "inventoryScannerQueue.some((queued) => queued.captureToken === captureToken)" in javascript
     assert "inventoryScannerLastQueuedAt" not in javascript
@@ -669,6 +669,11 @@ def test_scanner_uses_inventory_tile_context_to_count_duplicate_titles() -> None
     assert "inventoryScannerLastContextHash" in javascript
     assert "inventoryScannerLastCountedCaptureToken" in javascript
     assert "contextHash = imageAverageHash(contextCanvas, 24)" in javascript
+    assert "titleHash = imageAverageHash(titleCanvas, 32)" in javascript
+    assert "inventoryScannerSameHover(inventoryScannerStableCandidate, capture)" in javascript
+    assert "inventoryScannerSameHover(inventoryScannerLastStableCapture, capture)" in javascript
+    assert "if (left.tileToken !== right.tileToken) return false" in javascript
+    assert "return titleDistance < 40 || contextDistance <= 20" in javascript
 
 
 def test_manual_inventory_entry_uses_hybrid_catalog_autocomplete() -> None:
@@ -732,6 +737,26 @@ def test_retained_scanner_diagnostics_stay_backend_only() -> None:
     assert "inventoryScanDiagnosticsOutput" not in html
     assert "loadLatestInventoryScanDiagnostics" not in javascript
     assert 'api("/api/me/inventory/scans/recent")' not in javascript
+
+
+def test_admin_can_download_latest_scanner_diagnostics_without_exposing_viewer() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+    python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+
+    assert 'downloadButton.dataset.adminOnly = ""' in javascript
+    assert 'downloadButton.dataset.downloadLatestScan = ""' in javascript
+    assert 'if (!currentUser.can_manage_admin || !button) return' in javascript
+    assert 'fetch("/api/admin/inventory/scans/latest/download")' in javascript
+    assert 'Depends(require_bot_admin)' in python
+    assert 'headers={"Content-Disposition": f\'attachment; filename="{filename}"\'}' in python
+
+
+def test_scanner_diagnostic_retention_is_6_hours() -> None:
+    python = (WEB_DIR.parent / "src" / "web.py").read_text(encoding="utf-8")
+    cache_python = (WEB_DIR.parent / "src" / "cache.py").read_text(encoding="utf-8")
+
+    assert "SCANNER_DIAGNOSTIC_RETENTION_SECONDS = 6 * 60 * 60" in cache_python
+    assert '"retention_hours": SCANNER_DIAGNOSTIC_RETENTION_SECONDS // 3600' in python
 
 
 def test_save_all_returns_to_station_inventory_after_one_refresh() -> None:
