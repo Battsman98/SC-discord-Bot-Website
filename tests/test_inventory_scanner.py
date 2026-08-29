@@ -709,6 +709,7 @@ def test_inventory_scanner_supplements_catalog_gaps_from_live_video() -> None:
         "Pyre RYT'microTechMult-Tol": 'Pyro RYT "microTech" Multi-Tool',
         "Tractorbeam": "TruHold Tractor Beam Attachment",
         "BUL-H4ArmorSteelTek": "BUL-H4 Armor SteelTek",
+        'C54"0chelo"SMG': 'C54 "Ochelo" SMG',
     }
 
     for scanned, expected in examples.items():
