@@ -572,6 +572,9 @@ def test_live_scanner_uses_provisioned_ocr_workers_and_reports_stage_timings() -
     assert '"ocr_ms": ocr_ms' in python
     assert '"match_ms": match_ms' in python
     assert '"server_ms":' in python
+    assert "background_tasks.add_task(" in python
+    assert '"diagnostic_write_deferred": bool(background_tasks and diagnostic_id)' in python
+    assert "multi-megabyte database write" in python
     assert 'INVENTORY_SCANNER_WORKERS", "2"' in python
     assert "_RAPID_OCR_POOL_SIZE = 1" in python
     assert '"queue_ms": queue_ms' in python
