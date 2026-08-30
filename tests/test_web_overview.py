@@ -614,6 +614,16 @@ def test_live_scanner_captures_into_a_bounded_queue_while_ocr_is_busy() -> None:
     assert "inventoryScannerQueue.length > inventoryScannerQueueLimit" not in javascript
 
 
+def test_live_scanner_times_out_and_continues_after_one_retry() -> None:
+    javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "const inventoryScannerRequestTimeoutMs = 20000" in javascript
+    assert "const inventoryScannerRequestAttempts = 2" in javascript
+    assert "requestController.abort()" in javascript
+    assert "inventoryScannerFailedCaptures.push(capture)" in javascript
+    assert "data-scanner-retry-failed" in javascript
+
+
 def test_live_scanner_retains_distinct_one_second_hovers_and_deduplicates_frames() -> None:
     javascript = (WEB_DIR / "app.js").read_text(encoding="utf-8")
 
