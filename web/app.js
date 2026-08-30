@@ -257,6 +257,8 @@ let inventoryScannerInFlight = 0;
 // Keep one request in flight per browser. Each ONNX OCR engine uses the
 // service's CPU threads internally, so overlapping engines increase latency.
 const inventoryScannerMaxInFlight = 1;
+const inventoryScannerRequestTimeoutMs = 20000;
+const inventoryScannerRequestAttempts = 2;
 let inventoryScannerPendingHashes = new Set();
 let inventoryScannerCaptureBusy = false;
 let inventoryScannerQueue = [];
@@ -270,6 +272,7 @@ let inventoryScannerQueueFullCount = 0;
 let inventoryScannerProgressTimer = null;
 let inventoryScannerProcessingStartedAt = 0;
 let inventoryScannerSessionCompleted = 0;
+let inventoryScannerFailedCaptures = [];
 let inventoryScannerDrainTotal = 0;
 let inventoryScannerDrainCompleted = 0;
 let inventoryScannerLastTiming = null;
@@ -2403,7 +2406,8 @@ function renderInventoryScanProgress() {
           <span data-scanner-progress-time>Elapsed ${elapsed}</span>
         </div>
         <progress data-scanner-progress-bar max="100" value="${percent}">${percent}%</progress>
-        <small data-scanner-progress-counts>${completed} of ${total} captures processed · ${remaining} remaining</small>
+        <small data-scanner-progress-counts>${completed} of ${total} captures processed · ${remaining} remaining${inventoryScannerFailedCaptures.length ? ` · ${inventoryScannerFailedCaptures.length} failed` : ""}</small>
+        ${inventoryScannerFailedCaptures.length ? `<button type="button" data-scanner-retry-failed>Retry ${inventoryScannerFailedCaptures.length} failed capture${inventoryScannerFailedCaptures.length === 1 ? "" : "s"}</button>` : ""}
       </section>`
     : "";
   const timing = inventoryScannerLastTiming
@@ -2458,7 +2462,7 @@ function refreshInventoryScannerProgress() {
   if (percentElement) percentElement.textContent = `${percent}% processed`;
   if (timeElement) timeElement.textContent = `Elapsed ${elapsed}`;
   if (bar) bar.value = percent;
-  if (counts) counts.textContent = `${completed} of ${total} captures processed · ${remaining} remaining`;
+  if (counts) counts.textContent = `${completed} of ${total} captures processed · ${remaining} remaining${inventoryScannerFailedCaptures.length ? ` · ${inventoryScannerFailedCaptures.length} failed` : ""}`;
 }
 
 function firstInventoryOcrLine(text) {
@@ -2466,6 +2470,27 @@ function firstInventoryOcrLine(text) {
 }
 
 document.addEventListener("click", (event) => {
+  const retryFailed = event.target.closest("[data-scanner-retry-failed]");
+  if (retryFailed) {
+    const failed = inventoryScannerFailedCaptures.splice(0);
+    if (!inventoryScannerStream) {
+      inventoryScannerStopping = true;
+      inventoryScannerDrainTotal = inventoryScannerDrainCompleted + failed.length;
+    }
+    failed.forEach((capture) => {
+      capture.generation = inventoryScannerGeneration;
+      capture.captureIndex = inventoryScannerCaptureIndex++;
+      capture.clientQueueDepth = inventoryScannerQueue.length + inventoryScannerInFlight;
+      inventoryScannerQueue.push(capture);
+    });
+    inventoryScannerStatus = `Retrying ${failed.length} failed capture${failed.length === 1 ? "" : "s"}.`;
+    renderInventoryImportItems(
+      { items: inventoryImportItems, scan_status: inventoryScannerStatus },
+      { scannerMode: true, recordHistory: false, reviewMode: inventoryScannerStopping },
+    );
+    drainInventoryScannerQueue();
+    return;
+  }
   const dismissAll = event.target.closest("[data-scanner-dismiss-all]");
   if (dismissAll) {
     inventoryScannerHistory = inventoryScannerHistory.filter((entry) => entry.status !== "review");
@@ -2633,6 +2658,7 @@ async function startInventoryScanner() {
   inventoryScannerHoverBackups.clear();
   inventoryScannerQueueFullCount = 0;
   inventoryScannerSessionCompleted = 0;
+  inventoryScannerFailedCaptures = [];
   inventoryScannerDrainTotal = 0;
   inventoryScannerDrainCompleted = 0;
   inventoryScannerLastTiming = null;
@@ -2842,20 +2868,45 @@ function drainInventoryScannerQueue() {
 }
 
 async function processInventoryScannerCapture(capture) {
-  const payload = await submitInventoryImages([capture.file], {
-    scannerMode: true,
-    append: true,
-    liveScan: true,
-    captureMs: capture.captureMs,
-    captureToken: capture.captureToken,
-    scannerGeneration: capture.generation,
-    diagnosticSessionId: inventoryScannerDiagnosticSessionId,
-    captureIndex: capture.captureIndex,
-    clientElapsedMs: capture.clientElapsedMs,
-    clientQueueDepth: capture.clientQueueDepth,
-    deferRender: true,
-    titleBox: capture.requestTitleBox,
-  });
+  let payload = null;
+  for (let attempt = 1; attempt <= inventoryScannerRequestAttempts; attempt += 1) {
+    try {
+      payload = await submitInventoryImages([capture.file], {
+        scannerMode: true,
+        append: true,
+        liveScan: true,
+        captureMs: capture.captureMs,
+        captureToken: capture.captureToken,
+        scannerGeneration: capture.generation,
+        diagnosticSessionId: inventoryScannerDiagnosticSessionId,
+        captureIndex: capture.captureIndex,
+        clientElapsedMs: capture.clientElapsedMs,
+        clientQueueDepth: capture.clientQueueDepth,
+        deferRender: true,
+        titleBox: capture.requestTitleBox,
+        requestTimeoutMs: inventoryScannerRequestTimeoutMs,
+        throwOnError: true,
+      });
+      break;
+    } catch (error) {
+      if (capture.generation !== inventoryScannerGeneration) return;
+      if (attempt < inventoryScannerRequestAttempts) {
+        inventoryScannerStatus = `Capture timed out after 20 seconds. Retrying once (${inventoryScannerQueue.length} still queued).`;
+        renderInventoryImportItems(
+          { items: inventoryImportItems, scan_status: inventoryScannerStatus },
+          { scannerMode: true, recordHistory: false, reviewMode: inventoryScannerStopping },
+        );
+        continue;
+      }
+      inventoryScannerFailedCaptures.push(capture);
+      inventoryScannerStatus = `Capture failed twice and was skipped. Continuing with ${inventoryScannerQueue.length} queued capture${inventoryScannerQueue.length === 1 ? "" : "s"}.`;
+      renderInventoryImportItems(
+        { items: inventoryImportItems, scan_status: inventoryScannerStatus },
+        { scannerMode: true, recordHistory: false, reviewMode: inventoryScannerStopping },
+      );
+      return;
+    }
+  }
   if (capture.generation !== inventoryScannerGeneration) return;
   const backup = capture.backupKey
     ? inventoryScannerHoverBackups.get(capture.backupKey)
@@ -3307,9 +3358,18 @@ async function submitInventoryImages(files, options = {}) {
     const excludeWords = document.querySelector("#inventoryScannerExcludeWords")?.value.trim();
     if (excludeWords) params.set("exclude_words", excludeWords);
   }
+  let requestTimeout = null;
+  const requestController = options.requestTimeoutMs ? new AbortController() : null;
+  if (requestController) {
+    requestTimeout = setTimeout(() => requestController.abort(), options.requestTimeoutMs);
+  }
   try {
     const requestStartedAt = performance.now();
-    const response = await fetch(`/api/me/inventory/import/images?${params}`, { method: "POST", body: formData });
+    const response = await fetch(`/api/me/inventory/import/images?${params}`, {
+      method: "POST",
+      body: formData,
+      signal: requestController?.signal,
+    });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.detail || `Request failed with ${response.status}`);
     if (options.scannerGeneration !== undefined
@@ -3339,8 +3399,14 @@ async function submitInventoryImages(files, options = {}) {
   } catch (error) {
     if (options.scannerGeneration !== undefined
       && options.scannerGeneration !== inventoryScannerGeneration) return null;
-    outputs.inventoryImport.innerHTML = errorMessage(error.message);
+    const displayError = error?.name === "AbortError"
+      ? new Error(`Scanner request timed out after ${Math.round(Number(options.requestTimeoutMs || 0) / 1000)} seconds.`)
+      : error;
+    if (options.throwOnError) throw displayError;
+    outputs.inventoryImport.innerHTML = errorMessage(displayError.message);
     return null;
+  } finally {
+    if (requestTimeout) clearTimeout(requestTimeout);
   }
 }
 
