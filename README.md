@@ -46,6 +46,7 @@ not part of the update process.
 
 - `/trade routing` calculates UEX-based circular trade route candidates.
 - The configured trading forum automatically requires WTS, WTB, or WTT and adds Wiki item details and imagery to new listings.
+- `/trade listing` provides catalog-backed item-name suggestions and creates the correctly named forum listing with its tag and aUEC price.
 - `/exec` shows the Executive Hangar clock.
 - `/execset` corrects the Executive Hangar clock for approved users.
 - `/execclear` clears an Executive Hangar manual override.

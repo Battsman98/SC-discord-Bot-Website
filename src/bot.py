@@ -4071,6 +4071,115 @@ async def inventory_search_autocomplete(
 trade_group = app_commands.Group(name="trade", description="Trade planning tools.")
 
 
+def _trade_listing_content(
+    user: discord.abc.User,
+    listing_type: str,
+    price: int,
+    quantity: int,
+    notes: str | None,
+) -> str:
+    lines = [
+        f"**{listing_type} listing by {user.mention}**",
+        "",
+        f"**Price:** {price:,} aUEC",
+        f"**Quantity:** {quantity:,}",
+    ]
+    if notes and notes.strip():
+        lines.extend(("", f"**Details:** {notes.strip()[:1000]}"))
+    lines.extend(("", "Reply in this post if interested."))
+    return "\n".join(lines)
+
+
+@trade_group.command(name="listing", description="Create an item listing with assisted catalog-name selection.")
+@app_commands.describe(
+    listing_type="Choose whether you want to sell, buy, or trade the item.",
+    item="Start typing, then select the exact item name from the catalog.",
+    price="Price per item in aUEC.",
+    quantity="Number of items included in the listing.",
+    notes="Optional condition, availability, or trade details.",
+)
+@app_commands.choices(
+    listing_type=[
+        app_commands.Choice(name="WTS — Want to sell", value="WTS"),
+        app_commands.Choice(name="WTB — Want to buy", value="WTB"),
+        app_commands.Choice(name="WTT — Want to trade", value="WTT"),
+    ]
+)
+async def trade_listing_command(
+    interaction: discord.Interaction,
+    listing_type: app_commands.Choice[str],
+    item: str,
+    price: app_commands.Range[int, 1, 2_147_483_647],
+    quantity: app_commands.Range[int, 1, 10_000] = 1,
+    notes: str | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    catalog_item = await bot.sources.lookup_trade_item(item)
+    if catalog_item is None or catalog_item.name.casefold() != item.strip().casefold():
+        await interaction.followup.send(
+            "That item name was not an exact catalog match. Start typing the name and select one of the suggestions.",
+            ephemeral=True,
+        )
+        return
+
+    forum = bot.get_channel(bot.settings.trading_forum_channel_id or 0)
+    if forum is None and bot.settings.trading_forum_channel_id:
+        try:
+            forum = await bot.fetch_channel(bot.settings.trading_forum_channel_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            forum = None
+    if not isinstance(forum, discord.ForumChannel):
+        await interaction.followup.send("The trading forum is currently unavailable.", ephemeral=True)
+        return
+
+    tag = discord.utils.find(
+        lambda candidate: candidate.name.casefold() == listing_type.value.casefold(),
+        forum.available_tags,
+    )
+    if tag is None:
+        await bot.ensure_trading_forum()
+        refreshed = bot.get_channel(forum.id)
+        if isinstance(refreshed, discord.ForumChannel):
+            forum = refreshed
+        tag = discord.utils.find(
+            lambda candidate: candidate.name.casefold() == listing_type.value.casefold(),
+            forum.available_tags,
+        )
+    if tag is None:
+        await interaction.followup.send("The selected trading tag is currently unavailable.", ephemeral=True)
+        return
+
+    created = await forum.create_thread(
+        name=catalog_item.name[:100],
+        content=_trade_listing_content(interaction.user, listing_type.value, price, quantity, notes),
+        applied_tags=[tag],
+        auto_archive_duration=10080,
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        reason=f"Trading listing created by {interaction.user} ({interaction.user.id})",
+    )
+    await interaction.followup.send(
+        f"Created {created.thread.mention} with the exact catalog name **{catalog_item.name}**.",
+        ephemeral=True,
+    )
+
+
+@trade_listing_command.autocomplete("item")
+async def trade_listing_item_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+    results = await bot.sources.lookup_inventory_items(current, limit=25)
+    return [app_commands.Choice(name=result.name[:100], value=result.name[:100]) for result in results[:25]]
+
+
 @trade_group.command(name="routing", description="Find Star Citizen trade route candidates from UEX.")
 @app_commands.describe(
     starting_point="Required starting trade terminal for the circular route.",

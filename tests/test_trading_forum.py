@@ -1,4 +1,6 @@
-from src.bot import TRADING_FORUM_TAGS, build_trading_item_embed
+from types import SimpleNamespace
+
+from src.bot import TRADING_FORUM_TAGS, _trade_listing_content, build_trading_item_embed
 from src.sources.base import TradeItemResult
 
 
@@ -27,3 +29,18 @@ def test_trade_item_embed_includes_catalog_details_and_image() -> None:
     assert any(field.name == "Listing" and "WTS" in field.value for field in embed.fields)
     assert any(field.name == "Seller's terms" and "aUEC" in field.value for field in embed.fields)
     assert any(field.name == "Item links" and "View on UEX" in field.value for field in embed.fields)
+
+
+def test_trade_listing_content_formats_user_price_quantity_and_notes() -> None:
+    content = _trade_listing_content(
+        SimpleNamespace(mention="<@123>"),
+        "WTB",
+        125000,
+        2,
+        "Meet at Seraphim Station.",
+    )
+
+    assert "**WTB listing by <@123>**" in content
+    assert "**Price:** 125,000 aUEC" in content
+    assert "**Quantity:** 2" in content
+    assert "Meet at Seraphim Station." in content
