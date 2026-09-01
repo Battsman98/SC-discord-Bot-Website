@@ -1312,6 +1312,22 @@ def test_item_category_is_supported_for_buyable_locator_categories() -> None:
     )
 
 
+def test_item_category_autocomplete_keeps_undersuits_in_default_choices() -> None:
+    source = UEXSource.__new__(UEXSource)
+    source._buyable_items = [
+        {"category": f"Category {index:02d}"}
+        for index in range(30)
+    ] + [{"category": "Undersuits"}]
+
+    results = asyncio.run(source.autocomplete_item_filter("category", "", limit=25))
+
+    assert results[0] == "Undersuits"
+    assert len(results) == 25
+    assert asyncio.run(source.autocomplete_item_filter("category", "Category 29", limit=25)) == [
+        "Category 29"
+    ]
+
+
 def test_filter_items_matches_query_category_section_and_size() -> None:
     source = UEXSource.__new__(UEXSource)
     items = [

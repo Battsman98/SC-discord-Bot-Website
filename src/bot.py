@@ -3664,7 +3664,7 @@ async def loot_report_autocomplete(
 @item_group.command(name="search", description="Search for in-game buyable Star Citizen items.")
 @app_commands.describe(
     name="Item name to search.",
-    category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
+    category="Optional category. Start typing to search all choices, including those beyond Discord's first 25.",
     section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
     size="Optional item size.",
     location="Optional station, city, outpost, or point of interest.",
