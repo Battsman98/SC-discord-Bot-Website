@@ -18,7 +18,7 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -37,7 +37,7 @@ from src.shared import (
     apply_community_mining_locations,
     get_cz_dashboard_timers,
 )
-from src.cache import AUDIT_ACTION_TYPES, SQLiteCache
+from src.cache import AUDIT_ACTION_TYPES, SCANNER_DIAGNOSTIC_RETENTION_SECONDS, SQLiteCache
 from src.config import Settings
 from src.security import SlidingWindowLimiter, install_secret_redaction
 from src.sources.base import ItemLocatorResult
@@ -440,7 +440,7 @@ async def lifespan(app: FastAPI):
     app.state.game_assist.updates = updates
     app.state.game_assist.warbonds = warbonds
     app.state.game_assist.scanner_gate = InventoryScannerGate(
-        worker_count=int(os.getenv("INVENTORY_SCANNER_WORKERS", "2")),
+        worker_count=1,
         capacity=int(os.getenv("INVENTORY_SCANNER_CAPACITY", "4")),
     )
     app.state.game_assist.request_limiter = SlidingWindowLimiter(
@@ -502,7 +502,7 @@ _RAPID_OCR_LOCK = threading.Lock()
 _RAPID_OCR_POOL_SIZE = 1
 _RAPID_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_OCR_POOL_SIZE)
 _RAPID_OCR_POOL_READY = False
-_RAPID_TITLE_OCR_POOL_SIZE = max(1, int(os.getenv("INVENTORY_SCANNER_WORKERS", "2")))
+_RAPID_TITLE_OCR_POOL_SIZE = 1
 _RAPID_TITLE_OCR_POOL: queue.LifoQueue[Any] = queue.LifoQueue(maxsize=_RAPID_TITLE_OCR_POOL_SIZE)
 _RAPID_TITLE_OCR_POOL_READY = False
 _DEFAULT_INVENTORY_TITLE_BOX = "0.300000,0.245000,0.380000,0.027500"
@@ -2093,6 +2093,7 @@ async def import_inventory_from_text(
 
 @app.post("/api/me/inventory/import/images")
 async def import_inventory_from_images(
+    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     default_location: str | None = None,
     default_category: str | None = None,
@@ -2133,6 +2134,7 @@ async def import_inventory_from_images(
                 capture_token,
                 client_elapsed_ms,
                 client_queue_depth,
+                background_tasks,
             )
 
     ocr_text, ocr_error = await _ocr_blueprint_images(files)
@@ -2163,6 +2165,7 @@ async def _import_inventory_scanner_images(
     capture_token: str | None,
     client_elapsed_ms: int | None,
     client_queue_depth: int | None,
+    background_tasks: BackgroundTasks | None = None,
 ) -> dict[str, Any]:
     started_at = time.perf_counter()
     ocr_started_at = time.perf_counter()
@@ -2262,29 +2265,38 @@ async def _import_inventory_scanner_images(
     diagnostic_id: str | None = None
     if live_scan and diagnostic_session_id and image_data:
         diagnostic_id = f"{diagnostic_session_id}-{capture_index}-{scan_id}"
-        await state().cache.save_inventory_scan_diagnostic(
-            diagnostic_id=diagnostic_id,
-            session_id=diagnostic_session_id,
-            user_id=user_id,
-            capture_index=capture_index,
-            capture_token=capture_token,
-            category=default_category,
-            item_type=default_item_type,
-            ocr_text=ocr_text,
-            matched_items=[str(item.get("name")) for item in items if item.get("name")],
-            attempted_titles=attempted_titles,
-            diagnostics=diagnostic_details,
-            calibration=calibration,
-            error_text=str(ocr_error) if ocr_error else None,
-            queue_ms=queue_ms,
-            ocr_ms=ocr_ms,
-            match_ms=match_ms,
-            server_ms=server_ms,
-            client_elapsed_ms=client_elapsed_ms,
-            client_queue_depth=client_queue_depth,
-            image_content_type=image_content_type,
-            image_data=image_data,
-        )
+        diagnostic_write = {
+            "diagnostic_id": diagnostic_id,
+            "session_id": diagnostic_session_id,
+            "user_id": user_id,
+            "capture_index": capture_index,
+            "capture_token": capture_token,
+            "category": default_category,
+            "item_type": default_item_type,
+            "ocr_text": ocr_text,
+            "matched_items": [str(item.get("name")) for item in items if item.get("name")],
+            "attempted_titles": attempted_titles,
+            "diagnostics": diagnostic_details,
+            "calibration": calibration,
+            "error_text": str(ocr_error) if ocr_error else None,
+            "queue_ms": queue_ms,
+            "ocr_ms": ocr_ms,
+            "match_ms": match_ms,
+            "server_ms": server_ms,
+            "client_elapsed_ms": client_elapsed_ms,
+            "client_queue_depth": client_queue_depth,
+            "image_content_type": image_content_type,
+            "image_data": image_data,
+        }
+        if background_tasks is not None:
+            # Preserve 24-hour diagnostics without making the user wait for a
+            # multi-megabyte database write before receiving the OCR result.
+            background_tasks.add_task(
+                state().cache.save_inventory_scan_diagnostic,
+                **diagnostic_write,
+            )
+        else:
+            await state().cache.save_inventory_scan_diagnostic(**diagnostic_write)
     logging.info(
         "Inventory scanner scan_id=%s category=%r type=%r ocr=%r matches=%r attempts=%r queue_ms=%d ocr_ms=%d match_ms=%d",
         scan_id,
@@ -2312,6 +2324,7 @@ async def _import_inventory_scanner_images(
             "ocr_ms": ocr_ms,
             "match_ms": match_ms,
             "server_ms": server_ms,
+            "diagnostic_write_deferred": bool(background_tasks and diagnostic_id),
         },
     }
 
@@ -2326,7 +2339,36 @@ async def inventory_scan_session(session_id: str, user=Depends(require_user)) ->
     captures = await state().cache.get_inventory_scan_session(user.id, session_id)
     if not captures:
         raise HTTPException(status_code=404, detail="Scanner diagnostic session not found or expired.")
-    return {"session_id": session_id, "retention_hours": 6, "captures": captures}
+    return {
+        "session_id": session_id,
+        "retention_hours": SCANNER_DIAGNOSTIC_RETENTION_SECONDS // 3600,
+        "captures": captures,
+    }
+
+
+@app.get("/api/admin/inventory/scans/latest/download")
+async def download_latest_inventory_scan_diagnostics(
+    user=Depends(require_user),
+    _admin: None = Depends(require_bot_admin),
+) -> Response:
+    sessions = await state().cache.list_inventory_scan_sessions(user.id, limit=1)
+    if not sessions:
+        raise HTTPException(status_code=404, detail="No retained inventory scanner diagnostics were found.")
+    session = sessions[0]
+    session_id = str(session["session_id"])
+    captures = await state().cache.get_inventory_scan_session(user.id, session_id)
+    payload = {
+        "session_id": session_id,
+        "retention_hours": SCANNER_DIAGNOSTIC_RETENTION_SECONDS // 3600,
+        "session": session,
+        "captures": captures,
+    }
+    filename = f"inventory-scan-{session_id}.json"
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.post("/api/me/inventory")
@@ -3539,6 +3581,9 @@ def _inventory_scanner_catalog_supplements(candidate: str) -> list[ItemLocatorRe
         (("xdl", "mark", "monocular", "rangefinder"), 'XDL "Mark I" Monocular Rangefinder', "Gadgets", "Utility", "Behring Applied Technology"),
         (("maxlift", "aa", "support", "tractor", "beam"), "MaxLift AA Support Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
         (("maxlift", "aa", "transport", "tractor", "beam"), "MaxLift AA Transport Tractor Beam", "Tractor Beams", "Utility", "Greycat Industrial"),
+        (("bul", "h4", "armor", "steeltek"), "BUL-H4 Armor SteelTek", "Heavy", "Armor", "Clark Defense Systems"),
+        (("c54", "ochelo", "smg"), 'C54 "Ochelo" SMG', "SMG", "Weapons", "Gemini"),
+        (("c54", "0chelo", "smg"), 'C54 "Ochelo" SMG', "SMG", "Weapons", "Gemini"),
         (("tumbril", "cargo", "plushie"), "Tumbril Cargo Plushie", "Flair", "Other", "Tumbril Land Systems"),
         (("redimake", "item", "fabricator", "aa", "support"), "RediMake Item Fabricator AA Support", "Crafter", "Other", "RediMake"),
     )
@@ -4161,6 +4206,11 @@ def _normalize_inventory_tooltip_name(value: str) -> str:
         r"\bsorguine\b": "Sanguine",
         r"\bsarguine\b": "Sanguine",
         r"\bcompensatora\b": "Compensator",
+        # RapidOCR commonly reads the narrow trailing numeral 1 as a lowercase
+        # L. Restrict this to numbered Sion attachments so ordinary words
+        # ending in L remain untouched.
+        r"\bsion\s+compensatorl\b": "Sion Compensator1",
+        r"^focus\s+illl\s+module$": "Focus III Module",
         # The thin "III" in the Deadbolt title commonly collapses into "i" or
         # "im" at screen-share resolution. Keep VI untouched so the two cannon
         # variants remain distinguishable.

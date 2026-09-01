@@ -933,9 +933,12 @@ class UEXSource:
         result: MiningLocationResult,
         commodity: dict,
     ) -> MiningLocationResult:
-        if result.rock_signatures:
+        material_name = self._mining_material_base_name(commodity)
+        normalized_name = self._normalize(material_name)
+        canonical = self._canonical_mining_signatures.get(normalized_name)
+        if canonical is None and result.rock_signatures:
             return result
-        signatures = await self._get_mining_signatures(self._mining_material_base_name(commodity))
+        signatures = [canonical] if canonical is not None else await self._get_mining_signatures(material_name)
         return MiningLocationResult(
             material_name=result.material_name,
             code=result.code,

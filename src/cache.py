@@ -310,13 +310,16 @@ class SQLiteCache:
         cls._ensure_column(connection, "loot_sighting_reports", "source_url", "TEXT")
         cls._ensure_column(connection, "audit_events", "action_type", "TEXT NOT NULL DEFAULT 'other'")
         cls._backfill_audit_action_types(connection)
-        # Scanner crops used to be stored as BYTEA values. Keep the columns for
-        # a backwards-compatible rollout, but release existing blobs and retain
-        # only compact OCR/diagnostic metadata going forward.
-        connection.execute(
-            "UPDATE inventory_scan_diagnostics SET image_data = ?, image_size = 0 WHERE image_size > 0",
-            (b"",),
-        )
+        # Scanner diagnostics are transient. PostgreSQL TRUNCATE releases the
+        # legacy image/TOAST allocation without needing the free space that a
+        # row-by-row rewrite would require on an already-full database.
+        if isinstance(connection, PostgresConnection):
+            connection.execute("TRUNCATE TABLE inventory_scan_diagnostics")
+        else:
+            connection.execute(
+                "UPDATE inventory_scan_diagnostics SET image_data = ?, image_size = 0 WHERE image_size > 0",
+                (b"",),
+            )
         connection.commit()
         return cls(connection)
 

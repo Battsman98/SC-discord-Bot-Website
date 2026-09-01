@@ -258,8 +258,9 @@ under `database` in `/api/health`. Set `DATABASE_STORAGE_LIMIT_BYTES` if the
 configured Render capacity changes.
 
 Inventory scanner diagnostics retain OCR and timing metadata for six hours but
-do not persist uploaded image bytes. On startup, existing diagnostic image blobs
-are cleared. Hourly maintenance removes expired cache entries and scanner
+do not persist uploaded image bytes. On PostgreSQL startup, the transient
+diagnostics table is truncated to immediately release legacy image storage.
+Hourly maintenance removes expired cache entries and scanner
 diagnostics, website visit aggregates older than 90 days, and language samples
 older than 180 days. User-owned hangar, inventory, blueprint, refinery, and loot
 records are not removed by storage maintenance.

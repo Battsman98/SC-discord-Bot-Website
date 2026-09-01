@@ -469,10 +469,11 @@
         </div>
         <p class="scanner-timing-guide">
           <strong>Scanning timing:</strong> Keep the first item steady while the scanner finds its tooltip and the
-          <em>Volume</em> line beneath the title. After the first confirmation, hover each item until its recognized
-          name appears, then move to the next tile. The scanner keeps only the newest waiting frame so old captures
-          cannot build up behind your current item. For troubleshooting, cropped tooltip images and processing
-          diagnostics are stored securely for 24 hours, then automatically deleted.
+          <em>Volume</em> line beneath the title. After the first confirmation, hover each item for about one second
+          so the tooltip can stabilize, then move to the next tile. Repeated frames are skipped so distinct items keep
+          their place in the processing queue. If the queue-full message appears, pause until processing catches up.
+          For troubleshooting, cropped tooltip images and processing diagnostics are stored securely for 6 hours,
+          then automatically deleted.
         </p>
         <div class="scanner-preview">
           <video id="inventoryScannerVideo" muted playsinline></video>
@@ -501,13 +502,6 @@
             <textarea id="inventoryOcrText" placeholder="Paste OCR text only if you are troubleshooting scanner reads"></textarea>
             <button type="button" data-action-button="matchInventoryText">Find Inventory Items</button>
           </details>
-        </details>
-        <details class="scanner-retained-diagnostics">
-          <summary>Recent scan diagnostics (24 hours)</summary>
-          <div class="import-actions">
-            <button type="button" data-action-button="loadInventoryScanDiagnostics">Load Latest Scan</button>
-          </div>
-          <div id="inventoryScanDiagnosticsOutput" class="results compact"></div>
         </details>
         <div id="inventoryImportOutput" class="results compact"></div>
       </article>
@@ -808,6 +802,6 @@
   </div>
 
   <script src="/assets/hotfix-overlay.js?v=20260815-scanner-errors" defer></script>
-  <script src="/assets/app.js?v=20260828-scanner-diagnostics-viewer" defer></script>
+  <script src="/assets/app.js?v=20260828-scanner-distinct-queue" defer></script>
 </body>
 </html>
