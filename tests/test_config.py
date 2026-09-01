@@ -31,6 +31,7 @@ def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("COMMAND_CHANNEL_IDS", "ship:100,trade routing=200;/item locator:300")
     monkeypatch.setenv("CACHE_TTL_SECONDS", "60")
     monkeypatch.setenv("UEX_API_TOKEN", "uex-test-token")
+    monkeypatch.setenv("TRADING_FORUM_CHANNEL_ID", "1544467298046320711")
     monkeypatch.setenv("TURNSTILE_SITE_KEY", "site-key")
     monkeypatch.setenv("TURNSTILE_SECRET_KEY", "secret-key")
 
@@ -52,5 +53,6 @@ def test_settings_read_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     }
     assert settings.cache_ttl_seconds == 60
     assert settings.uex_api_token == "uex-test-token"
+    assert settings.trading_forum_channel_id == 1544467298046320711
     assert settings.turnstile_site_key == "site-key"
     assert settings.turnstile_secret_key == "secret-key"

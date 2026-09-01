@@ -393,15 +393,28 @@ async def _warm_inventory_scanner(sources: SourceRegistry) -> None:
         )
 
 
-async def _inventory_scanner_diagnostics_cleanup_loop(cache: SQLiteCache) -> None:
-    """Remove expired scanner crops even during quiet periods."""
+async def _database_storage_maintenance_loop(cache: SQLiteCache) -> None:
+    """Bound transient database data and report storage pressure hourly."""
     while True:
         try:
-            removed = await cache.purge_expired_inventory_scan_diagnostics()
-            if removed:
+            removed = await cache.purge_expired_data()
+            removed_total = sum(removed.values())
+            if removed_total:
                 logging.getLogger("uvicorn.error").info(
-                    "Purged %d expired inventory scanner diagnostic captures", removed
+                    "Purged %d expired database rows: %s", removed_total, removed
                 )
+            usage = await cache.storage_usage()
+            limit = int(os.getenv("DATABASE_STORAGE_LIMIT_BYTES", "1073741824"))
+            used = int(usage["total_bytes"])
+            level = logging.WARNING if limit and used >= limit * 0.8 else logging.INFO
+            logging.getLogger("uvicorn.error").log(
+                level,
+                "Database storage is %.1f%% full (%d/%d bytes); largest tables: %s",
+                used * 100 / limit if limit else 0,
+                used,
+                limit,
+                usage["largest_tables"],
+            )
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -445,9 +458,9 @@ async def lifespan(app: FastAPI):
         _warm_inventory_scanner(sources),
         name="inventory-scanner-warmup",
     )
-    app.state.game_assist.scanner_diagnostics_cleanup_task = asyncio.create_task(
-        _inventory_scanner_diagnostics_cleanup_loop(cache),
-        name="inventory-scanner-diagnostics-cleanup",
+    app.state.game_assist.storage_maintenance_task = asyncio.create_task(
+        _database_storage_maintenance_loop(cache),
+        name="database-storage-maintenance",
     )
     # Do not advertise the service as ready while the OCR engines are still
     # loading. A request that wins this startup race otherwise pays several
@@ -463,7 +476,7 @@ async def lifespan(app: FastAPI):
         app.state.game_assist.item_catalog_task.cancel()
         app.state.game_assist.warbond_task.cancel()
         app.state.game_assist.scanner_warmup_task.cancel()
-        app.state.game_assist.scanner_diagnostics_cleanup_task.cancel()
+        app.state.game_assist.storage_maintenance_task.cancel()
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.item_catalog_task
         with suppress(asyncio.CancelledError):
@@ -471,7 +484,7 @@ async def lifespan(app: FastAPI):
         with suppress(asyncio.CancelledError):
             await app.state.game_assist.scanner_warmup_task
         with suppress(asyncio.CancelledError):
-            await app.state.game_assist.scanner_diagnostics_cleanup_task
+            await app.state.game_assist.storage_maintenance_task
         await warbonds.close()
         await updates.close()
         await sources.close()
@@ -804,6 +817,11 @@ def not_found(message: str) -> None:
 async def health() -> dict[str, Any]:
     settings = state().settings
     catalog = await state().sources.item_catalog_status()
+    database = await state().cache.storage_usage()
+    storage_limit = int(os.getenv("DATABASE_STORAGE_LIMIT_BYTES", "1073741824"))
+    database["limit_bytes"] = storage_limit
+    database["used_percent"] = round(database["total_bytes"] * 100 / storage_limit, 1) if storage_limit else None
+    database["storage_warning"] = bool(storage_limit and database["total_bytes"] >= storage_limit * 0.8)
     return {
         "status": "online",
         "revision": os.getenv("RENDER_GIT_COMMIT", "local")[:12],
@@ -815,6 +833,7 @@ async def health() -> dict[str, Any]:
             "p4k_catalog_version": P4K_INVENTORY_CATALOG.version,
         },
         "item_catalog": catalog,
+        "database": database,
     }
 
 
@@ -2307,16 +2326,7 @@ async def inventory_scan_session(session_id: str, user=Depends(require_user)) ->
     captures = await state().cache.get_inventory_scan_session(user.id, session_id)
     if not captures:
         raise HTTPException(status_code=404, detail="Scanner diagnostic session not found or expired.")
-    return {"session_id": session_id, "retention_hours": 24, "captures": captures}
-
-
-@app.get("/api/me/inventory/scans/images/{diagnostic_id}")
-async def inventory_scan_diagnostic_image(diagnostic_id: str, user=Depends(require_user)) -> Response:
-    stored = await state().cache.get_inventory_scan_image(user.id, diagnostic_id)
-    if stored is None:
-        raise HTTPException(status_code=404, detail="Scanner diagnostic image not found or expired.")
-    content_type, image_data = stored
-    return Response(content=image_data, media_type=content_type, headers={"Cache-Control": "private, max-age=300"})
+    return {"session_id": session_id, "retention_hours": 6, "captures": captures}
 
 
 @app.post("/api/me/inventory")

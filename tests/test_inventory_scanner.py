@@ -26,7 +26,7 @@ from src.web import (
 )
 
 
-def test_inventory_scanner_diagnostics_store_crops_and_expire_after_24_hours(tmp_path) -> None:
+def test_inventory_scanner_diagnostics_store_metadata_without_images(tmp_path) -> None:
     async def run() -> None:
         cache = await SQLiteCache.create(str(tmp_path / "scanner.sqlite3"))
         image_data = b"\x89PNG\r\n\x1a\nscanner-crop"
@@ -56,13 +56,12 @@ def test_inventory_scanner_diagnostics_store_crops_and_expire_after_24_hours(tmp
 
         sessions = await cache.list_inventory_scan_sessions(42)
         assert sessions[0]["capture_count"] == 1
-        assert sessions[0]["storage_bytes"] == len(image_data)
+        assert sessions[0]["storage_bytes"] == 0
         captures = await cache.get_inventory_scan_session(42, "session-one")
         assert captures[0]["matched_items"] == ["Overlord Helmet Flashback"]
         assert captures[0]["performance"]["client_elapsed_ms"] == 5100
-        assert await cache.get_inventory_scan_image(42, captures[0]["diagnostic_id"]) == (
-            "image/png", image_data,
-        )
+        assert captures[0]["image_size"] == 0
+        assert captures[0]["expires_at"] - captures[0]["created_at"] == 6 * 60 * 60
         assert await cache.get_inventory_scan_session(7, "session-one") == []
 
         cache._connection.execute(
@@ -72,6 +71,37 @@ def test_inventory_scanner_diagnostics_store_crops_and_expire_after_24_hours(tmp
         cache._connection.commit()
         assert await cache.purge_expired_inventory_scan_diagnostics() == 1
         assert await cache.get_inventory_scan_session(42, "session-one") == []
+        await cache.close()
+
+    asyncio.run(run())
+
+
+def test_expired_data_cleanup_bounds_transient_and_analytics_rows(tmp_path) -> None:
+    async def run() -> None:
+        cache = await SQLiteCache.create(str(tmp_path / "cleanup.sqlite3"))
+        now = int(time.time())
+        cache._connection.execute(
+            "INSERT INTO cache_entries (cache_key, value_json, expires_at) VALUES (?, ?, ?)",
+            ("expired", "{}", now - 1),
+        )
+        cache._connection.execute(
+            "INSERT INTO website_daily_visits (visit_day, visitor_hash, page_views, first_seen_at, last_seen_at) VALUES (?, ?, 1, ?, ?)",
+            ("2020-01-01", "old-visitor", now - 1, now - 1),
+        )
+        cache._connection.execute(
+            "INSERT INTO website_language_samples (week_start, visitor_hash, language_code, sampled_at) VALUES (?, ?, ?, ?)",
+            ("2020-01-01", "old-visitor", "en", now - 1),
+        )
+        cache._connection.commit()
+
+        removed = await cache.purge_expired_data(now)
+
+        assert removed["cache_entries"] == 1
+        assert removed["website_daily_visits"] == 1
+        assert removed["website_language_samples"] == 1
+        usage = await cache.storage_usage()
+        assert usage["engine"] == "sqlite"
+        assert usage["total_bytes"] > 0
         await cache.close()
 
     asyncio.run(run())

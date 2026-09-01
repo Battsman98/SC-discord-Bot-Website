@@ -31,6 +31,7 @@ from src.sources.base import (
     ShipResult,
     TradeRouteLeg,
     TradeRouteResult,
+    TradeItemResult,
 )
 from src.sources.registry import SourceRegistry, build_default_registry
 from src.timers import (
@@ -105,6 +106,8 @@ VISITOR_CHANNEL_TOPICS = {
     "general-chat": "General conversation for Discord Bot Hub visitors.",
 }
 FEEDBACK_FORUM_TOPIC = "Submit website feedback, bug reports, screenshots, and reproducible examples."
+TRADING_FORUM_TOPIC = "Trade in-game items. Select WTS, WTB, or WTT; use the item name as the title and include your price in aUEC."
+TRADING_FORUM_TAGS = ("WTS", "WTB", "WTT")
 HUB_PROTECTED_ROLE_NAMES = {VISITOR_ROLE_NAME, BOT_MANAGER_ROLE_NAME}
 HUB_RECOVERY_COOLDOWN_SECONDS = 10
 HUB_PERMANENT_MESSAGE_PREFIXES = (
@@ -237,6 +240,49 @@ def build_feedback_template_embed() -> discord.Embed:
         inline=False,
     )
     embed.set_footer(text="This is an example. Create a new forum post for your own report.")
+    return embed
+
+
+def build_trading_item_embed(item: TradeItemResult, listing_type: str) -> discord.Embed:
+    colors = {
+        "WTS": discord.Color.from_rgb(46, 204, 113),
+        "WTB": discord.Color.from_rgb(52, 152, 219),
+        "WTT": discord.Color.from_rgb(241, 196, 15),
+    }
+    descriptions = {
+        "WTS": "Want to sell",
+        "WTB": "Want to buy",
+        "WTT": "Want to trade",
+    }
+    description = " ".join((item.description or "No catalog description is currently available.").split())
+    if len(description) > 500:
+        description = f"{description[:497].rstrip()}..."
+    embed = discord.Embed(
+        title=item.name,
+        url=item.wiki_url,
+        description=description,
+        color=colors.get(listing_type, discord.Color.blurple()),
+    )
+    embed.add_field(name="Listing", value=f"**{listing_type}** — {descriptions.get(listing_type, 'Trade listing')}", inline=True)
+    if item.manufacturer:
+        embed.add_field(name="Manufacturer", value=item.manufacturer, inline=True)
+    if item.category:
+        embed.add_field(name="Category", value=item.category, inline=True)
+    if item.size:
+        embed.add_field(name="Size", value=item.size, inline=True)
+    embed.add_field(
+        name="Seller's terms",
+        value="See the original post above for the user's aUEC price and trade details.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Item links",
+        value=f"[Star Citizen Wiki]({item.wiki_url}) • [View on UEX]({item.uex_url})",
+        inline=False,
+    )
+    if item.image_url:
+        embed.set_image(url=item.image_url)
+    embed.set_footer(text="Item details: Star Citizen Wiki • Player listing: verify terms before trading")
     return embed
 
 
@@ -540,6 +586,7 @@ class GameAssistBot(commands.Bot):
         await self._run_startup_step("provision membership applications", self.ensure_membership_applications)
         await self._run_startup_step("refresh Bot Manager channel access", self.ensure_bot_manager_role)
         await self._run_startup_step("prepare feedback forum", self.ensure_feedback_forum)
+        await self._run_startup_step("prepare trading forum", self.ensure_trading_forum)
         await self._run_startup_step("verify inventory channel", self.ensure_inventory_search_channel)
         await self._run_startup_step("sync command references", self.sync_commands_reference_message)
         await self._run_startup_step("sync Visitor command examples", self.sync_visitor_command_examples)
@@ -1159,6 +1206,58 @@ class GameAssistBot(commands.Bot):
                 discord.AuditLogAction.thread_delete,
                 payload.thread_id,
             )
+
+    async def on_thread_create(self, thread: discord.Thread) -> None:
+        if thread.parent_id != self.settings.trading_forum_channel_id:
+            return
+        await self.enrich_trading_post(thread)
+
+    async def ensure_trading_forum(self) -> None:
+        channel_id = self.settings.trading_forum_channel_id
+        if not channel_id:
+            return
+        channel = self.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.fetch_channel(channel_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logging.exception("Could not resolve trading forum %s", channel_id)
+                return
+        if not isinstance(channel, discord.ForumChannel):
+            logging.error("TRADING_FORUM_CHANNEL_ID %s is not a Discord forum channel", channel_id)
+            return
+        existing = {tag.name.upper(): tag for tag in channel.available_tags}
+        tags = [existing.get(name) or discord.ForumTag(name=name) for name in TRADING_FORUM_TAGS]
+        needs_edit = [tag.name.upper() for tag in channel.available_tags] != list(TRADING_FORUM_TAGS)
+        if needs_edit or channel.topic != TRADING_FORUM_TOPIC or not channel.flags.require_tag:
+            await channel.edit(
+                topic=TRADING_FORUM_TOPIC,
+                available_tags=tags,
+                require_tag=True,
+                reason="Configure the in-game item trading forum",
+            )
+
+    async def enrich_trading_post(self, thread: discord.Thread) -> None:
+        selected = [tag.name.upper() for tag in thread.applied_tags if tag.name.upper() in TRADING_FORUM_TAGS]
+        if len(selected) != 1:
+            await thread.send(
+                "Please select exactly one listing type: **WTS** (want to sell), **WTB** (want to buy), or **WTT** (want to trade)."
+            )
+            return
+        item_query = re.sub(r"^\s*(?:WTS|WTB|WTT)\s*[-:|]?\s*", "", thread.name, flags=re.IGNORECASE).strip()
+        try:
+            item = await self.sources.lookup_trade_item(item_query)
+        except Exception:
+            logging.exception("Could not enrich trading post %s", thread.id)
+            await thread.send("I couldn't load item details right now. Your listing is still available; please try again later.")
+            return
+        if item is None:
+            await thread.send(
+                f"I couldn't match **{item_query or thread.name}** to the current Star Citizen item catalog. "
+                "Use the item's exact in-game name as the post title."
+            )
+            return
+        await thread.send(embed=build_trading_item_embed(item, selected[0]))
 
     async def on_guild_channel_update(self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel) -> None:
         changes = []
@@ -3100,7 +3199,13 @@ class WikeloContractSelect(discord.ui.Select):
 
 
 class WikeloBrowseView(discord.ui.View):
-    def __init__(self, sources, results: list[WikeloMissionResult], page: int, has_next: bool) -> None:
+    def __init__(
+        self,
+        sources,
+        results: list[WikeloMissionResult],
+        page: int,
+        has_next: bool,
+    ) -> None:
         super().__init__(timeout=300)
         self.sources = sources
         self.page = page
@@ -3579,7 +3684,7 @@ async def loot_found_command(
     report = await bot.cache.loot_sighting_report(report_id)
     await bot.publish_loot_review(report or {})
     await interaction.followup.send(
-        f"Thanks ? sighting **#{report_id}** is waiting for Bot Manager review.", ephemeral=True
+        f"Thanks — sighting **#{report_id}** is waiting for Bot Manager review.", ephemeral=True
     )
 
 
@@ -3664,7 +3769,7 @@ async def loot_report_autocomplete(
 @item_group.command(name="search", description="Search for in-game buyable Star Citizen items.")
 @app_commands.describe(
     name="Item name to search.",
-    category="Optional item category, such as Quantum Drives, Guns, Helmets, or Undersuits.",
+    category="Optional category. Start typing to search all choices, including those beyond Discord's first 25.",
     section="Optional item section, such as Systems, Vehicle Weapons, Armor, or Utility.",
     size="Optional item size.",
     location="Optional station, city, outpost, or point of interest.",
@@ -5175,7 +5280,7 @@ def build_wikelo_embed(result: WikeloMissionResult) -> discord.Embed:
         lines = []
         for item in items:
             quantity = f"{item.quantity:g}" if isinstance(item.quantity, (int, float)) else str(item.quantity)
-            lines.append(f"- {quantity}{' SCU' if item.unit == 'SCU' else 'x'} {item.name}")
+            lines.append(f"• {quantity}{' SCU' if item.unit == 'SCU' else '×'} {item.name}")
         return "\n".join(lines)[:1024]
 
     embed.add_field(name="Reward", value=format_items(result.rewards) or "Reward details unavailable", inline=False)
@@ -5191,7 +5296,7 @@ def build_wikelo_embed(result: WikeloMissionResult) -> discord.Embed:
         inline=True,
     )
     embed.add_field(name="Availability", value="Released" if result.released else "Unreleased / verify in game", inline=True)
-    embed.set_footer(text="Wikelo Emporium" + (f" | {result.version}" if result.version else ""))
+    embed.set_footer(text=" · ".join(filter(None, ["Wikelo Emporium", result.version])))
     return embed
 
 
@@ -5199,13 +5304,19 @@ def _format_approved_loot_sightings(sightings: list[dict]) -> str:
     if not sightings:
         return (
             "No community sighting has been approved for this item yet. "
-            "Use `/loot report` to submit one."
+            "Use `/loot found` to submit one."
         )
     lines = []
     for sighting in sightings[:5]:
-        details = [sighting.get("location_type"), sighting.get("game_version")]
+        details = [sighting.get("celestial_body"), sighting.get("location_type"), sighting.get("game_version")]
+        if sighting.get("confidence"):
+            reports = int(sighting.get("report_count") or 0)
+            details.append(
+                f"{sighting['confidence']} confidence"
+                + (f" ({reports} report{'s' if reports != 1 else ''})" if reports else "")
+            )
         suffix = " · ".join(str(value) for value in details if value)
-        timestamp = sighting.get("reviewed_at")
+        timestamp = sighting.get("latest_confirmed_at") or sighting.get("reviewed_at")
         confirmed = f" · approved <t:{timestamp}:R>" if isinstance(timestamp, int) else ""
         lines.append(f"• **{sighting['location']}**{f' — {suffix}' if suffix else ''}{confirmed}")
     return "\n".join(lines)[:1024]
@@ -5225,6 +5336,7 @@ def build_loot_sighting_review_embed(report: dict) -> discord.Embed:
         timestamp=discord.utils.utcnow(),
     )
     embed.add_field(name="Location", value=str(report.get("location") or "Unknown")[:1024], inline=False)
+    embed.add_field(name="Planet / Moon", value=report.get("celestial_body") or "Not supplied", inline=True)
     embed.add_field(name="Location Type", value=report.get("location_type") or "Not supplied", inline=True)
     embed.add_field(name="Game Version", value=report.get("game_version") or "Not supplied", inline=True)
     embed.add_field(

@@ -45,6 +45,7 @@ snapshot the website and Discord bot are currently using; the local website is
 not part of the update process.
 
 - `/trade routing` calculates UEX-based circular trade route candidates.
+- The configured trading forum automatically requires WTS, WTB, or WTT and adds Wiki item details and imagery to new listings.
 - `/exec` shows the Executive Hangar clock.
 - `/execset` corrects the Executive Hangar clock for approved users.
 - `/execclear` clears an Executive Hangar manual override.
@@ -247,6 +248,21 @@ The migration preserves hangar, blueprint, inventory, timer, audit, and website
 analytics data. Do not run the local bot and Render worker with the same token at
 the same time after cutover. The old SQLite file is not deleted and remains a
 rollback copy.
+
+### Database storage controls
+
+The production database remains capped at 1 GB and storage autoscaling is
+disabled in `render.yaml`. The web service logs database usage and its five
+largest tables hourly, warns at 80% usage, and exposes the same safe sizing data
+under `database` in `/api/health`. Set `DATABASE_STORAGE_LIMIT_BYTES` if the
+configured Render capacity changes.
+
+Inventory scanner diagnostics retain OCR and timing metadata for six hours but
+do not persist uploaded image bytes. On startup, existing diagnostic image blobs
+are cleared. Hourly maintenance removes expired cache entries and scanner
+diagnostics, website visit aggregates older than 90 days, and language samples
+older than 180 days. User-owned hangar, inventory, blueprint, refinery, and loot
+records are not removed by storage maintenance.
 
 ## GitHub Notes
 

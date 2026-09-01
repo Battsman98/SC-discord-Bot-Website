@@ -30,6 +30,7 @@ class Settings:
     web_rate_limit_per_minute: int = 120
     discord_rate_limit_per_10_seconds: int = 8
     feedback_forum_channel_id: int | None = 1533026212463775754
+    trading_forum_channel_id: int | None = 1544467298046320711
     uex_api_token: str = ""
     turnstile_site_key: str = ""
     turnstile_secret_key: str = ""
@@ -57,6 +58,7 @@ class Settings:
         cz_timers_channel_id = os.getenv("CZ_TIMERS_CHANNEL_ID", "").strip()
         audit_log_channel_id = os.getenv("AUDIT_LOG_CHANNEL_ID", "").strip()
         feedback_forum_channel_id = os.getenv("FEEDBACK_FORUM_CHANNEL_ID", "1533026212463775754").strip()
+        trading_forum_channel_id = os.getenv("TRADING_FORUM_CHANNEL_ID", "1544467298046320711").strip()
         exec_admin_role_ids = tuple(
             int(role_id.strip())
             for role_id in os.getenv("EXEC_ADMIN_ROLE_IDS", "").split(",")
@@ -102,6 +104,7 @@ class Settings:
             web_rate_limit_per_minute=int(os.getenv("WEB_RATE_LIMIT_PER_MINUTE", "120")),
             discord_rate_limit_per_10_seconds=int(os.getenv("DISCORD_RATE_LIMIT_PER_10_SECONDS", "8")),
             feedback_forum_channel_id=int(feedback_forum_channel_id) if feedback_forum_channel_id else None,
+            trading_forum_channel_id=int(trading_forum_channel_id) if trading_forum_channel_id else None,
             uex_api_token=os.getenv("UEX_API_TOKEN", "").strip(),
             turnstile_site_key=os.getenv("TURNSTILE_SITE_KEY", "").strip(),
             turnstile_secret_key=os.getenv("TURNSTILE_SECRET_KEY", "").strip(),

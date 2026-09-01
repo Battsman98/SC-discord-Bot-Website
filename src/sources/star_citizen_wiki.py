@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 
 from src.cache import SQLiteCache
 from src.config import Settings
-from src.sources.base import ItemLocatorResult, LootItemResult, LookupResult, ShipPledge, ShipPurchase, ShipResult
+from src.sources.base import ItemLocatorResult, LootItemResult, LookupResult, ShipPledge, ShipPurchase, ShipResult, TradeItemResult
 
 
 class StarCitizenWikiSource:
@@ -325,6 +325,38 @@ class StarCitizenWikiSource:
             game_version=self._string_or_none(row.get("version")),
             description=self._string_or_none(descriptions.get("en_EN") or descriptions.get("en_US")),
             image_url=self._string_or_none(image.get("thumbnail_url") or image.get("original_url")),
+            wiki_url=str(row.get("web_url") or f"https://starcitizen.tools/{quote(name.replace(' ', '_'))}"),
+            uex_url=f"https://uexcorp.space/items/info/name/{slug}/" if slug else "https://uexcorp.space/items",
+        )
+
+    async def lookup_trade_item(self, query: str) -> TradeItemResult | None:
+        """Resolve any catalog item to the metadata used by Discord trade listings."""
+        normalized = " ".join(str(query or "").strip().split())
+        if not normalized:
+            return None
+        payload = await self._fetch_json(
+            f"{self.base_url}/api/items?filter[name]={quote(normalized)}&page[size]=25"
+        )
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        candidates = [row for row in (rows or []) if isinstance(row, dict) and row.get("name")]
+        if not candidates:
+            return None
+        candidates.sort(key=lambda row: self._inventory_item_match_rank(normalized, str(row.get("name") or "")))
+        row = candidates[0]
+        manufacturer = row.get("manufacturer") if isinstance(row.get("manufacturer"), dict) else {}
+        descriptions = row.get("description") if isinstance(row.get("description"), dict) else {}
+        images = row.get("images") if isinstance(row.get("images"), list) else []
+        image = images[0] if images and isinstance(images[0], dict) else {}
+        name = str(row.get("name") or normalized)
+        slug = str(row.get("slug") or "").strip()
+        return TradeItemResult(
+            uuid=str(row.get("uuid") or ""),
+            name=name,
+            category=self._string_or_none(row.get("sub_type_label") or row.get("type_label")),
+            manufacturer=self._string_or_none(manufacturer.get("name")),
+            size=self._string_or_none(row.get("size")),
+            description=self._string_or_none(descriptions.get("en_EN") or descriptions.get("en_US")),
+            image_url=self._string_or_none(image.get("original_url") or image.get("thumbnail_url")),
             wiki_url=str(row.get("web_url") or f"https://starcitizen.tools/{quote(name.replace(' ', '_'))}"),
             uex_url=f"https://uexcorp.space/items/info/name/{slug}/" if slug else "https://uexcorp.space/items",
         )

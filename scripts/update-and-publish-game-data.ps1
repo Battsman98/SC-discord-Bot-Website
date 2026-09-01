@@ -5,8 +5,12 @@ $snapshotRelative = "data/blueprints_snapshot.json"
 $snapshotPath = Join-Path $projectRoot $snapshotRelative
 $pythonPath = Join-Path $projectRoot ".venv\Scripts\python.exe"
 $importerPath = Join-Path $projectRoot "scripts\update_game_data_from_p4k.py"
+$toolsPath = Join-Path $projectRoot "tools\sc-game-data"
 $gameArchive = "C:\StarCitizen\LIVE\Data.p4k"
 $productionStatusUrl = "https://sccompanion.org/api/game-data/status"
+$deployParent = Join-Path $env:LOCALAPPDATA "StarCitizenCompanion\deploy"
+$deployRoot = Join-Path $deployParent ([guid]::NewGuid().ToString("N"))
+$deployCreated = $false
 
 function Invoke-Checked {
     param(
@@ -23,7 +27,7 @@ Write-Host ""
 Write-Host "STAR CITIZEN MISSION + BLUEPRINT UPDATE" -ForegroundColor Cyan
 Write-Host "This publishes data from your installed LIVE game files." -ForegroundColor DarkGray
 
-foreach ($requiredPath in @($gameArchive, $pythonPath, $importerPath)) {
+foreach ($requiredPath in @($gameArchive, $pythonPath, $importerPath, $toolsPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required file not found: $requiredPath"
     }
@@ -31,27 +35,21 @@ foreach ($requiredPath in @($gameArchive, $pythonPath, $importerPath)) {
 
 Push-Location $projectRoot
 try {
-    $branch = (& git branch --show-current).Trim()
-    if ($LASTEXITCODE -ne 0 -or $branch -ne "main") {
-        throw "Open the project on the main branch before running the updater."
-    }
-    $trackedChanges = @(& git status --porcelain --untracked-files=no)
-    if ($LASTEXITCODE -ne 0) {
-        throw "The project status could not be checked."
-    }
-    if ($trackedChanges.Count -gt 0) {
-        throw "The project has other unfinished changes. Finish or set them aside before updating game data."
-    }
-
     Write-Host ""
     Write-Host "1/5  Checking for the latest project version..."
-    Invoke-Checked git pull --ff-only origin main
+    Invoke-Checked git fetch origin main
+    New-Item -ItemType Directory -Path $deployParent -Force | Out-Null
+    Invoke-Checked git worktree add --detach $deployRoot origin/main
+    $deployCreated = $true
+
+    $deploySnapshotPath = Join-Path $deployRoot $snapshotRelative
+    $deployImporterPath = Join-Path $deployRoot "scripts\update_game_data_from_p4k.py"
 
     Write-Host ""
     Write-Host "2/5  Reading Data.p4k and rebuilding the database..."
-    Invoke-Checked $pythonPath $importerPath
+    Invoke-Checked $pythonPath $deployImporterPath --game-dir (Split-Path -Parent $gameArchive) --tools-dir $toolsPath --output $deploySnapshotPath
 
-    & git diff --quiet -- $snapshotRelative
+    & git -C $deployRoot diff --quiet -- $snapshotRelative
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
         Write-Host "The installed game data already matches the published snapshot." -ForegroundColor Green
@@ -61,7 +59,7 @@ try {
         throw "The rebuilt snapshot could not be compared."
     }
 
-    $snapshot = Get-Content -LiteralPath $snapshotPath -Raw | ConvertFrom-Json
+    $snapshot = Get-Content -LiteralPath $deploySnapshotPath -Raw | ConvertFrom-Json
     $version = [string]$snapshot.source.version
     if ([string]::IsNullOrWhiteSpace($version)) {
         throw "The rebuilt snapshot does not contain a game version."
@@ -69,13 +67,19 @@ try {
 
     Write-Host ""
     Write-Host "3/5  Running safety checks..."
-    Invoke-Checked $pythonPath -m pytest -q
+    Push-Location $deployRoot
+    try {
+        Invoke-Checked $pythonPath -m pytest -q
+    }
+    finally {
+        Pop-Location
+    }
 
     Write-Host ""
     Write-Host "4/5  Publishing $version..."
-    Invoke-Checked git add -- $snapshotRelative
-    Invoke-Checked git commit -m "Update game data to $version" -- $snapshotRelative
-    Invoke-Checked git push origin main
+    Invoke-Checked git -C $deployRoot add -- $snapshotRelative
+    Invoke-Checked git -C $deployRoot commit -m "Update game data to $version" -- $snapshotRelative
+    Invoke-Checked git -C $deployRoot push origin HEAD:main
 
     Write-Host ""
     Write-Host "5/5  Waiting for the hosted website to confirm the update..."
@@ -102,5 +106,8 @@ try {
     }
 }
 finally {
+    if ($deployCreated -and (Test-Path -LiteralPath $deployRoot)) {
+        & git worktree remove --force -- $deployRoot | Out-Null
+    }
     Pop-Location
 }

@@ -9,6 +9,7 @@ from src.sources.base import (
     GameInfoSource,
     ItemLocatorResult,
     LootItemResult,
+    TradeItemResult,
     LookupResult,
     MissionResult,
     WikeloMissionResult,
@@ -161,6 +162,15 @@ class SourceRegistry:
                 "uex_url": price.get("uex_url") or result.uex_url,
             }
         )
+
+    async def lookup_trade_item(self, query: str) -> TradeItemResult | None:
+        for source in self._sources:
+            lookup = getattr(source, "lookup_trade_item", None)
+            if lookup is not None:
+                result = await lookup(query)
+                if result is not None:
+                    return result
+        return None
 
     async def autocomplete_loot_items(self, query: str, limit: int = 25) -> list[str]:
         for source in self._sources:

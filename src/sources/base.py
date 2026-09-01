@@ -243,6 +243,19 @@ class LootItemResult:
 
 
 @dataclass(frozen=True)
+class TradeItemResult:
+    uuid: str
+    name: str
+    category: str | None
+    manufacturer: str | None
+    size: str | None
+    description: str | None
+    image_url: str | None
+    wiki_url: str
+    uex_url: str
+
+
+@dataclass(frozen=True)
 class TradeRouteLeg:
     commodity_name: str
     buy_price: int | float

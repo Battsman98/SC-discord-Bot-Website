@@ -339,6 +339,12 @@ class UEXSource:
                 values.append(value)
         values.sort(key=str.lower)
 
+        # Discord only displays the first 25 autocomplete choices. Keep the
+        # undersuit category visible with the other commonly used armor filters
+        # instead of letting it fall beyond that limit alphabetically.
+        if filter_name == "category" and not self._normalize(query):
+            values.sort(key=lambda value: (self._normalize(value) != "undersuits", value.lower()))
+
         return self._autocomplete_values(values, query, limit)
 
     def _autocomplete_values(self, values: list[str], query: str, limit: int) -> list[str]:
