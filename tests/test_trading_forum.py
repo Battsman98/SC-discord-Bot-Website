@@ -1,12 +1,22 @@
 from types import SimpleNamespace
 
-from src.bot import TRADING_FORUM_TAGS, TRADING_GUIDE_TAG, _trade_listing_content, build_trading_item_embed
+from src.bot import (
+    TRADING_FORUM_TAGS,
+    TRADING_GUIDE_TAG,
+    VISITOR_COMMAND_CHANNELS,
+    _trade_listing_content,
+    build_trading_item_embed,
+)
 from src.sources.base import TradeItemResult
 
 
 def test_trading_forum_has_the_three_required_listing_types() -> None:
     assert TRADING_FORUM_TAGS == ("WTS", "WTB", "WTT")
     assert TRADING_GUIDE_TAG not in TRADING_FORUM_TAGS
+
+
+def test_trade_listing_command_is_routed_to_trade_tools() -> None:
+    assert VISITOR_COMMAND_CHANNELS["trade listing"] == "trade-tools"
 
 
 def test_trade_item_embed_includes_catalog_details_and_image() -> None:

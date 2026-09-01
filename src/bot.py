@@ -132,6 +132,7 @@ VISITOR_COMMAND_CHANNELS = {
     "lookup": "bot-start-here",
     "ship": "ship-search",
     "commodity": "trade-tools",
+    "trade listing": "trade-tools",
     "trade routing": "trade-tools",
     "mining": "mining-tools",
     "miningadd": "mining-tools",
