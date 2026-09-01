@@ -1261,6 +1261,8 @@ class GameAssistBot(commands.Bot):
             )
 
     async def enrich_trading_post(self, thread: discord.Thread) -> None:
+        if self.user is not None and thread.owner_id == self.user.id:
+            return
         if any(tag.name.casefold() == TRADING_GUIDE_TAG.casefold() for tag in thread.applied_tags):
             return
         selected = [tag.name.upper() for tag in thread.applied_tags if tag.name.upper() in TRADING_FORUM_TAGS]
@@ -4185,9 +4187,15 @@ async def trade_listing_command(
         await interaction.followup.send("The selected trading tag is currently unavailable.", ephemeral=True)
         return
 
+    listing_content = _trade_listing_content(interaction.user, listing_type.value, price, quantity, notes)
     created = await forum.create_thread(
         name=catalog_item.name[:100],
-        content=_trade_listing_content(interaction.user, listing_type.value, price, quantity, notes),
+        content=listing_content,
+        embed=build_trading_item_embed(
+            catalog_item,
+            listing_type.value,
+            _trade_seller_terms(listing_content),
+        ),
         applied_tags=[tag],
         auto_archive_duration=10080,
         allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
