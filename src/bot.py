@@ -245,7 +245,11 @@ def build_feedback_template_embed() -> discord.Embed:
     return embed
 
 
-def build_trading_item_embed(item: TradeItemResult, listing_type: str) -> discord.Embed:
+def build_trading_item_embed(
+    item: TradeItemResult,
+    listing_type: str,
+    seller_terms: str | None = None,
+) -> discord.Embed:
     colors = {
         "WTS": discord.Color.from_rgb(46, 204, 113),
         "WTB": discord.Color.from_rgb(52, 152, 219),
@@ -274,7 +278,7 @@ def build_trading_item_embed(item: TradeItemResult, listing_type: str) -> discor
         embed.add_field(name="Size", value=item.size, inline=True)
     embed.add_field(
         name="Seller's terms",
-        value="See the original post above for the user's aUEC price and trade details.",
+        value=(seller_terms or "See the original post above for the user's aUEC price and trade details.")[:1024],
         inline=False,
     )
     embed.add_field(
@@ -286,6 +290,21 @@ def build_trading_item_embed(item: TradeItemResult, listing_type: str) -> discor
         embed.set_image(url=item.image_url)
     embed.set_footer(text="Item details: Star Citizen Wiki • Player listing: verify terms before trading")
     return embed
+
+
+def _trade_seller_terms(content: str) -> str | None:
+    fields = []
+    for label in ("Price", "Quantity", "Details"):
+        match = re.search(
+            rf"\*\*{label}:\*\*\s*(.+?)(?=\n\*\*[A-Za-z][^\n]*?:\*\*|\n\n|$)",
+            content or "",
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if match:
+            value = " ".join(match.group(1).strip().split())
+            if value:
+                fields.append(f"**{'Notes' if label == 'Details' else label}:** {value}")
+    return "\n".join(fields) or None
 
 
 class GameAssistCommandTree(app_commands.CommandTree):
@@ -1263,7 +1282,13 @@ class GameAssistBot(commands.Bot):
                 "Use the item's exact in-game name as the post title."
             )
             return
-        await thread.send(embed=build_trading_item_embed(item, selected[0]))
+        seller_terms = None
+        try:
+            starter = await thread.fetch_message(thread.id)
+            seller_terms = _trade_seller_terms(starter.content)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.exception("Could not read starter message for trading post %s", thread.id)
+        await thread.send(embed=build_trading_item_embed(item, selected[0], seller_terms))
 
     async def on_guild_channel_update(self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel) -> None:
         changes = []
