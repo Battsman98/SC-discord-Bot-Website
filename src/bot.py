@@ -108,6 +108,7 @@ VISITOR_CHANNEL_TOPICS = {
 FEEDBACK_FORUM_TOPIC = "Submit website feedback, bug reports, screenshots, and reproducible examples."
 TRADING_FORUM_TOPIC = "Trade in-game items. Select WTS, WTB, or WTT; use the item name as the title and include your price in aUEC."
 TRADING_FORUM_TAGS = ("WTS", "WTB", "WTT")
+TRADING_GUIDE_TAG = "GUIDE"
 HUB_PROTECTED_ROLE_NAMES = {VISITOR_ROLE_NAME, BOT_MANAGER_ROLE_NAME}
 HUB_RECOVERY_COOLDOWN_SECONDS = 10
 HUB_PERMANENT_MESSAGE_PREFIXES = (
@@ -1228,7 +1229,9 @@ class GameAssistBot(commands.Bot):
             return
         existing = {tag.name.upper(): tag for tag in channel.available_tags}
         tags = [existing.get(name) or discord.ForumTag(name=name) for name in TRADING_FORUM_TAGS]
-        needs_edit = [tag.name.upper() for tag in channel.available_tags] != list(TRADING_FORUM_TAGS)
+        tags.append(existing.get(TRADING_GUIDE_TAG) or discord.ForumTag(name=TRADING_GUIDE_TAG, moderated=True))
+        desired_names = [*TRADING_FORUM_TAGS, TRADING_GUIDE_TAG]
+        needs_edit = [tag.name.upper() for tag in channel.available_tags] != desired_names
         if needs_edit or channel.topic != TRADING_FORUM_TOPIC or not channel.flags.require_tag:
             await channel.edit(
                 topic=TRADING_FORUM_TOPIC,
@@ -1238,6 +1241,8 @@ class GameAssistBot(commands.Bot):
             )
 
     async def enrich_trading_post(self, thread: discord.Thread) -> None:
+        if any(tag.name.casefold() == TRADING_GUIDE_TAG.casefold() for tag in thread.applied_tags):
+            return
         selected = [tag.name.upper() for tag in thread.applied_tags if tag.name.upper() in TRADING_FORUM_TAGS]
         if len(selected) != 1:
             await thread.send(
