@@ -41,6 +41,7 @@ from src.timers import (
     calculate_exec_hangar_status,
     fetch_exec_cycle_start_unix,
 )
+from src.trade_stores import ParsedStoreInventory, StoreInventoryItem, google_sheet_csv_url, parse_store_inventory_csv
 
 
 EXEC_OVERRIDE_CACHE_KEY = "exec:cycle-start-override"
@@ -109,6 +110,8 @@ FEEDBACK_FORUM_TOPIC = "Submit website feedback, bug reports, screenshots, and r
 TRADING_FORUM_TOPIC = "Trade in-game items. Select WTS, WTB, or WTT; use the item name as the title and include your price in aUEC."
 TRADING_FORUM_TAGS = ("WTS", "WTB", "WTT")
 TRADING_GUIDE_TAG = "GUIDE"
+TRADING_STORE_TAG = "STORE"
+TRADE_STORE_SYNC_INTERVAL_SECONDS = 15 * 60
 HUB_PROTECTED_ROLE_NAMES = {VISITOR_ROLE_NAME, BOT_MANAGER_ROLE_NAME}
 HUB_RECOVERY_COOLDOWN_SECONDS = 10
 HUB_PERMANENT_MESSAGE_PREFIXES = (
@@ -133,6 +136,8 @@ VISITOR_COMMAND_CHANNELS = {
     "ship": "ship-search",
     "commodity": "trade-tools",
     "trade listing": "trade-tools",
+    "trade store": "trade-tools",
+    "trade store-refresh": "trade-tools",
     "trade routing": "trade-tools",
     "mining": "mining-tools",
     "miningadd": "mining-tools",
@@ -305,6 +310,73 @@ def _trade_seller_terms(content: str) -> str | None:
             if value:
                 fields.append(f"**{'Notes' if label == 'Details' else label}:** {value}")
     return "\n".join(fields) or None
+
+
+def build_trade_store_content(store: dict) -> str:
+    lines = [
+        f"# {str(store['store_name'])[:100]}",
+        "",
+        str(store["description"])[:1500],
+        "",
+        f"**Store owner:** <@{int(store['owner_id'])}>",
+    ]
+    if store.get("location"):
+        lines.append(f"**Default meetup:** {str(store['location'])[:300]}")
+    if store.get("availability"):
+        lines.append(f"**Availability:** {str(store['availability'])[:300]}")
+    lines.extend(("", f"[Open the live Google Sheet]({store['sheet_url']})"))
+    return "\n".join(lines)
+
+
+def build_trade_store_embed(
+    store: dict,
+    items: list[StoreInventoryItem],
+    synced_at: int,
+) -> discord.Embed:
+    embed = discord.Embed(
+        title=str(store["store_name"])[:256],
+        url=str(store["sheet_url"]),
+        description=(
+            f"{str(store['description'])[:1200]}\n\n"
+            f"**{len(items):,} item{'s' if len(items) != 1 else ''} available** · "
+            "[Open live inventory]({})".format(store["sheet_url"])
+        ),
+        color=discord.Color.from_rgb(155, 89, 182),
+    )
+    for start in range(0, min(len(items), 15), 5):
+        lines = []
+        for item in items[start : start + 5]:
+            details = []
+            if item.price:
+                price = item.price if "auec" in item.price.casefold() else f"{item.price} aUEC"
+                details.append(price)
+            if item.quantity:
+                details.append(f"Qty {item.quantity}")
+            if item.quality:
+                details.append(f"Quality {item.quality}")
+            line = f"• **{item.name}**"
+            if details:
+                line += f" — {' · '.join(details)}"
+            if item.notes:
+                line += f"\n  {item.notes[:180]}"
+            lines.append(line)
+        embed.add_field(
+            name="Inventory preview" if start == 0 else "More inventory",
+            value="\n".join(lines)[:1024],
+            inline=False,
+        )
+    if len(items) > 15:
+        embed.add_field(
+            name="Complete inventory",
+            value=f"{len(items) - 15:,} more item(s) are available in the [Google Sheet]({store['sheet_url']}).",
+            inline=False,
+        )
+    if store.get("location"):
+        embed.add_field(name="Default meetup", value=str(store["location"])[:1024], inline=True)
+    if store.get("availability"):
+        embed.add_field(name="Availability", value=str(store["availability"])[:1024], inline=True)
+    embed.set_footer(text=f"Google Sheets inventory · Last inventory update <t:{synced_at}:R>")
+    return embed
 
 
 class GameAssistCommandTree(app_commands.CommandTree):
@@ -553,6 +625,7 @@ class GameAssistBot(commands.Bot):
         self._item_catalog_task: asyncio.Task | None = None
         self._website_deployment_task: asyncio.Task | None = None
         self._anniversary_task: asyncio.Task | None = None
+        self._trade_store_sync_task: asyncio.Task | None = None
         self._hub_last_recovery_monotonic = 0.0
         self._hub_incident_count = 0
         self._hub_pending_incident: tuple[str, discord.AuditLogAction | None, int | None] | None = None
@@ -628,6 +701,8 @@ class GameAssistBot(commands.Bot):
             self._website_deployment_task = asyncio.create_task(self._website_deployment_monitor_loop())
         if self._anniversary_task is None:
             self._anniversary_task = asyncio.create_task(self._anniversary_role_loop())
+        if self._trade_store_sync_task is None:
+            self._trade_store_sync_task = asyncio.create_task(self._trade_store_sync_loop())
 
     async def _website_deployment_monitor_loop(self) -> None:
         """Record website-only Render revisions without restarting Discord."""
@@ -673,6 +748,15 @@ class GameAssistBot(commands.Bot):
                 await self.sync_anniversary_roles()
             except Exception:
                 logging.exception("One-year member role synchronization failed")
+
+    async def _trade_store_sync_loop(self) -> None:
+        while not self.is_closed():
+            try:
+                for store in await self.cache.trade_stores():
+                    await self.sync_trade_store(store)
+            except Exception:
+                logging.exception("Trading store synchronization cycle failed")
+            await asyncio.sleep(TRADE_STORE_SYNC_INTERVAL_SECONDS)
 
     async def sync_anniversary_roles(self) -> None:
         """Create and award the one-year role, announcing each new milestone."""
@@ -1217,6 +1301,16 @@ class GameAssistBot(commands.Bot):
     async def on_raw_thread_delete(self, payload: discord.RawThreadDeleteEvent) -> None:
         if payload.guild_id != self.settings.discord_guild_id:
             return
+        if payload.parent_id == self.settings.trading_forum_channel_id:
+            store = await self.cache.trade_store(payload.thread_id)
+            if store is not None:
+                await self.cache.update_trade_store_sync(
+                    payload.thread_id,
+                    content_hash=store.get("content_hash"),
+                    last_synced_at=store.get("last_synced_at"),
+                    last_error="The store forum post was deleted.",
+                    active=False,
+                )
         forum_id = self.visitor_channels.get("feedback-and-issues") or self.settings.feedback_forum_channel_id
         if forum_id != payload.parent_id:
             return
@@ -1249,8 +1343,9 @@ class GameAssistBot(commands.Bot):
             return
         existing = {tag.name.upper(): tag for tag in channel.available_tags}
         tags = [existing.get(name) or discord.ForumTag(name=name) for name in TRADING_FORUM_TAGS]
+        tags.append(existing.get(TRADING_STORE_TAG) or discord.ForumTag(name=TRADING_STORE_TAG, moderated=True))
         tags.append(existing.get(TRADING_GUIDE_TAG) or discord.ForumTag(name=TRADING_GUIDE_TAG, moderated=True))
-        desired_names = [*TRADING_FORUM_TAGS, TRADING_GUIDE_TAG]
+        desired_names = [*TRADING_FORUM_TAGS, TRADING_STORE_TAG, TRADING_GUIDE_TAG]
         needs_edit = [tag.name.upper() for tag in channel.available_tags] != desired_names
         if needs_edit or channel.topic != TRADING_FORUM_TOPIC or not channel.flags.require_tag:
             await channel.edit(
@@ -1263,7 +1358,7 @@ class GameAssistBot(commands.Bot):
     async def enrich_trading_post(self, thread: discord.Thread) -> None:
         if self.user is not None and thread.owner_id == self.user.id:
             return
-        if any(tag.name.casefold() == TRADING_GUIDE_TAG.casefold() for tag in thread.applied_tags):
+        if any(tag.name.casefold() in {TRADING_GUIDE_TAG.casefold(), TRADING_STORE_TAG.casefold()} for tag in thread.applied_tags):
             return
         selected = [tag.name.upper() for tag in thread.applied_tags if tag.name.upper() in TRADING_FORUM_TAGS]
         if len(selected) != 1:
@@ -1291,6 +1386,57 @@ class GameAssistBot(commands.Bot):
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logging.exception("Could not read starter message for trading post %s", thread.id)
         await thread.send(embed=build_trading_item_embed(item, selected[0], seller_terms))
+
+    async def fetch_trade_store_inventory(self, sheet_url: str) -> ParsedStoreInventory:
+        export_url = google_sheet_csv_url(sheet_url)
+        timeout = aiohttp.ClientTimeout(total=max(15, self.settings.http_timeout_seconds))
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(export_url, headers={"Accept": "text/csv"}) as response:
+                response.raise_for_status()
+                return parse_store_inventory_csv(await response.read())
+
+    async def sync_trade_store(self, store: dict, force: bool = False) -> tuple[bool, str]:
+        thread_id = int(store["thread_id"])
+        try:
+            inventory = await self.fetch_trade_store_inventory(str(store["sheet_url"]))
+            now = int(discord.utils.utcnow().timestamp())
+            changed = inventory.content_hash != store.get("content_hash")
+            if changed or force:
+                channel = self.get_channel(thread_id) or await self.fetch_channel(thread_id)
+                if not isinstance(channel, discord.Thread):
+                    raise RuntimeError("The store forum post no longer exists.")
+                message = await channel.fetch_message(int(store["message_id"]))
+                await message.edit(
+                    content=build_trade_store_content(store),
+                    embed=build_trade_store_embed(store, inventory.items, now),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+                )
+            await self.cache.update_trade_store_sync(
+                thread_id,
+                content_hash=inventory.content_hash,
+                last_synced_at=now,
+                last_error=None,
+            )
+            return True, f"Synchronized {len(inventory.items)} inventory item(s)."
+        except (discord.NotFound, discord.Forbidden):
+            await self.cache.update_trade_store_sync(
+                thread_id,
+                content_hash=store.get("content_hash"),
+                last_synced_at=store.get("last_synced_at"),
+                last_error="The store forum post is missing or inaccessible.",
+                active=False,
+            )
+            return False, "The store forum post is missing or inaccessible."
+        except Exception as exc:
+            message = str(exc).strip() or type(exc).__name__
+            await self.cache.update_trade_store_sync(
+                thread_id,
+                content_hash=store.get("content_hash"),
+                last_synced_at=store.get("last_synced_at"),
+                last_error=message[:500],
+            )
+            logging.warning("Store sync failed for thread %s: %s", thread_id, message)
+            return False, message[:500]
 
     async def on_guild_channel_update(self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel) -> None:
         changes = []
@@ -2440,6 +2586,8 @@ class GameAssistBot(commands.Bot):
             self._hub_recovery_task.cancel()
         if self._website_deployment_task:
             self._website_deployment_task.cancel()
+        if self._trade_store_sync_task:
+            self._trade_store_sync_task.cancel()
         await self.sources.close()
         await self.cache.close()
         await super().close()
@@ -4217,6 +4365,136 @@ async def trade_listing_item_autocomplete(
         return []
     results = await bot.sources.lookup_inventory_items(current, limit=25)
     return [app_commands.Choice(name=result.name[:100], value=result.name[:100]) for result in results[:25]]
+
+
+@trade_group.command(name="store", description="Create an automatically synchronized Google Sheets store.")
+@app_commands.describe(
+    name="Store name shown in the trading forum.",
+    description="Brief description of what the store sells.",
+    sheet_url="View-only Google Sheets sharing link.",
+    location="Optional default in-game meetup location.",
+    availability="Optional schedule or fulfillment information.",
+)
+async def trade_store_command(
+    interaction: discord.Interaction,
+    name: str,
+    description: str,
+    sheet_url: str,
+    location: str | None = None,
+    availability: str | None = None,
+) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    if not name.strip() or len(name.strip()) > 100:
+        await interaction.followup.send("Store names must be between 1 and 100 characters.", ephemeral=True)
+        return
+    if not description.strip() or len(description.strip()) > 1500:
+        await interaction.followup.send("Store descriptions must be between 1 and 1,500 characters.", ephemeral=True)
+        return
+    try:
+        google_sheet_csv_url(sheet_url)
+        inventory = await bot.fetch_trade_store_inventory(sheet_url)
+    except (ValueError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
+        await interaction.followup.send(f"I couldn't import that Google Sheet: {exc}", ephemeral=True)
+        return
+
+    forum = bot.get_channel(bot.settings.trading_forum_channel_id or 0)
+    if not isinstance(forum, discord.ForumChannel):
+        try:
+            forum = await bot.fetch_channel(bot.settings.trading_forum_channel_id or 0)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            forum = None
+    if not isinstance(forum, discord.ForumChannel):
+        await interaction.followup.send("The trading forum is currently unavailable.", ephemeral=True)
+        return
+    tag = discord.utils.find(lambda item: item.name.casefold() == TRADING_STORE_TAG.casefold(), forum.available_tags)
+    if tag is None:
+        await bot.ensure_trading_forum()
+        refreshed = await bot.fetch_channel(forum.id)
+        if isinstance(refreshed, discord.ForumChannel):
+            forum = refreshed
+        tag = discord.utils.find(lambda item: item.name.casefold() == TRADING_STORE_TAG.casefold(), forum.available_tags)
+    if tag is None:
+        await interaction.followup.send("The STORE forum tag is currently unavailable.", ephemeral=True)
+        return
+
+    now = int(discord.utils.utcnow().timestamp())
+    store = {
+        "owner_id": interaction.user.id,
+        "store_name": name.strip(),
+        "description": description.strip(),
+        "sheet_url": sheet_url.strip(),
+        "location": (location or "").strip() or None,
+        "availability": (availability or "").strip() or None,
+    }
+    created = await forum.create_thread(
+        name=f"STORE · {store['store_name']}"[:100],
+        content=build_trade_store_content(store),
+        embed=build_trade_store_embed(store, inventory.items, now),
+        applied_tags=[tag],
+        auto_archive_duration=10080,
+        allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
+        reason=f"Google Sheets store created by {interaction.user} ({interaction.user.id})",
+    )
+    await bot.cache.save_trade_store(
+        {
+            **store,
+            "thread_id": created.thread.id,
+            "message_id": created.message.id,
+            "content_hash": inventory.content_hash,
+            "last_synced_at": now,
+            "last_error": None,
+        }
+    )
+    await interaction.followup.send(
+        f"Created {created.thread.mention} with {len(inventory.items):,} imported item(s). "
+        "The inventory will be checked automatically every 15 minutes.",
+        ephemeral=True,
+    )
+
+
+@trade_group.command(name="store-refresh", description="Refresh one of your Google Sheets store listings now.")
+@app_commands.describe(store="Choose one of your active stores.")
+async def trade_store_refresh_command(interaction: discord.Interaction, store: str) -> None:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        await interaction.response.send_message("Bot is not fully initialized.", ephemeral=True)
+        return
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    try:
+        thread_id = int(store)
+    except ValueError:
+        await interaction.followup.send("Choose a store from autocomplete.", ephemeral=True)
+        return
+    record = await bot.cache.trade_store(thread_id)
+    if record is None:
+        await interaction.followup.send("That active store could not be found.", ephemeral=True)
+        return
+    if int(record["owner_id"]) != interaction.user.id and not _can_manage_admin_commands(interaction, bot.settings):
+        await interaction.followup.send("Only the store owner or a Bot Manager can refresh this store.", ephemeral=True)
+        return
+    success, message = await bot.sync_trade_store(record, force=True)
+    await interaction.followup.send(("✅ " if success else "⚠️ ") + message, ephemeral=True)
+
+
+@trade_store_refresh_command.autocomplete("store")
+async def trade_store_refresh_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    bot = interaction.client
+    if not isinstance(bot, GameAssistBot):
+        return []
+    stores = await bot.cache.trade_stores(owner_id=interaction.user.id)
+    normalized = current.strip().casefold()
+    matches = [store for store in stores if not normalized or normalized in str(store["store_name"]).casefold()]
+    return [
+        app_commands.Choice(name=str(store["store_name"])[:100], value=str(store["thread_id"]))
+        for store in matches[:25]
+    ]
 
 
 @trade_group.command(name="routing", description="Find Star Citizen trade route candidates from UEX.")

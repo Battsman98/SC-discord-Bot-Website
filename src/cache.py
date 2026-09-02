@@ -296,6 +296,29 @@ class SQLiteCache:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_inventory_scan_diagnostics_expiry ON inventory_scan_diagnostics(expires_at)"
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS trade_store_listings (
+                thread_id INTEGER PRIMARY KEY,
+                message_id INTEGER NOT NULL,
+                owner_id INTEGER NOT NULL,
+                store_name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                sheet_url TEXT NOT NULL,
+                location TEXT,
+                availability TEXT,
+                content_hash TEXT,
+                last_synced_at INTEGER,
+                last_error TEXT,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_trade_stores_owner_active ON trade_store_listings(owner_id, active, updated_at)"
+        )
         cls._ensure_column(connection, "user_ships", "image_url", "TEXT")
         cls._ensure_column(connection, "user_ships", "notes", "TEXT")
         cls._ensure_column(connection, "user_ships", "loaner_for", "TEXT")
@@ -1419,6 +1442,85 @@ class SQLiteCache:
         )
         self._connection.commit()
         return cursor.rowcount > 0
+
+    async def save_trade_store(self, values: dict[str, Any]) -> None:
+        now = int(time.time())
+        self._connection.execute(
+            """
+            INSERT INTO trade_store_listings (
+                thread_id, message_id, owner_id, store_name, description, sheet_url,
+                location, availability, content_hash, last_synced_at, last_error,
+                active, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+            ON CONFLICT(thread_id) DO UPDATE SET
+                message_id = excluded.message_id,
+                owner_id = excluded.owner_id,
+                store_name = excluded.store_name,
+                description = excluded.description,
+                sheet_url = excluded.sheet_url,
+                location = excluded.location,
+                availability = excluded.availability,
+                content_hash = excluded.content_hash,
+                last_synced_at = excluded.last_synced_at,
+                last_error = excluded.last_error,
+                active = 1,
+                updated_at = excluded.updated_at
+            """,
+            (
+                values["thread_id"], values["message_id"], values["owner_id"],
+                values["store_name"], values["description"], values["sheet_url"],
+                values.get("location"), values.get("availability"), values.get("content_hash"),
+                values.get("last_synced_at"), values.get("last_error"), now, now,
+            ),
+        )
+        self._connection.commit()
+
+    async def trade_stores(self, owner_id: int | None = None) -> list[dict[str, Any]]:
+        where = "WHERE active = 1"
+        parameters: tuple[Any, ...] = ()
+        if owner_id is not None:
+            where += " AND owner_id = ?"
+            parameters = (owner_id,)
+        rows = self._connection.execute(
+            f"""
+            SELECT thread_id, message_id, owner_id, store_name, description, sheet_url,
+                   location, availability, content_hash, last_synced_at, last_error,
+                   active, created_at, updated_at
+            FROM trade_store_listings
+            {where}
+            ORDER BY updated_at DESC
+            """,
+            parameters,
+        ).fetchall()
+        keys = (
+            "thread_id", "message_id", "owner_id", "store_name", "description", "sheet_url",
+            "location", "availability", "content_hash", "last_synced_at", "last_error",
+            "active", "created_at", "updated_at",
+        )
+        return [dict(zip(keys, row)) for row in rows]
+
+    async def trade_store(self, thread_id: int) -> dict[str, Any] | None:
+        stores = await self.trade_stores()
+        return next((store for store in stores if int(store["thread_id"]) == int(thread_id)), None)
+
+    async def update_trade_store_sync(
+        self,
+        thread_id: int,
+        *,
+        content_hash: str | None,
+        last_synced_at: int | None,
+        last_error: str | None,
+        active: bool = True,
+    ) -> None:
+        self._connection.execute(
+            """
+            UPDATE trade_store_listings
+            SET content_hash = ?, last_synced_at = ?, last_error = ?, active = ?, updated_at = ?
+            WHERE thread_id = ?
+            """,
+            (content_hash, last_synced_at, last_error, int(active), int(time.time()), thread_id),
+        )
+        self._connection.commit()
 
     async def close(self) -> None:
         self._connection.close()
