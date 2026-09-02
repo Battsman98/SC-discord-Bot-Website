@@ -305,6 +305,7 @@ class SQLiteCache:
                 store_name TEXT NOT NULL,
                 description TEXT NOT NULL,
                 sheet_url TEXT NOT NULL,
+                source_type TEXT NOT NULL DEFAULT 'google_sheet',
                 location TEXT,
                 availability TEXT,
                 content_hash TEXT,
@@ -319,6 +320,7 @@ class SQLiteCache:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_trade_stores_owner_active ON trade_store_listings(owner_id, active, updated_at)"
         )
+        cls._ensure_column(connection, "trade_store_listings", "source_type", "TEXT NOT NULL DEFAULT 'google_sheet'")
         cls._ensure_column(connection, "user_ships", "image_url", "TEXT")
         cls._ensure_column(connection, "user_ships", "notes", "TEXT")
         cls._ensure_column(connection, "user_ships", "loaner_for", "TEXT")
@@ -1448,16 +1450,17 @@ class SQLiteCache:
         self._connection.execute(
             """
             INSERT INTO trade_store_listings (
-                thread_id, message_id, owner_id, store_name, description, sheet_url,
+                thread_id, message_id, owner_id, store_name, description, sheet_url, source_type,
                 location, availability, content_hash, last_synced_at, last_error,
                 active, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
             ON CONFLICT(thread_id) DO UPDATE SET
                 message_id = excluded.message_id,
                 owner_id = excluded.owner_id,
                 store_name = excluded.store_name,
                 description = excluded.description,
                 sheet_url = excluded.sheet_url,
+                source_type = excluded.source_type,
                 location = excluded.location,
                 availability = excluded.availability,
                 content_hash = excluded.content_hash,
@@ -1468,7 +1471,7 @@ class SQLiteCache:
             """,
             (
                 values["thread_id"], values["message_id"], values["owner_id"],
-                values["store_name"], values["description"], values["sheet_url"],
+                values["store_name"], values["description"], values["sheet_url"], values.get("source_type", "google_sheet"),
                 values.get("location"), values.get("availability"), values.get("content_hash"),
                 values.get("last_synced_at"), values.get("last_error"), now, now,
             ),
@@ -1483,7 +1486,7 @@ class SQLiteCache:
             parameters = (owner_id,)
         rows = self._connection.execute(
             f"""
-            SELECT thread_id, message_id, owner_id, store_name, description, sheet_url,
+            SELECT thread_id, message_id, owner_id, store_name, description, sheet_url, source_type,
                    location, availability, content_hash, last_synced_at, last_error,
                    active, created_at, updated_at
             FROM trade_store_listings
@@ -1493,7 +1496,7 @@ class SQLiteCache:
             parameters,
         ).fetchall()
         keys = (
-            "thread_id", "message_id", "owner_id", "store_name", "description", "sheet_url",
+            "thread_id", "message_id", "owner_id", "store_name", "description", "sheet_url", "source_type",
             "location", "availability", "content_hash", "last_synced_at", "last_error",
             "active", "created_at", "updated_at",
         )

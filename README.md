@@ -47,7 +47,7 @@ not part of the update process.
 - `/trade routing` calculates UEX-based circular trade route candidates.
 - The configured trading forum automatically requires WTS, WTB, or WTT and adds Wiki item details and imagery to new listings.
 - `/trade listing` provides catalog-backed item-name suggestions and creates the correctly named forum listing with its tag and aUEC price.
-- `/trade store` imports a view-only Google Sheet into a STORE forum post; inventory changes synchronize automatically every 15 minutes and `/trade store-refresh` performs an immediate owner refresh.
+- `/trade store` imports either a view-only Google Sheet or an Inventory Scanner `.xlsx` export into a STORE forum post. Google Sheets synchronize once daily (or immediately with `/trade store-refresh`); uploaded workbooks preserve scanner quantities and selling costs as a snapshot.
 - `/exec` shows the Executive Hangar clock.
 - `/execset` corrects the Executive Hangar clock for approved users.
 - `/execclear` clears an Executive Hangar manual override.

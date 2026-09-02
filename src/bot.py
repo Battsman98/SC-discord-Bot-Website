@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import io
 import os
 import re
 import time
@@ -41,7 +42,7 @@ from src.timers import (
     calculate_exec_hangar_status,
     fetch_exec_cycle_start_unix,
 )
-from src.trade_stores import ParsedStoreInventory, StoreInventoryItem, google_sheet_csv_url, parse_store_inventory_csv
+from src.trade_stores import ParsedStoreInventory, StoreInventoryItem, google_sheet_csv_url, parse_store_inventory_csv, parse_store_inventory_xlsx
 
 
 EXEC_OVERRIDE_CACHE_KEY = "exec:cycle-start-override"
@@ -111,7 +112,7 @@ TRADING_FORUM_TOPIC = "Trade in-game items. Select WTS, WTB, or WTT; use the ite
 TRADING_FORUM_TAGS = ("WTS", "WTB", "WTT")
 TRADING_GUIDE_TAG = "GUIDE"
 TRADING_STORE_TAG = "STORE"
-TRADE_STORE_SYNC_INTERVAL_SECONDS = 15 * 60
+TRADE_STORE_SYNC_INTERVAL_SECONDS = 24 * 60 * 60
 HUB_PROTECTED_ROLE_NAMES = {VISITOR_ROLE_NAME, BOT_MANAGER_ROLE_NAME}
 HUB_RECOVERY_COOLDOWN_SECONDS = 10
 HUB_PERMANENT_MESSAGE_PREFIXES = (
@@ -313,6 +314,8 @@ def _trade_seller_terms(content: str) -> str | None:
 
 
 def build_trade_store_content(store: dict) -> str:
+    uploaded = store.get("source_type") == "inventory_workbook"
+    inventory_label = "Download the uploaded inventory workbook" if uploaded else "Open the live Google Sheet"
     lines = [
         f"# {str(store['store_name'])[:100]}",
         "",
@@ -324,7 +327,7 @@ def build_trade_store_content(store: dict) -> str:
         lines.append(f"**Default meetup:** {str(store['location'])[:300]}")
     if store.get("availability"):
         lines.append(f"**Availability:** {str(store['availability'])[:300]}")
-    lines.extend(("", f"[Open the live Google Sheet]({store['sheet_url']})"))
+    lines.extend(("", f"[{inventory_label}]({store['sheet_url']})"))
     return "\n".join(lines)
 
 
@@ -333,13 +336,15 @@ def build_trade_store_embed(
     items: list[StoreInventoryItem],
     synced_at: int,
 ) -> discord.Embed:
+    uploaded = store.get("source_type") == "inventory_workbook"
+    inventory_label = "Download inventory workbook" if uploaded else "Open live inventory"
     embed = discord.Embed(
         title=str(store["store_name"])[:256],
         url=str(store["sheet_url"]),
         description=(
             f"{str(store['description'])[:1200]}\n\n"
             f"**{len(items):,} item{'s' if len(items) != 1 else ''} available** · "
-            "[Open live inventory]({})".format(store["sheet_url"])
+            f"[{inventory_label}]({store['sheet_url']})"
         ),
         color=discord.Color.from_rgb(155, 89, 182),
     )
@@ -354,6 +359,8 @@ def build_trade_store_embed(
                 details.append(f"Qty {item.quantity}")
             if item.quality:
                 details.append(f"Quality {item.quality}")
+            if item.location:
+                details.append(item.location)
             line = f"• **{item.name}**"
             if details:
                 line += f" — {' · '.join(details)}"
@@ -366,16 +373,18 @@ def build_trade_store_embed(
             inline=False,
         )
     if len(items) > 15:
+        source_name = "uploaded workbook" if uploaded else "Google Sheet"
         embed.add_field(
             name="Complete inventory",
-            value=f"{len(items) - 15:,} more item(s) are available in the [Google Sheet]({store['sheet_url']}).",
+            value=f"{len(items) - 15:,} more item(s) are available in the [{source_name}]({store['sheet_url']}).",
             inline=False,
         )
     if store.get("location"):
         embed.add_field(name="Default meetup", value=str(store["location"])[:1024], inline=True)
     if store.get("availability"):
         embed.add_field(name="Availability", value=str(store["availability"])[:1024], inline=True)
-    embed.set_footer(text=f"Google Sheets inventory · Last inventory update <t:{synced_at}:R>")
+    source_name = "Uploaded Inventory Scanner workbook" if uploaded else "Google Sheets inventory"
+    embed.set_footer(text=f"{source_name} · Inventory timestamp {synced_at}")
     return embed
 
 
@@ -752,8 +761,12 @@ class GameAssistBot(commands.Bot):
     async def _trade_store_sync_loop(self) -> None:
         while not self.is_closed():
             try:
+                now = int(discord.utils.utcnow().timestamp())
                 for store in await self.cache.trade_stores():
-                    await self.sync_trade_store(store)
+                    if store.get("source_type") != "google_sheet":
+                        continue
+                    if now - int(store.get("last_synced_at") or 0) >= TRADE_STORE_SYNC_INTERVAL_SECONDS:
+                        await self.sync_trade_store(store)
             except Exception:
                 logging.exception("Trading store synchronization cycle failed")
             await asyncio.sleep(TRADE_STORE_SYNC_INTERVAL_SECONDS)
@@ -1397,6 +1410,8 @@ class GameAssistBot(commands.Bot):
 
     async def sync_trade_store(self, store: dict, force: bool = False) -> tuple[bool, str]:
         thread_id = int(store["thread_id"])
+        if store.get("source_type") == "inventory_workbook":
+            return False, "Uploaded inventory workbooks are snapshots. Upload a new workbook to publish updated inventory."
         try:
             inventory = await self.fetch_trade_store_inventory(str(store["sheet_url"]))
             now = int(discord.utils.utcnow().timestamp())
@@ -4367,11 +4382,12 @@ async def trade_listing_item_autocomplete(
     return [app_commands.Choice(name=result.name[:100], value=result.name[:100]) for result in results[:25]]
 
 
-@trade_group.command(name="store", description="Create an automatically synchronized Google Sheets store.")
+@trade_group.command(name="store", description="Create a store from Google Sheets or an Inventory Scanner workbook.")
 @app_commands.describe(
     name="Store name shown in the trading forum.",
     description="Brief description of what the store sells.",
-    sheet_url="View-only Google Sheets sharing link.",
+    sheet_url="View-only Google Sheets link (choose this or inventory_file).",
+    inventory_file="Inventory Scanner .xlsx export (choose this or sheet_url).",
     location="Optional default in-game meetup location.",
     availability="Optional schedule or fulfillment information.",
 )
@@ -4379,7 +4395,8 @@ async def trade_store_command(
     interaction: discord.Interaction,
     name: str,
     description: str,
-    sheet_url: str,
+    sheet_url: str | None = None,
+    inventory_file: discord.Attachment | None = None,
     location: str | None = None,
     availability: str | None = None,
 ) -> None:
@@ -4394,11 +4411,25 @@ async def trade_store_command(
     if not description.strip() or len(description.strip()) > 1500:
         await interaction.followup.send("Store descriptions must be between 1 and 1,500 characters.", ephemeral=True)
         return
+    if bool(sheet_url) == bool(inventory_file):
+        await interaction.followup.send("Provide exactly one inventory source: a Google Sheets link or an Inventory Scanner .xlsx file.", ephemeral=True)
+        return
+    upload_data: bytes | None = None
+    source_type = "google_sheet"
     try:
-        google_sheet_csv_url(sheet_url)
-        inventory = await bot.fetch_trade_store_inventory(sheet_url)
+        if inventory_file:
+            if not inventory_file.filename.casefold().endswith(".xlsx"):
+                raise ValueError("Inventory Scanner uploads must be .xlsx files.")
+            upload_data = await inventory_file.read()
+            inventory = parse_store_inventory_xlsx(upload_data)
+            source_type = "inventory_workbook"
+            source_url = inventory_file.url
+        else:
+            source_url = str(sheet_url).strip()
+            google_sheet_csv_url(source_url)
+            inventory = await bot.fetch_trade_store_inventory(source_url)
     except (ValueError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
-        await interaction.followup.send(f"I couldn't import that Google Sheet: {exc}", ephemeral=True)
+        await interaction.followup.send(f"I couldn't import that inventory: {exc}", ephemeral=True)
         return
 
     forum = bot.get_channel(bot.settings.trading_forum_channel_id or 0)
@@ -4426,19 +4457,26 @@ async def trade_store_command(
         "owner_id": interaction.user.id,
         "store_name": name.strip(),
         "description": description.strip(),
-        "sheet_url": sheet_url.strip(),
+        "sheet_url": source_url,
+        "source_type": source_type,
         "location": (location or "").strip() or None,
         "availability": (availability or "").strip() or None,
     }
-    created = await forum.create_thread(
+    create_options = dict(
         name=f"STORE · {store['store_name']}"[:100],
         content=build_trade_store_content(store),
         embed=build_trade_store_embed(store, inventory.items, now),
         applied_tags=[tag],
         auto_archive_duration=10080,
         allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
-        reason=f"Google Sheets store created by {interaction.user} ({interaction.user.id})",
+        reason=f"Trading store created by {interaction.user} ({interaction.user.id})",
     )
+    if upload_data is not None and inventory_file is not None:
+        create_options["file"] = discord.File(io.BytesIO(upload_data), filename=inventory_file.filename[:100])
+    created = await forum.create_thread(**create_options)
+    if upload_data is not None and created.message.attachments:
+        store["sheet_url"] = created.message.attachments[0].url
+        await created.message.edit(content=build_trade_store_content(store), embed=build_trade_store_embed(store, inventory.items, now))
     await bot.cache.save_trade_store(
         {
             **store,
@@ -4451,7 +4489,7 @@ async def trade_store_command(
     )
     await interaction.followup.send(
         f"Created {created.thread.mention} with {len(inventory.items):,} imported item(s). "
-        "The inventory will be checked automatically every 15 minutes.",
+        + ("This uploaded workbook is a snapshot; upload a new workbook when the inventory changes." if source_type == "inventory_workbook" else "The Google Sheet will be checked automatically once per day."),
         ephemeral=True,
     )
 

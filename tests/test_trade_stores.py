@@ -1,10 +1,13 @@
 import asyncio
+import io
 
 import pytest
 
 from src.bot import build_trade_store_embed
 from src.cache import SQLiteCache
-from src.trade_stores import google_sheet_csv_url, parse_store_inventory_csv
+from openpyxl import Workbook
+
+from src.trade_stores import google_sheet_csv_url, parse_store_inventory_csv, parse_store_inventory_xlsx
 
 
 def test_google_sheet_url_converts_to_csv_export() -> None:
@@ -36,6 +39,29 @@ def test_parse_store_inventory_supports_common_headers() -> None:
     assert len(parsed.content_hash) == 64
 
 
+def test_parse_inventory_scanner_workbook_uses_selling_costs() -> None:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append([
+        "Location", "Category", "Item Type", "Quantity", "Name", "Size", "Quality",
+        "Volume SCU", "Notes", "Average UEX Terminal Sell Price (aUEC)",
+        "Average UEX Player Seller Price (aUEC)", "Price Source",
+        "Estimated Sell Total (aUEC)",
+    ])
+    sheet.append(["Area18", "Weapons", "Rifle", 2, "FS-9 LMG", 4, 800, None, "Crafted", 1000, 1250, "UEX", 2500])
+    sheet.append(["Lorville", "Armor", "Helmet", 1, "Test Helmet", 2, None, None, None, 500, None, "UEX", 500])
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+
+    parsed = parse_store_inventory_xlsx(buffer.getvalue())
+
+    assert parsed.items[0].price == "1250"
+    assert parsed.items[0].quantity == "2"
+    assert parsed.items[0].location == "Area18"
+    assert parsed.items[0].category == "Weapons"
+    assert parsed.items[1].price == "500"
+
+
 def test_store_embed_previews_inventory() -> None:
     parsed = parse_store_inventory_csv(b"Item Name,Price,Quantity\nFS-9 LMG,500000,1\n")
     store = {
@@ -65,6 +91,7 @@ def test_trade_store_records_are_persistent(tmp_path) -> None:
                 "store_name": "Test Store",
                 "description": "Test inventory",
                 "sheet_url": "https://docs.google.com/spreadsheets/d/test/edit",
+                "source_type": "google_sheet",
                 "location": "Area18",
                 "availability": "Weekends",
                 "content_hash": "abc",
@@ -77,6 +104,7 @@ def test_trade_store_records_are_persistent(tmp_path) -> None:
         assert len(stores) == 1
         assert stores[0]["store_name"] == "Test Store"
         assert stores[0]["content_hash"] == "abc"
+        assert stores[0]["source_type"] == "google_sheet"
         await cache.close()
 
     asyncio.run(run())
